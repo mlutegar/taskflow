@@ -233,3 +233,13 @@
   font-size: 14px;
   margin-top: 1px;
 }
+
+/* ── Mobile ───────────────────────────────────────────── */
+@media (max-width: 520px) {
+  .cardToggle { padding: 12px; gap: 10px; }
+  .cardEmoji { font-size: 18px; width: 24px; }
+  .cardName { font-size: 13px; }
+  .startBtn { margin: 0 8px; padding: 6px 10px; font-size: 11px; }
+  .cardBody { padding: 12px 14px 14px; gap: 12px; }
+  .subtitle { font-size: 12px; }
+}
