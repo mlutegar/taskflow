@@ -1,0 +1,235 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: 600px;
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Card ──────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.18s;
+}
+
+.card:hover {
+  border-color: color-mix(in srgb, var(--mode-color) 35%, var(--border) 65%);
+}
+
+.cardOpen {
+  border-color: color-mix(in srgb, var(--mode-color) 50%, var(--border) 50%);
+}
+
+/* ── Card Header row ───────────────────────────────────── */
+.cardHeader {
+  display: flex;
+  align-items: stretch;
+}
+
+.cardOpen .cardHeader {
+  border-bottom: 1px solid color-mix(in srgb, var(--mode-color) 20%, var(--border) 80%);
+}
+
+/* Toggle button (left most of the header) */
+.cardToggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 16px;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  transition: background 0.14s;
+  min-width: 0;
+}
+
+.cardToggle:hover,
+.cardOpen .cardToggle {
+  background: var(--mode-bg, rgba(124,110,245,0.06));
+}
+
+.cardEmoji {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+}
+
+.cardMeta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cardName {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+}
+
+.cardTagline {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.chevron {
+  font-size: 18px;
+  color: var(--text-muted);
+  line-height: 1;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, color 0.14s;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+  color: var(--mode-color);
+}
+
+/* Start button */
+.startBtn {
+  flex-shrink: 0;
+  align-self: center;
+  margin: 0 12px;
+  padding: 6px 14px;
+  background: var(--mode-color);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: opacity 0.14s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.startBtn:hover { opacity: 0.88; }
+.startBtn:active { transform: scale(0.96); }
+
+/* ── Card Body ─────────────────────────────────────────── */
+.cardBody {
+  padding: 15px 18px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  animation: fadeSlide 0.16s ease;
+}
+
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Section ───────────────────────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mode-color);
+}
+
+/* ── Steps ─────────────────────────────────────────────── */
+.stepList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.stepItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.stepNum {
+  flex-shrink: 0;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 2px;
+}
+
+/* ── RPG Classes ───────────────────────────────────────── */
+.classesList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.classItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--cls-color);
+}
+
+.classEmoji { font-size: 17px; flex-shrink: 0; }
+.classItem > div { display: flex; flex-direction: column; gap: 1px; }
+.className { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.classDesc { font-size: 11.5px; color: var(--text-muted); }
+
+/* ── Tip ───────────────────────────────────────────────── */
+.tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  background: rgba(124,110,245,0.05);
+  border: 1px solid rgba(124,110,245,0.13);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.tipIcon {
+  flex-shrink: 0;
+  font-size: 14px;
+  margin-top: 1px;
+}

@@ -1,0 +1,27 @@
+{
+  "character": {
+    "name": "Mlut",
+    "class": "warrior",
+    "level": 1,
+    "xp": 0,
+    "created_at": "2026-04-14T16:35:32.859142",
+    "total_tasks": 0,
+    "total_focus_time": 0,
+    "consecutive_tasks": 0,
+    "max_consecutive": 0
+  },
+  "stats": {
+    "warrior": {
+      "skills_used": {
+        "🔙 Voltar": 1
+      },
+      "special_abilities_activated": 1
+    }
+  },
+  "achievements": [],
+  "skills_unlocked": [
+    "Berserker Rage"
+  ],
+  "history": [],
+  "last_played": "2026-04-14T16:46:01.461613"
+}

@@ -1,0 +1,358 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.card:hover { border-color: #3a3a50; }
+.done { opacity: 0.6; }
+
+.main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.checkBtn {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.checkBtn:not(:disabled):hover { border-color: var(--success); }
+
+.checkDone {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--bg);
+  cursor: default;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.done .title { text-decoration: line-through; color: var(--text-muted); }
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.badgeDone { background: rgba(78,204,163,0.15); color: var(--success); }
+.badgePending { background: rgba(124,110,245,0.12); color: var(--accent); }
+
+/* Progress bar */
+.progressWrap {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progressBar {
+  height: 5px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progressLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.card:hover .actions { opacity: 1; }
+
+.actionBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.actionBtn:hover { background: var(--surface-2); }
+.deleteBtn:hover { background: rgba(224,82,82,0.15); }
+.uncompleteBtn { color: var(--text-muted); }
+.uncompleteBtn:hover { background: rgba(124,110,245,0.12); color: var(--accent); }
+
+/* Detail */
+.detail {
+  border-top: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.description {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* Progress form */
+.progressForm {
+  display: flex;
+  gap: 8px;
+}
+
+.progressInput {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.progressInput:focus { border-color: var(--accent); }
+
+.progressAddBtn {
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.progressAddBtn:hover:not(:disabled) { background: var(--accent-hover); }
+.progressAddBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Checklist */
+.checklist { display: flex; flex-direction: column; gap: 8px; }
+
+.checklistItem { display: flex; align-items: center; gap: 10px; }
+
+.checklistCheck {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.checklistCheck:hover { border-color: var(--success); }
+.checklistDone { background: var(--success); border-color: var(--success); color: var(--bg); }
+
+.checklistItem span { flex: 1; font-size: 13px; color: var(--text); }
+.checklistTextDone { text-decoration: line-through; color: var(--text-muted) !important; }
+
+.checklistDelete {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+}
+
+.checklistItem:hover .checklistDelete { opacity: 1; }
+.checklistDelete:hover { background: var(--surface-2); color: var(--danger); }
+
+.checklistForm { display: flex; gap: 8px; margin-top: 4px; }
+
+.checklistInput {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.checklistInput:focus { border-color: var(--accent); }
+.checklistInput::placeholder { color: var(--text-muted); }
+
+.checklistAdd {
+  background: var(--accent);
+  color: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.checklistAdd:hover:not(:disabled) { background: var(--accent-hover); }
+.checklistAdd:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Date picker row */
+.datePickerRow {
+  border-top: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: rgba(124,110,245,0.04);
+}
+
+.datePickerLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.datePickerInput {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  outline: none;
+  color-scheme: dark;
+}
+
+.datePickerInput:focus { border-color: var(--accent); }
+
+.datePickerConfirm {
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.datePickerConfirm:hover:not(:disabled) { background: var(--accent-hover); }
+.datePickerConfirm:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.datePickerCancel {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+
+.datePickerCancel:hover { color: var(--text); border-color: var(--text-muted); }
+
+.datePickerBtnActive { background: rgba(124,110,245,0.15); color: var(--accent); }
+
+/* Edit form */
+.editForm { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+
+.editInput, .editTextarea {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  outline: none;
+  width: 100%;
+}
+
+.editInput:focus, .editTextarea:focus { border-color: var(--accent); }
+.editTextarea { resize: vertical; }
+
+.editRow { display: flex; gap: 10px; }
+.editRow .editInput { flex: 1; }
+
+.editActions { display: flex; gap: 8px; }
+
+.btnSave {
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.btnSave:hover:not(:disabled) { background: var(--accent-hover); }
+.btnSave:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btnCancel {
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+
+.btnCancel:hover { color: var(--text); border-color: var(--text-muted); }

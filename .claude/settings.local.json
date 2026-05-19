@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find C:Usersmlutegeneralmast -type f -name .*)",
+      "Bash(find C:Usersmlutegeneralmast -type d -name .*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(grep:*)",
+      "Bash(routines-window *)",
+      "Bash(taskflow *)",
+      "Bash(taskkill /F /IM python.exe)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\mlute\\\\generalmast\" -Recurse -Force)",
+      "Bash(Select-Object -First 100)",
+      "Bash(Format-Table FullName, PSIsContainer)",
+      "Bash(pip list *)",
+      "Bash(npm --version)",
+      "PowerShell(New-Item *)",
+      "PowerShell(Start-Sleep -Seconds 2; Invoke-RestMethod -Uri \"http://localhost:8025/api/tasks/?status=active\" -Method Get | Select-Object -First 3 | ConvertTo-Json)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8025/api/routines/\" -Method Get | Select-Object -First 3 | ForEach-Object { \"$\\($_.title\\) | target: $\\($_.target_value\\) $\\($_.unit\\) | done: $\\($_.is_completed_today\\)\" })",
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(npx vite *)"
+    ]
+  }
+}

@@ -1,0 +1,383 @@
+/* ── Layout ─────────────────────────────────────────────── */
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.headerEmoji { font-size: 20px; line-height: 1; }
+
+.headerMeta { flex: 1; }
+
+.headerTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  display: block;
+}
+
+.headerSub {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: block;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 17px;
+  cursor: pointer;
+  padding: 4px 7px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  transition: color 0.13s, background 0.13s;
+  line-height: 1;
+}
+.closeBtn:hover { color: var(--text); background: var(--surface-2); }
+
+.body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Prompt box ─────────────────────────────────────────── */
+.promptBox {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.promptTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.promptText {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── Steps ──────────────────────────────────────────────── */
+.stepList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.stepItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.stepNum {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+/* ── Cycle badge ────────────────────────────────────────── */
+.cycleBadge {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 6px;
+  background: rgba(124,110,245,0.12);
+  border: 1px solid rgba(124,110,245,0.25);
+  color: var(--accent);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Info pill ──────────────────────────────────────────── */
+.infoPill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: rgba(124,110,245,0.07);
+  border: 1px solid rgba(124,110,245,0.18);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+/* ── Task display ───────────────────────────────────────── */
+.taskDisplay {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.taskName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.taskMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Buttons ────────────────────────────────────────────── */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.actionsRow {
+  display: flex;
+  gap: 8px;
+}
+.actionsRow .btn { flex: 1; }
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: all 0.14s;
+  width: 100%;
+  line-height: 1;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btnPrimary { background: var(--accent); color: #fff; }
+.btnPrimary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btnSuccess { background: var(--success); color: var(--bg); }
+.btnSuccess:hover:not(:disabled) { background: #3db892; }
+
+.btnSecondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btnSecondary:hover:not(:disabled) { background: #2a2a38; border-color: #4a4a60; }
+
+.btnDanger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid rgba(224,82,82,0.25);
+}
+.btnDanger:hover:not(:disabled) { background: rgba(224,82,82,0.08); }
+
+/* ── Summary ────────────────────────────────────────────── */
+.summaryBox {
+  text-align: center;
+  padding: 16px 0 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.summaryEmoji { font-size: 42px; line-height: 1; }
+
+.summaryTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.summaryText {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── Stats ──────────────────────────────────────────────── */
+.statRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.statLabel { color: var(--text-muted); }
+.statValue { color: var(--text); font-weight: 600; }
+
+/* ── XP bar ─────────────────────────────────────────────── */
+.xpBar {
+  background: var(--surface-2);
+  border-radius: 4px;
+  height: 7px;
+  overflow: hidden;
+}
+.xpFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.6s ease;
+  min-width: 2px;
+}
+
+/* ── Input ──────────────────────────────────────────────── */
+.input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.14s;
+}
+.input:focus { border-color: var(--accent); }
+
+/* ── Class selector (RPG) ───────────────────────────────── */
+.classGrid { display: flex; flex-direction: column; gap: 8px; }
+
+.classCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: all 0.14s;
+  width: 100%;
+}
+.classCard:hover { border-color: var(--accent); background: rgba(124,110,245,0.06); }
+.classCardSelected { border-color: var(--accent) !important; background: rgba(124,110,245,0.1) !important; }
+
+.classEmoji { font-size: 24px; line-height: 1; }
+.classInfo { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.className { font-size: 13px; font-weight: 700; color: var(--text); }
+.classDesc { font-size: 12px; color: var(--text-muted); }
+.classFocus { font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 1px; }
+
+/* ── Difficulty grid (RPG) ──────────────────────────────── */
+.diffGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.diffBtn {
+  padding: 11px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: inherit;
+  text-align: center;
+  transition: all 0.14s;
+  line-height: 1.5;
+}
+.diffBtn:hover { color: var(--text); border-color: var(--accent); background: rgba(124,110,245,0.07); }
+
+/* ── Activity list (Splite / LazyFalcon) ───────────────── */
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.activityItem {
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: all 0.13s;
+}
+.activityItem:hover { border-color: var(--accent); color: var(--text); background: rgba(124,110,245,0.07); }
+
+/* ── Saved tasks (LazyFalcon) ───────────────────────────── */
+.savedTaskList { display: flex; flex-direction: column; gap: 5px; }
+
+.savedTask {
+  padding: 9px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.savedTaskTitle { font-size: 13px; font-weight: 500; color: var(--text); }
+.savedTaskMeta { font-size: 11px; color: var(--text-muted); }
+
+/* ── Section label ──────────────────────────────────────── */
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2px 0;
+}

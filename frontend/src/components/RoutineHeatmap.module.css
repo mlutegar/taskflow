@@ -1,0 +1,97 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.routineTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.85rem;
+}
+
+.heatmapScroll {
+  overflow-x: auto;
+  margin-bottom: 0.6rem;
+}
+
+.heatmapOuter {
+  width: fit-content;
+}
+
+.monthRow {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+
+.monthCell {
+  width: 13px;
+  height: 12px;
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.heatmapGrid {
+  display: flex;
+  gap: 3px;
+}
+
+.heatmapCol {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cell {
+  width: 13px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--surface-2);
+}
+
+.cellEmpty {
+  background: transparent;
+}
+
+.cellDone {
+  background: var(--success);
+}
+
+.cellToday {
+  outline: 2px solid var(--text-muted);
+  outline-offset: -1px;
+}
+
+.cell:not(.cellEmpty):hover {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem 1.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  padding-top: 0.65rem;
+  margin-top: 0.1rem;
+}
+
+.stats strong {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.empty {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}

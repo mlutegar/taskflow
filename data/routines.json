@@ -1,0 +1,65 @@
+[
+  {
+    "id": "bf94a5e1-b77f-4841-afbf-78e6c6bb2a6d",
+    "title": "Beber 4,5L de água",
+    "description": null,
+    "target_value": 4.5,
+    "unit": "L",
+    "checklist": [],
+    "last_completed_date": null,
+    "current_progress": 0.3,
+    "created_at": "2026-04-05T21:38:17.268405",
+    "completion_history": []
+  },
+  {
+    "id": "4258a3d8-8443-4bea-9d8c-770f12657d43",
+    "title": "Skin Care Martinal",
+    "description": null,
+    "target_value": null,
+    "unit": null,
+    "checklist": [],
+    "last_completed_date": null,
+    "current_progress": 0.0,
+    "created_at": "2026-04-07T14:42:45.185232",
+    "completion_history": []
+  },
+  {
+    "id": "ba30d6cb-cf94-4aa6-ab1b-5d54b8ac4051",
+    "title": "Skin Care Noturno",
+    "description": null,
+    "target_value": null,
+    "unit": null,
+    "checklist": [],
+    "last_completed_date": null,
+    "current_progress": 0.0,
+    "created_at": "2026-04-07T14:42:58.374686",
+    "completion_history": []
+  },
+  {
+    "id": "71cef845-00f3-453b-8ea0-ff47ed5a5bbf",
+    "title": "Fio dental",
+    "description": null,
+    "target_value": null,
+    "unit": null,
+    "checklist": [],
+    "last_completed_date": null,
+    "current_progress": 0.0,
+    "created_at": "2026-04-07T16:26:29.147387",
+    "completion_history": []
+  },
+  {
+    "id": "874029f4-d40e-45a0-9398-db75aaa11a00",
+    "title": "Lauryn Hill Albuns",
+    "description": null,
+    "target_value": null,
+    "unit": null,
+    "checklist": [],
+    "last_completed_date": "2026-05-13",
+    "current_progress": 0.0,
+    "created_at": "2026-05-11T17:34:39.295907",
+    "completion_history": [
+      "2026-05-11",
+      "2026-05-13"
+    ]
+  }
+]

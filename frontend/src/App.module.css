@@ -1,0 +1,225 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.headerInner {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: stretch;
+  gap: 0;
+  height: 54px;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 20px;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.logoIcon { font-size: 18px; line-height: 1; }
+
+.logoText {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.4px;
+}
+
+.logoText span { color: var(--accent); }
+
+/* ── Tabs ─────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  align-items: stretch;
+  padding: 0 4px;
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+
+.tab::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+
+.tab:hover { color: var(--text); }
+
+.tabActive {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tabActive::after {
+  transform: scaleX(1);
+}
+
+/* Badge pill */
+.tabBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  background: rgba(124, 110, 245, 0.18);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 9px;
+  line-height: 1;
+}
+
+.tabActive .tabBadge {
+  background: var(--accent);
+  color: #fff;
+}
+
+.tabBadgeDone {
+  background: rgba(78, 204, 163, 0.18) !important;
+  color: var(--success) !important;
+}
+
+.tabActive .tabBadgeDone {
+  background: var(--success) !important;
+  color: var(--bg) !important;
+}
+
+/* Add button */
+.addBtnWrap {
+  display: flex;
+  align-items: center;
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.addBtn:hover { background: var(--accent-hover); }
+.addBtn:active { transform: scale(0.97); }
+
+.addBtnRoutine { background: var(--success); color: var(--bg); }
+.addBtnRoutine:hover { background: #3db892; }
+
+.addBtnCancel {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.addBtnCancel:hover { background: var(--surface-2); color: var(--text); border-color: var(--text-muted); }
+
+/* ── Main ─────────────────────────────────────────────── */
+.main {
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 20px;
+  flex: 1;
+}
+
+.formWrapper { margin-bottom: 24px; }
+
+/* ── Controls ─────────────────────────────────────────── */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filters { display: flex; gap: 6px; }
+
+.filterBtn {
+  padding: 5px 13px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+
+.filterBtn:hover { color: var(--text); border-color: #4a4a60; }
+.filterActive { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.sortWrapper { display: flex; align-items: center; gap: 8px; }
+.sortLabel { font-size: 12px; color: var(--text-muted); }
+
+.sortSelect {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.sortSelect:focus { border-color: var(--accent); }
+
+.routineProgress {
+  font-size: 12px;
+  color: var(--success);
+  font-weight: 500;
+}
+
+/* ── States ───────────────────────────────────────────── */
+.loading, .error {
+  text-align: center;
+  padding: 48px;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
+.error { color: var(--danger); }

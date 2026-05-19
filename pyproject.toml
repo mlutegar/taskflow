@@ -1,0 +1,22 @@
+[project]
+name = "taskflow"
+version = "0.1.0"
+description = "CLI task manager with gamified execution modes"
+authors = [{name = "User"}]
+requires-python = ">=3.10"
+dependencies = [
+    "typer>=0.12.5",
+    "questionary>=2.0.1",
+    "rich>=13.9.2",
+]
+
+[project.scripts]
+taskflow = "taskflow.cli:main"
+routines-window = "taskflow.routines_window:main"
+
+[tool.setuptools]
+packages = ["taskflow", "taskflow.modes"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
