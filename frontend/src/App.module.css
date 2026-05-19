@@ -223,3 +223,29 @@
 }
 
 .error { color: var(--danger); }
+
+/* ── Mobile ───────────────────────────────────────────── */
+@media (max-width: 520px) {
+  .headerInner {
+    padding: 0 12px;
+    height: 50px;
+  }
+
+  .logo { padding-right: 10px; }
+  .logoText { display: none; }
+
+  .tab { padding: 0 10px; font-size: 12px; gap: 5px; }
+  .tabBadge { min-width: 16px; height: 16px; font-size: 10px; padding: 0 4px; }
+
+  .addBtnWrap { padding-left: 10px; }
+  .addBtn { padding: 6px 10px; font-size: 12px; gap: 4px; }
+
+  .main { padding: 14px 12px; }
+
+  .controls { gap: 8px; margin-bottom: 14px; }
+  .filterBtn { padding: 4px 9px; font-size: 11px; }
+
+  .sortWrapper { gap: 5px; }
+  .sortSelect { font-size: 11px; padding: 4px 8px; }
+  .sortLabel { font-size: 11px; }
+}

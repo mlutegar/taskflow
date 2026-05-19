@@ -19,7 +19,11 @@
       "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8025/api/routines/\" -Method Get | Select-Object -First 3 | ForEach-Object { \"$\\($_.title\\) | target: $\\($_.target_value\\) $\\($_.unit\\) | done: $\\($_.is_completed_today\\)\" })",
       "Bash(npm run *)",
       "Bash(npm install *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(git config *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git branch *)",
+      "Bash(git push *)"
     ]
   }
 }
