@@ -356,3 +356,45 @@
 }
 
 .btnCancel:hover { color: var(--text); border-color: var(--text-muted); }
+
+/* ── Mobile ───────────────────────────────────────────── */
+@media (hover: none) {
+  .actions { opacity: 1; }
+  .checklistDelete { opacity: 1; }
+}
+
+@media (max-width: 520px) {
+  .actions { opacity: 1; }
+  .checklistDelete { opacity: 1; }
+
+  .main { padding: 12px; gap: 10px; }
+
+  .checkBtn {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    flex-shrink: 0;
+  }
+
+  .actionBtn { width: 34px; height: 34px; font-size: 15px; }
+
+  .checklistCheck {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .checklistDelete {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  .editRow { flex-direction: column; }
+
+  .detail { padding: 12px; }
+
+  .datePickerRow { padding: 10px 12px; gap: 6px; }
+}
