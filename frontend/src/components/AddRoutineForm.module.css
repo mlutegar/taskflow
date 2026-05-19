@@ -84,3 +84,9 @@
 }
 
 .btnCancel:hover { color: var(--text); border-color: var(--text-muted); }
+
+/* ── Mobile ───────────────────────────────────────────── */
+@media (max-width: 520px) {
+  .form { padding: 16px; gap: 10px; }
+  .row { flex-direction: column; }
+}
