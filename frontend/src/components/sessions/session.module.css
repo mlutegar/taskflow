@@ -381,3 +381,19 @@
   border-top: 1px solid var(--border);
   margin: 2px 0;
 }
+
+/* ── Mobile ───────────────────────────────────────────── */
+@media (max-width: 520px) {
+  .body { padding: 14px; gap: 12px; }
+  .header { padding: 12px 14px; }
+  .btn { padding: 12px 14px; font-size: 14px; }
+  .diffGrid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .diffBtn { padding: 12px 6px; font-size: 12px; }
+  .activityList { max-height: 240px; }
+  .activityItem { padding: 12px 14px; font-size: 14px; }
+  .classCard { padding: 12px; gap: 12px; }
+  .classEmoji { font-size: 22px; }
+  .summaryEmoji { font-size: 36px; }
+  .summaryTitle { font-size: 15px; }
+  .input { padding: 12px; font-size: 15px; }
+}
