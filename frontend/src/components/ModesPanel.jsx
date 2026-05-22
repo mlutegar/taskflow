@@ -115,7 +115,7 @@ const MODES = [
   },
 ];
 
-export default function ModesPanel({ tasks, onCompleteTask }) {
+export default function ModesPanel({ tasks, onCompleteTask, onAddTask, onAddChecklist }) {
   const [expanded, setExpanded] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
 
