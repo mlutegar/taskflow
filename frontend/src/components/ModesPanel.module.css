@@ -4,12 +4,49 @@
   gap: 20px;
 }
 
+/* ── Panel Header ─────────────────────────────────────── */
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .subtitle {
   font-size: 13px;
   color: var(--text-muted);
   line-height: 1.6;
-  max-width: 600px;
+  max-width: 500px;
+  flex: 1;
 }
+
+/* ── Create Button ────────────────────────────────────── */
+.createBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.createBtn span {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.createBtn:hover { opacity: 0.88; }
+.createBtn:active { transform: scale(0.96); }
 
 .grid {
   display: flex;
@@ -32,6 +69,10 @@
 
 .cardOpen {
   border-color: color-mix(in srgb, var(--mode-color) 50%, var(--border) 50%);
+}
+
+.cardCustom {
+  border-style: dashed;
 }
 
 /* ── Card Header row ───────────────────────────────────── */
@@ -81,11 +122,30 @@
   min-width: 0;
 }
 
+.cardNameRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .cardName {
   font-size: 13.5px;
   font-weight: 600;
   color: var(--text);
   display: block;
+}
+
+.customBadge {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--mode-color) 15%, transparent);
+  color: var(--mode-color);
+  border: 1px solid color-mix(in srgb, var(--mode-color) 30%, transparent);
+  white-space: nowrap;
 }
 
 .cardTagline {
@@ -110,11 +170,19 @@
   color: var(--mode-color);
 }
 
+/* Card actions (Start + Delete) */
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 12px;
+  flex-shrink: 0;
+}
+
 /* Start button */
 .startBtn {
   flex-shrink: 0;
   align-self: center;
-  margin: 0 12px;
   padding: 6px 14px;
   background: var(--mode-color);
   color: #fff;
@@ -130,6 +198,27 @@
 
 .startBtn:hover { opacity: 0.88; }
 .startBtn:active { transform: scale(0.96); }
+
+/* Delete button (custom modes only) */
+.deleteBtn {
+  flex-shrink: 0;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(224,82,82,0.1);
+  color: var(--danger);
+  font-size: 16px;
+  font-weight: 400;
+  border: 1px solid rgba(224,82,82,0.2);
+  cursor: pointer;
+  transition: background 0.14s, opacity 0.14s;
+}
+
+.deleteBtn:hover { background: rgba(224,82,82,0.22); }
 
 /* ── Card Body ─────────────────────────────────────────── */
 .cardBody {
@@ -234,12 +323,348 @@
   margin-top: 1px;
 }
 
+/* ══════════════════════════════════════════════════════════
+   MODAL
+   ══════════════════════════════════════════════════════════ */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 20px;
+  animation: overlayIn 0.15s ease;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: modalIn 0.18s ease;
+  overflow: hidden;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modalClose {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 18px;
+  font-weight: 400;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s;
+  line-height: 1;
+}
+
+.modalClose:hover { background: var(--border); color: var(--text); }
+
+.modalBody {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  flex: 1;
+}
+
+.modalFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.cancelBtn {
+  padding: 8px 18px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s;
+}
+
+.cancelBtn:hover { background: var(--border); color: var(--text); }
+
+.saveBtn {
+  padding: 8px 22px;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.14s, transform 0.1s;
+}
+
+.saveBtn:hover { opacity: 0.88; }
+.saveBtn:active { transform: scale(0.97); }
+
+/* ── Form ──────────────────────────────────────────────── */
+.formRow {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.formLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.formInput {
+  padding: 8px 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.14s;
+  width: 100%;
+}
+
+.formInput:focus { border-color: var(--accent); }
+
+.formTextarea {
+  padding: 9px 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.14s;
+  width: 100%;
+  line-height: 1.55;
+}
+
+.formTextarea:focus { border-color: var(--accent); }
+
+.inputError { border-color: var(--danger) !important; }
+
+.errorText {
+  font-size: 11px;
+  color: var(--danger);
+}
+
+/* ── Emoji Picker ──────────────────────────────────────── */
+.emojiPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.emojiPreview {
+  font-size: 32px;
+  text-align: center;
+  display: block;
+  line-height: 1;
+  padding: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.emojiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.emojiOption {
+  padding: 5px;
+  font-size: 17px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  line-height: 1;
+}
+
+.emojiOption:hover { background: var(--border); }
+
+.emojiSelected {
+  border-color: var(--accent);
+  background: rgba(124,110,245,0.12);
+}
+
+/* ── Color Picker ──────────────────────────────────────── */
+.colorRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.colorSwatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+}
+
+.colorSwatch:hover { transform: scale(1.15); }
+
+.colorSelected {
+  border-color: var(--text) !important;
+  transform: scale(1.15);
+}
+
+.colorCustom {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+  background: none;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.colorCustom::-webkit-color-swatch-wrapper { padding: 0; }
+.colorCustom::-webkit-color-swatch { border: none; border-radius: 50%; }
+
+.colorPreview {
+  padding: 8px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* ── Steps (modal) ─────────────────────────────────────── */
+.stepsList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.stepRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepBadge {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.removeStepBtn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(224,82,82,0.1);
+  color: var(--danger);
+  font-size: 16px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.14s;
+  line-height: 1;
+}
+
+.removeStepBtn:hover { background: rgba(224,82,82,0.22); }
+
+.addStepBtn {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 1px dashed color-mix(in srgb, var(--accent) 40%, var(--border) 60%);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s;
+  font-family: inherit;
+}
+
+.addStepBtn:hover {
+  background: rgba(124,110,245,0.07);
+  border-color: var(--accent);
+}
+
 /* ── Mobile ───────────────────────────────────────────── */
 @media (max-width: 520px) {
   .cardToggle { padding: 12px; gap: 10px; }
   .cardEmoji { font-size: 18px; width: 24px; }
   .cardName { font-size: 13px; }
-  .startBtn { margin: 0 8px; padding: 6px 10px; font-size: 11px; }
+  .cardActions { margin: 0 8px; gap: 4px; }
+  .startBtn { padding: 6px 10px; font-size: 11px; }
   .cardBody { padding: 12px 14px 14px; gap: 12px; }
   .subtitle { font-size: 12px; }
+  .panelHeader { flex-direction: column; gap: 12px; }
+  .createBtn { align-self: flex-start; }
+  .formRow { flex-direction: column; }
+  .modal { max-height: 95vh; }
 }
