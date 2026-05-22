@@ -20,12 +20,22 @@
   --radius-sm: 6px;
 }
 
+html {
+  /* Ocupa a altura real da janela no mobile (exclui barra do browser) */
+  height: -webkit-fill-available;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   line-height: 1.5;
+  /* Evita o efeito de "borracha" ao rolar — parece mais app nativo */
+  overscroll-behavior: none;
+  /* Espaço para o indicador de home (bottom bar) do iPhone */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 button {
