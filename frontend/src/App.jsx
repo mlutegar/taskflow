@@ -375,7 +375,12 @@ export default function App() {
         )}
 
         {tab === "modes" && (
-          <ModesPanel tasks={tasks} onCompleteTask={handleCompleteTask} />
+          <ModesPanel
+            tasks={tasks}
+            onCompleteTask={handleCompleteTask}
+            onAddTask={handleCreateTask}
+            onAddChecklist={handleAddTaskChecklist}
+          />
         )}
       </main>
     </div>
