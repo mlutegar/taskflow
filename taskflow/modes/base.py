@@ -153,73 +153,41 @@ class BaseMode(ABC):
         return action == "return"
 
     def _select_task_from_list(self, tasks: List[Task]) -> Optional[Task]:
-        """Mostra lista de tarefas e permite selecionar"""
+        """Mostra lista de tarefas e permite selecionar.
+
+        Exibe apenas tarefas ativas (não concluídas) em formato de árvore,
+        expandindo automaticamente as subtarefas (checklist) de cada tarefa.
+        """
         if not tasks:
             console.print("[bright_red]No active tasks available![/bright_red]")
             return None
 
-        # Ask user for view mode preference
-        from questionary import select as qselect
+        # Mostrar apenas tarefas ativas (não concluídas)
+        display_tasks = [t for t in tasks if not t.completed]
 
-        view_mode = qselect(
-            "Modo de visualização?",
-            choices=[
-                {"name": "🌳 Árvore (Tree) - Todas", "value": "tree_all"},
-                {"name": "🌳 Árvore (Tree) - Apenas Ativas", "value": "tree_active"},
-                {"name": "📊 Tabela (Table) - Todas", "value": "table_all"},
-                {"name": "📊 Tabela (Table) - Apenas Ativas", "value": "table_active"},
-            ]
-        ).ask()
+        if not display_tasks:
+            console.print("[bright_yellow]Todas as tarefas estão concluídas![/bright_yellow]")
+            return None
 
-        # Default to tree_all mode if user cancels
-        if view_mode is None:
-            view_mode = "tree_all"
+        # Sempre usar a árvore com subtarefas expandidas
+        task_map = print_tree_for_selection(display_tasks)
+        console.print("")
 
-        # Filter tasks based on view mode
-        display_tasks = tasks
-        if "active" in view_mode:
-            display_tasks = [t for t in tasks if not t.completed]
-
-        if "tree" in view_mode:
-            # Use tree view with full task titles
-            task_map = print_tree_for_selection(display_tasks)
-            console.print("")
-
-            while True:
-                try:
-                    choice = console.input("Enter task number (or 0 to go back): ")
-                    if not choice:
-                        continue
-                    num = int(choice)
-                    if num == 0:
-                        return None
-                    if num in task_map:
-                        return task_map[num]
-                    console.print(f"[bright_red]Please enter a number between 0 and {len(task_map)}[/bright_red]")
-                except ValueError:
-                    console.print("[bright_red]Please enter a valid number[/bright_red]")
-                except KeyboardInterrupt:
+        while True:
+            try:
+                choice = console.input("Enter task number (or 0 to go back): ")
+                if not choice:
+                    continue
+                num = int(choice)
+                if num == 0:
                     return None
-        else:
-            # Use table view (original behavior)
-            print_task_list(display_tasks, "Select a Task", show_back_option=True)
-            console.print("")
-
-            while True:
-                try:
-                    choice = console.input("Enter task number (or 0 to go back): ")
-                    if not choice:
-                        continue
-                    num = int(choice)
-                    if num == 0:
-                        return None
-                    if 1 <= num <= len(display_tasks):
-                        return display_tasks[num - 1]
-                    console.print(f"[bright_red]Please enter a number between 0 and {len(display_tasks)}[/bright_red]")
-                except ValueError:
-                    console.print("[bright_red]Please enter a valid number[/bright_red]")
-                except KeyboardInterrupt:
-                    return None
+                if num in task_map:
+                    return task_map[num]
+                console.print(f"[bright_red]Please enter a number between 0 and {len(task_map)}[/bright_red]")
+            except ValueError:
+                console.print("[bright_red]Please enter a valid number[/bright_red]")
+            except KeyboardInterrupt:
+                return None
 
     def _add_new_task_interactive(self) -> Optional[Task]:
         """Adiciona nova tarefa de forma interativa"""
