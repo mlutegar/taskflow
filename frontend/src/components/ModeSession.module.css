@@ -53,3 +53,154 @@
   from { transform: translateY(100%); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
 }
+
+/* ── Quick-Add Bar ──────────────────────────────────────── */
+.quickAddBar {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 10px 14px;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+}
+
+.quickAddBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.qaShortcut {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.13s;
+}
+.qaShortcut span { font-size: 15px; color: var(--accent); font-weight: 700; line-height: 1; }
+.qaShortcut:hover { border-color: var(--accent); color: var(--text); background: rgba(124,110,245,0.07); }
+
+/* ── Quick-Add form (expanded) ─────────────────────────── */
+.quickAddForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: qaSlide 0.14s ease;
+}
+
+@keyframes qaSlide {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.qaTabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qaTab {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: inherit;
+  transition: all 0.12s;
+}
+.qaTab:hover { border-color: var(--accent); color: var(--text); }
+.qaTabActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.qaClose {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  transition: color 0.12s, background 0.12s;
+}
+.qaClose:hover { color: var(--text); background: var(--surface-2); }
+
+.qaInputRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qaSelect {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.13s;
+}
+.qaSelect:focus { border-color: var(--accent); }
+
+.qaRow {
+  display: flex;
+  gap: 6px;
+}
+
+.qaInput {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.13s;
+}
+.qaInput:focus { border-color: var(--accent); }
+
+.qaSubmit {
+  padding: 9px 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.13s;
+  flex-shrink: 0;
+}
+.qaSubmit:hover:not(:disabled) { background: var(--accent-hover); }
+.qaSubmit:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.qaSuccessMsg {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--success);
+  padding: 8px 0 2px;
+  animation: qaSlide 0.14s ease;
+}
