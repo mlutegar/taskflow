@@ -201,6 +201,8 @@ export default function ModesPanel({ tasks, onCompleteTask, onAddTask, onAddChec
           modeId={activeSession}
           tasks={tasks}
           onCompleteTask={onCompleteTask}
+          onAddTask={onAddTask}
+          onAddChecklist={onAddChecklist}
           onClose={() => setActiveSession(null)}
         />
       )}
