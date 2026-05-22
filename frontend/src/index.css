@@ -63,3 +63,14 @@ html { -webkit-text-size-adjust: 100%; }
 
 /* Better tap highlight on mobile */
 * { -webkit-tap-highlight-color: transparent; }
+
+/* ─── iOS: impede zoom automático ao focar em inputs ───────────────────────
+   O Safari faz zoom quando o input tem font-size < 16px.
+   A correção é forçar 16px no mobile sem mudar o visual — usamos
+   transform: scale para manter a aparência menor visualmente se quiser,
+   mas o mais simples e correto é deixar em 16px mesmo. */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
