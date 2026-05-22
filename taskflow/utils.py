@@ -391,7 +391,9 @@ def print_tree_for_selection(tasks: List[Task]) -> dict[int, Task]:
     """Display tasks in tree format for selection purposes.
 
     Shows full task titles without truncation and returns a mapping
-    of displayed numbers to actual task objects.
+    of displayed numbers to actual task objects. Tasks with subtarefas
+    (checklist) are automatically expanded, showing each item with its
+    completion status.
 
     Args:
         tasks: List of tasks to display
@@ -419,7 +421,7 @@ def print_tree_for_selection(tasks: List[Task]) -> dict[int, Task]:
     # Create mapping of displayed number to task
     task_map = {}
 
-    console.print("\n[bold cyan]Select a Task:[/bold cyan]\n")
+    console.print("\n[bold cyan]Selecionar Tarefa:[/bold cyan]\n")
 
     for i, task in enumerate(sorted_tasks, 1):
         # Map displayed number to task
@@ -446,17 +448,25 @@ def print_tree_for_selection(tasks: List[Task]) -> dict[int, Task]:
         # Add checklist progress if available
         if task.has_checklist:
             completed, total = task.checklist_progress
-            task_label += f" [bright_green]({completed}/{total})[/bright_green]"
+            task_label += f" [bright_green][{completed}/{total} subtarefas][/bright_green]"
 
         console.print(task_label)
 
-        # Show checklist items if task has checklist
+        # Expandir subtarefas (checklist) automaticamente quando existirem
         if task.has_checklist:
-            for item in task.checklist:
-                item_status = "[bright_green]  [X][/bright_green]" if item.completed else "[bright_red]  [_[/bright_red]"
-                console.print(f"{item_status} {item.description}")
+            for j, item in enumerate(task.checklist):
+                is_last = (j == len(task.checklist) - 1)
+                branch = "└─" if is_last else "├─"
+                if item.completed:
+                    item_status = "[bright_green]✓[/bright_green]"
+                    item_text = f"[dim]{item.description}[/dim]"
+                else:
+                    item_status = "[bright_red]○[/bright_red]"
+                    item_text = item.description
+                console.print(f"   [dim]{branch}[/dim] {item_status} {item_text}")
+            console.print("")  # Linha em branco após as subtarefas
 
     # Add back option
-    console.print(f"\n[bright_yellow]0. 🔙 Voltar[/bright_yellow]\n")
+    console.print(f"[bright_yellow]0. 🔙 Voltar[/bright_yellow]\n")
 
     return task_map
