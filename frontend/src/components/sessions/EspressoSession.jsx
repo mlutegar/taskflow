@@ -58,23 +58,41 @@ export default function EspressoSession({ tasks, onCompleteTask, onToggleCheckli
           />
         )}
 
-        {step === "ready_sprint" && selectedTask && (
-          <>
-            <div className={styles.infoPill}>☕ Sprint #{sprints + 1} • {coffees} café(s) esta sessão</div>
-            {sprints >= 4 && (
-              <div className={styles.infoPill} style={{ color: "var(--warning)", borderColor: "rgba(240,165,64,0.25)" }}>
-                ⚠️ {sprints} sprints completos. Considere pausar!
+        {step === "ready_sprint" && selectedTask && (() => {
+          const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
+          return (
+            <>
+              <div className={styles.infoPill}>☕ Sprint #{sprints + 1} • {coffees} café(s) esta sessão</div>
+              {sprints >= 4 && (
+                <div className={styles.infoPill} style={{ color: "var(--warning)", borderColor: "rgba(240,165,64,0.25)" }}>
+                  ⚠️ {sprints} sprints completos. Considere pausar!
+                </div>
+              )}
+              <div className={styles.taskDisplay}>
+                <span className={styles.taskName}>{live.title}</span>
+                {live.description && <span className={styles.taskMeta}>{live.description}</span>}
+                {live.checklist?.length > 0 && (
+                  <div className={styles.taskChecklist}>
+                    <span className={styles.taskChecklistLabel}>Subtarefas</span>
+                    {live.checklist.map((item) => (
+                      <button
+                        key={item.id}
+                        className={`${styles.checklistRow} ${item.completed ? styles.checklistRowDone : ""}`}
+                        onClick={() => onToggleChecklist?.(live.id, item.id)}
+                      >
+                        <span className={styles.checklistBox}>{item.completed ? "✓" : ""}</span>
+                        <span className={styles.checklistRowText}>{item.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-            <div className={styles.taskDisplay}>
-              <span className={styles.taskName}>{selectedTask.title}</span>
-              {selectedTask.description && <span className={styles.taskMeta}>{selectedTask.description}</span>}
-            </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
-              ▶ Iniciar sprint de 25 minutos
-            </button>
-          </>
-        )}
+              <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
+                ▶ Iniciar sprint de 25 minutos
+              </button>
+            </>
+          );
+        })()}
 
         {step === "timing" && (
           <CountdownTimer
