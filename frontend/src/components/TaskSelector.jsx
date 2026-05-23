@@ -25,6 +25,11 @@ export default function TaskSelector({ tasks, onSelect, onCancel }) {
               <div className={styles.info}>
                 <span className={styles.taskTitle}>{task.title}</span>
                 {task.description && <span className={styles.desc}>{task.description}</span>}
+                {task.checklist_count > 0 && (
+                  <span className={styles.subtaskCount}>
+                    ☑ {task.checklist_completed_count}/{task.checklist_count} subtarefa{task.checklist_count !== 1 ? "s" : ""}
+                  </span>
+                )}
               </div>
               <span className={styles.badge} style={{ color: PRIORITY_COLORS[task.priority] }}>
                 {PRIORITY_LABELS[task.priority] || "—"}
