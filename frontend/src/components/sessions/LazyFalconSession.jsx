@@ -13,7 +13,7 @@ const LS_KEY = "taskflow_lazyfal_saved";
 function loadSaved() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } }
 function persistSaved(d) { localStorage.setItem(LS_KEY, JSON.stringify(d)); }
 
-export default function LazyFalconSession({ tasks, onCompleteTask, onClose }) {
+export default function LazyFalconSession({ tasks, onCompleteTask, onToggleChecklist, onClose }) {
   const [step, setStep] = useState("select_activity");
   const [activity, setActivity] = useState(null);
   const [cycle, setCycle] = useState(1);
