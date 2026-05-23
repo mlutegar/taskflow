@@ -382,6 +382,72 @@
   margin: 2px 0;
 }
 
+/* ── Checklist inside sessions ──────────────────────────── */
+.taskChecklist {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.taskChecklistLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+
+.checklistRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+  transition: background 0.12s;
+}
+.checklistRow:hover { background: rgba(124,110,245,0.07); }
+
+.checklistBox {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid var(--border);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  background: var(--surface-2);
+  color: transparent;
+  transition: all 0.13s;
+}
+.checklistRowDone .checklistBox {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--bg);
+}
+
+.checklistRowText {
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.checklistRowDone .checklistRowText {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
 /* ── Mobile ───────────────────────────────────────────── */
 @media (max-width: 520px) {
   .body { padding: 14px; gap: 12px; }
