@@ -380,6 +380,7 @@ export default function App() {
             onCompleteTask={handleCompleteTask}
             onAddTask={handleCreateTask}
             onAddChecklist={handleAddTaskChecklist}
+            onToggleChecklist={handleToggleTaskChecklist}
           />
         )}
       </main>
