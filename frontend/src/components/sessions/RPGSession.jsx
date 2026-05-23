@@ -171,18 +171,36 @@ export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, o
           </>
         )}
 
-        {step === "ready_timer" && selectedTask && cls && (
-          <>
-            <div className={styles.infoPill}>{cls.emoji} Sessão de {cls.focus} minutos ({cls.name})</div>
-            <div className={styles.taskDisplay}>
-              <span className={styles.taskName}>{selectedTask.title}</span>
-              {selectedTask.description && <span className={styles.taskMeta}>{selectedTask.description}</span>}
-            </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
-              ▶ Iniciar quest ({cls.focus} min)
-            </button>
-          </>
-        )}
+        {step === "ready_timer" && selectedTask && cls && (() => {
+          const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
+          return (
+            <>
+              <div className={styles.infoPill}>{cls.emoji} Sessão de {cls.focus} minutos ({cls.name})</div>
+              <div className={styles.taskDisplay}>
+                <span className={styles.taskName}>{live.title}</span>
+                {live.description && <span className={styles.taskMeta}>{live.description}</span>}
+                {live.checklist?.length > 0 && (
+                  <div className={styles.taskChecklist}>
+                    <span className={styles.taskChecklistLabel}>Subtarefas</span>
+                    {live.checklist.map((item) => (
+                      <button
+                        key={item.id}
+                        className={`${styles.checklistRow} ${item.completed ? styles.checklistRowDone : ""}`}
+                        onClick={() => onToggleChecklist?.(live.id, item.id)}
+                      >
+                        <span className={styles.checklistBox}>{item.completed ? "✓" : ""}</span>
+                        <span className={styles.checklistRowText}>{item.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
+                ▶ Iniciar quest ({cls.focus} min)
+              </button>
+            </>
+          );
+        })()}
 
         {step === "timing" && cls && (
           <CountdownTimer
