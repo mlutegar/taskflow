@@ -2,7 +2,7 @@ import { useState } from "react";
 import TaskSelector from "../TaskSelector";
 import styles from "./session.module.css";
 
-export default function MusicSession({ tasks, onCompleteTask, onClose }) {
+export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist, onClose }) {
   const [step, setStep] = useState("intro");
   const [selectedTask, setSelectedTask] = useState(null);
   const [completed, setCompleted] = useState(0);
