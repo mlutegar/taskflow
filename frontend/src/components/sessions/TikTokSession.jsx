@@ -2,7 +2,7 @@ import { useState } from "react";
 import TaskSelector from "../TaskSelector";
 import styles from "./session.module.css";
 
-export default function TikTokSession({ tasks, onCompleteTask, onClose }) {
+export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist, onClose }) {
   const [step, setStep] = useState("intro");
   const [cycle, setCycle] = useState(1);
   const [taskInCycle, setTaskInCycle] = useState(0);
