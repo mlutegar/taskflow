@@ -8,7 +8,7 @@ const ACTIVITIES = [
   "Esticar 5 minutos", "Meditar", "Fazer exercícios rápidos", "Organizar algo", "Responder mensagens",
 ];
 
-export default function SpliteSession({ tasks, onCompleteTask, onClose }) {
+export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist, onClose }) {
   const [step, setStep] = useState("select_activity");
   const [activity, setActivity] = useState(null);
   const [cycle, setCycle] = useState(1);
