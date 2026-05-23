@@ -139,20 +139,38 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
           </>
         )}
 
-        {step === "task_action" && selectedTask && !subStep && (
-          <>
-            <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
-            <div className={styles.taskDisplay}>
-              <span className={styles.taskName}>{selectedTask.title}</span>
-              {selectedTask.description && <span className={styles.taskMeta}>{selectedTask.description}</span>}
-            </div>
-            <div className={styles.actions}>
-              <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={doFinalize}>✅ Finalizar (marcar concluída)</button>
-              <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setSubStep("save_note")}>💾 Salvar para depois</button>
-              <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("select_task")}>Trocar tarefa</button>
-            </div>
-          </>
-        )}
+        {step === "task_action" && selectedTask && !subStep && (() => {
+          const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
+          return (
+            <>
+              <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
+              <div className={styles.taskDisplay}>
+                <span className={styles.taskName}>{live.title}</span>
+                {live.description && <span className={styles.taskMeta}>{live.description}</span>}
+                {live.checklist?.length > 0 && (
+                  <div className={styles.taskChecklist}>
+                    <span className={styles.taskChecklistLabel}>Subtarefas</span>
+                    {live.checklist.map((item) => (
+                      <button
+                        key={item.id}
+                        className={`${styles.checklistRow} ${item.completed ? styles.checklistRowDone : ""}`}
+                        onClick={() => onToggleChecklist?.(live.id, item.id)}
+                      >
+                        <span className={styles.checklistBox}>{item.completed ? "✓" : ""}</span>
+                        <span className={styles.checklistRowText}>{item.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className={styles.actions}>
+                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={doFinalize}>✅ Finalizar (marcar concluída)</button>
+                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setSubStep("save_note")}>💾 Salvar para depois</button>
+                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("select_task")}>Trocar tarefa</button>
+              </div>
+            </>
+          );
+        })()}
 
         {step === "task_action" && selectedTask && subStep === "save_note" && (
           <>
