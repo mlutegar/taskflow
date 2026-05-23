@@ -3,7 +3,7 @@ import TaskSelector from "../TaskSelector";
 import CountdownTimer from "../CountdownTimer";
 import styles from "./session.module.css";
 
-export default function MomentumSession({ tasks, onCompleteTask, onClose }) {
+export default function MomentumSession({ tasks, onCompleteTask, onToggleChecklist, onClose }) {
   const [step, setStep] = useState("phone_check");
   const [selectedTask, setSelectedTask] = useState(null);
   const [completed, setCompleted] = useState(0);
