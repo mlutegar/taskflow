@@ -107,6 +107,7 @@ export default function MomentumSession({ tasks, onCompleteTask, onToggleCheckli
             <div className={styles.actions}>
               <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>🔄 Mais 5 minutos</button>
               <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={completeTask}>✅ Tarefa concluída</button>
+              <SubtaskInline taskId={selectedTask.id} onAdd={onAddChecklist} />
               <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("summary")}>⏹ Parar (fiz progresso!)</button>
             </div>
           </>
