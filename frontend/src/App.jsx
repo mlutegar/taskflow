@@ -377,10 +377,14 @@ export default function App() {
         {tab === "modes" && (
           <ModesPanel
             tasks={tasks}
+            routines={routines}
             onCompleteTask={handleCompleteTask}
+            onCompleteRoutine={handleCompleteRoutine}
             onAddTask={handleCreateTask}
             onAddChecklist={handleAddTaskChecklist}
             onToggleChecklist={handleToggleTaskChecklist}
+            onAddRoutineChecklist={handleAddRoutineChecklist}
+            onToggleRoutineChecklist={handleToggleRoutineChecklist}
           />
         )}
       </main>
