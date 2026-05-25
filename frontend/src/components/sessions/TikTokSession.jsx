@@ -2,22 +2,28 @@ import { useState } from "react";
 import TaskSelector from "../TaskSelector";
 import styles from "./session.module.css";
 
-export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist, onClose }) {
+export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
   const [step, setStep] = useState("intro");
   const [cycle, setCycle] = useState(1);
   const [taskInCycle, setTaskInCycle] = useState(0);
   const [selectedTask, setSelectedTask] = useState(null);
   const [completed, setCompleted] = useState(0);
   const [doneIds, setDoneIds] = useState(new Set());
+  const [showSubtask, setShowSubtask] = useState(false);
+  const [subtaskText, setSubtaskText] = useState("");
+  const [savingSubtask, setSavingSubtask] = useState(false);
 
   const numVideos = cycle * 5;
   const numTasks = cycle;
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
 
+  const resetSubtask = () => { setShowSubtask(false); setSubtaskText(""); };
+
   const completeTask = async () => {
     await onCompleteTask(selectedTask.id);
     setDoneIds((p) => new Set([...p, selectedTask.id]));
     setCompleted((c) => c + 1);
+    resetSubtask();
     const next = taskInCycle + 1;
     if (next >= numTasks || available.length - 1 === 0) {
       setTaskInCycle(0);
@@ -27,6 +33,19 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
       setTaskInCycle(next);
       setSelectedTask(null);
       setStep("select_task");
+    }
+  };
+
+  const handleAddSubtask = async (e) => {
+    e.preventDefault();
+    if (!subtaskText.trim() || !selectedTask || !onAddChecklist) return;
+    setSavingSubtask(true);
+    try {
+      await onAddChecklist(selectedTask.id, subtaskText.trim());
+      setSubtaskText("");
+      setShowSubtask(false);
+    } finally {
+      setSavingSubtask(false);
     }
   };
 
