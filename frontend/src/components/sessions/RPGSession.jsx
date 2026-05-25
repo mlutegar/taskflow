@@ -196,6 +196,7 @@ export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, o
                   </div>
                 )}
               </div>
+              <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
               <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
                 ▶ Iniciar quest ({cls.focus} min)
               </button>
