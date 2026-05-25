@@ -71,7 +71,7 @@ create policy "Acesso público" on mode_stats for all using (true) with check (t
 
 -- Função de incremento atômico (evita race condition)
 create or replace function increment_mode_stat(p_mode_id text)
-returns integer as $$
+returns integer as $func$
 declare
   v_count integer;
 begin
@@ -83,4 +83,4 @@ begin
   returning task_count into v_count;
   return v_count;
 end;
-$$ language plpgsql;
+$func$ language plpgsql;
