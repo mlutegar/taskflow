@@ -60,13 +60,19 @@ export default function ModeSession({ modeId, tasks, onCompleteTask, onAddTask, 
     }
   };
 
+  // Intercepta onCompleteTask para registrar a tarefa no modo atual
+  const wrappedCompleteTask = async (id) => {
+    await onCompleteTask(id);
+    onTaskComplete?.(modeId);
+  };
+
   const Session = SESSION_MAP[modeId];
   if (!Session) return null;
 
   return (
     <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={styles.modal}>
-        <Session tasks={tasks} onCompleteTask={onCompleteTask} onToggleChecklist={onToggleChecklist} onAddChecklist={onAddChecklist} onClose={onClose} />
+        <Session tasks={tasks} onCompleteTask={wrappedCompleteTask} onToggleChecklist={onToggleChecklist} onAddChecklist={onAddChecklist} onClose={onClose} />
 
         {/* ── Quick-Add bar ─────────────────────────────────── */}
         <div className={styles.quickAddBar}>
