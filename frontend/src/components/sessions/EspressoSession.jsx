@@ -4,7 +4,7 @@ import CountdownTimer from "../CountdownTimer";
 import SubtaskInline from "./SubtaskInline";
 import styles from "./session.module.css";
 
-export default function EspressoSession({ tasks, onCompleteTask, onToggleChecklist, onClose }) {
+export default function EspressoSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
   const [step, setStep] = useState("coffee_check");
   const [selectedTask, setSelectedTask] = useState(null);
   const [completed, setCompleted] = useState(0);
