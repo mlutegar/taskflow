@@ -296,10 +296,26 @@ export default function ModesPanel({ tasks, onCompleteTask, onAddTask, onAddChec
   const [expanded, setExpanded] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [sortBy, setSortBy] = useState("default"); // "default" | "tasks"
+
   const [customModes, setCustomModes] = useState(() => {
     try { return JSON.parse(localStorage.getItem("customModes") || "[]"); }
     catch { return []; }
   });
+
+  // Stats: { [modeId]: number } — persistido em localStorage
+  const [modeStats, setModeStats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("modeStats") || "{}"); }
+    catch { return {}; }
+  });
+
+  const handleModeTaskComplete = (modeId) => {
+    setModeStats((prev) => {
+      const updated = { ...prev, [modeId]: (prev[modeId] || 0) + 1 };
+      localStorage.setItem("modeStats", JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const toggle = (id) => setExpanded((p) => (p === id ? null : id));
 
@@ -318,6 +334,10 @@ export default function ModesPanel({ tasks, onCompleteTask, onAddTask, onAddChec
 
   const allModes = [...MODES, ...customModes];
 
+  const sortedModes = sortBy === "tasks"
+    ? [...allModes].sort((a, b) => (modeStats[b.id] || 0) - (modeStats[a.id] || 0))
+    : allModes;
+
   return (
     <div className={styles.root}>
       <div className={styles.panelHeader}>
@@ -329,9 +349,27 @@ export default function ModesPanel({ tasks, onCompleteTask, onAddTask, onAddChec
         </button>
       </div>
 
+      {/* Sort bar */}
+      <div className={styles.sortBar}>
+        <span className={styles.sortLabel}>Ordenar:</span>
+        <button
+          className={`${styles.sortBtn} ${sortBy === "default" ? styles.sortBtnActive : ""}`}
+          onClick={() => setSortBy("default")}
+        >
+          Padrão
+        </button>
+        <button
+          className={`${styles.sortBtn} ${sortBy === "tasks" ? styles.sortBtnActive : ""}`}
+          onClick={() => setSortBy("tasks")}
+        >
+          ⚡ Mais usados
+        </button>
+      </div>
+
       <div className={styles.grid}>
-        {allModes.map((mode) => {
+        {sortedModes.map((mode) => {
           const open = expanded === mode.id;
+          const taskCount = modeStats[mode.id] || 0;
           return (
             <div
               key={mode.id}
@@ -345,6 +383,11 @@ export default function ModesPanel({ tasks, onCompleteTask, onAddTask, onAddChec
                     <div className={styles.cardNameRow}>
                       <span className={styles.cardName}>{mode.name}</span>
                       {mode.isCustom && <span className={styles.customBadge}>Personalizado</span>}
+                      {taskCount > 0 && (
+                        <span className={styles.statBadge}>
+                          ✓ {taskCount}
+                        </span>
+                      )}
                     </div>
                     <span className={styles.cardTagline}>{mode.tagline}</span>
                   </div>
@@ -373,6 +416,15 @@ export default function ModesPanel({ tasks, onCompleteTask, onAddTask, onAddChec
 
               {open && (
                 <div className={styles.cardBody}>
+                  {taskCount > 0 && (
+                    <div className={styles.statRow}>
+                      <span className={styles.statIcon}>🎯</span>
+                      <span className={styles.statText}>
+                        {taskCount} tarefa{taskCount !== 1 ? "s" : ""} concluída{taskCount !== 1 ? "s" : ""} neste modo
+                      </span>
+                    </div>
+                  )}
+
                   <div className={styles.section}>
                     <span className={styles.sectionLabel}>Como funciona</span>
                     <ol className={styles.stepList}>
@@ -427,6 +479,7 @@ export default function ModesPanel({ tasks, onCompleteTask, onAddTask, onAddChec
           onAddTask={onAddTask}
           onAddChecklist={onAddChecklist}
           onToggleChecklist={onToggleChecklist}
+          onTaskComplete={handleModeTaskComplete}
           onClose={() => setActiveSession(null)}
         />
       )}
