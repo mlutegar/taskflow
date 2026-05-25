@@ -68,10 +68,33 @@ export default function ModeSession({ modeId, tasks, routines = [], onCompleteTa
     }
   };
 
-  // Intercepta onCompleteTask para registrar a tarefa no modo atual
+  // Handlers unificados: despacham para tarefa ou rotina conforme o tipo do item
   const wrappedCompleteTask = async (id) => {
-    await onCompleteTask(id);
+    const item = items.find((i) => i.id === id);
+    if (item?._isRoutine) {
+      await onCompleteRoutine?.(id);
+    } else {
+      await onCompleteTask(id);
+    }
     onTaskComplete?.(modeId);
+  };
+
+  const wrappedToggleChecklist = async (parentId, itemId) => {
+    const parent = items.find((i) => i.id === parentId);
+    if (parent?._isRoutine) {
+      await onToggleRoutineChecklist?.(parentId, itemId);
+    } else {
+      await onToggleChecklist?.(parentId, itemId);
+    }
+  };
+
+  const wrappedAddChecklist = async (parentId, description) => {
+    const parent = items.find((i) => i.id === parentId);
+    if (parent?._isRoutine) {
+      await onAddRoutineChecklist?.(parentId, description);
+    } else {
+      await onAddChecklist?.(parentId, description);
+    }
   };
 
   const Session = SESSION_MAP[modeId];
@@ -80,7 +103,7 @@ export default function ModeSession({ modeId, tasks, routines = [], onCompleteTa
   return (
     <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={styles.modal}>
-        <Session tasks={tasks} onCompleteTask={wrappedCompleteTask} onToggleChecklist={onToggleChecklist} onAddChecklist={onAddChecklist} onClose={onClose} />
+        <Session tasks={items} onCompleteTask={wrappedCompleteTask} onToggleChecklist={wrappedToggleChecklist} onAddChecklist={wrappedAddChecklist} onClose={onClose} />
 
         {/* ── Quick-Add bar ─────────────────────────────────── */}
         <div className={styles.quickAddBar}>
