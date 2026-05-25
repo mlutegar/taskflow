@@ -262,6 +262,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
                 <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("album_select")}>
                   Trocar tarefa
                 </button>
+                <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
               </div>
             </>
           );
