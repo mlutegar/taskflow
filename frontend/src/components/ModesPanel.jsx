@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ModeSession from "./ModeSession";
 import styles from "./ModesPanel.module.css";
+import { modeStatsApi } from "../api/modeStats";
 
 const MODES = [
   {
