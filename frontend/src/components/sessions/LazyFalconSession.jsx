@@ -1,5 +1,6 @@
 import { useState } from "react";
 import TaskSelector from "../TaskSelector";
+import SubtaskInline from "./SubtaskInline";
 import styles from "./session.module.css";
 
 const ACTIVITIES = [
