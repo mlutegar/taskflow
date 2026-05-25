@@ -30,7 +30,7 @@ function nextXP(level) { return level < LEVELS.length ? LEVELS[level][0] : null;
 function loadChar() { try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch { return null; } }
 function saveChar(d) { localStorage.setItem(LS_KEY, JSON.stringify(d)); }
 
-export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, onClose }) {
+export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
   const [step, setStep] = useState("loading");
   const [char, setChar] = useState(null);
   const [charName, setCharName] = useState("");
