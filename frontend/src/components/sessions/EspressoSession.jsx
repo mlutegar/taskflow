@@ -118,6 +118,7 @@ export default function EspressoSession({ tasks, onCompleteTask, onToggleCheckli
               <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={completeTask}>
                 ✅ Tarefa concluída
               </button>
+              <SubtaskInline taskId={selectedTask.id} onAdd={onAddChecklist} />
               <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setStep("summary")}>
                 ⏹ Encerrar sessão
               </button>
