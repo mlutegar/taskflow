@@ -18,7 +18,7 @@ const SESSION_MAP = {
   lazyfal: LazyFalconSession,
 };
 
-export default function ModeSession({ modeId, tasks, onCompleteTask, onAddTask, onAddChecklist, onToggleChecklist, onTaskComplete, onClose }) {
+export default function ModeSession({ modeId, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }) {
   const [quickAdd, setQuickAdd] = useState(false);
   const [qaMode, setQaMode] = useState("task"); // "task" | "subtask"
   const [qaTitle, setQaTitle] = useState("");
@@ -26,7 +26,15 @@ export default function ModeSession({ modeId, tasks, onCompleteTask, onAddTask, 
   const [qaSaving, setQaSaving] = useState(false);
   const [qaSuccess, setQaSuccess] = useState(null); // "task" | "subtask" | null
 
-  const activeTasks = tasks.filter((t) => !t.completed);
+  // Mescla tarefas + rotinas pendentes num array unificado
+  const items = [
+    ...tasks,
+    ...routines
+      .filter((r) => !r.is_completed_today)
+      .map((r) => ({ ...r, _isRoutine: true, completed: false })),
+  ];
+
+  const activeTasks = items.filter((t) => !t.completed);
 
   const openQuickAdd = (mode) => {
     setQaMode(mode);
