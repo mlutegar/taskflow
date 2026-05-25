@@ -46,7 +46,7 @@ export default function ModeSession({ modeId, tasks, onCompleteTask, onAddTask, 
         await onAddTask({ title: qaTitle.trim(), priority: 4 });
         setQaSuccess("task");
       } else {
-        await onAddChecklist(Number(qaParent), qaTitle.trim());
+        await onAddChecklist(qaParent, qaTitle.trim());
         setQaSuccess("subtask");
       }
       setQaTitle("");
