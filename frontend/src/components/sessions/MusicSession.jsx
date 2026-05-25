@@ -50,25 +50,59 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
     else if (modeId === "playlist") setStep("playlist_hunt");
   };
 
-  // Conclui tarefa (usado nos modos hundred e album)
-  const finishTask = async (nextStep) => {
+  // Retorna o step de "encontrar música" para o modo atual
+  const getMusicStep = () => {
+    if (mode === "hundred") return "hundred_finding";
+    if (mode === "album")   return "album_choose";
+    if (mode === "playlist") return "playlist_hunt";
+    return "choose_mode";
+  };
+
+  // Conclui a tarefa e volta para escolher a próxima música
+  const finishTask = async () => {
     await onCompleteTask(selectedTask.id);
     setDoneIds((p) => new Set([...p, selectedTask.id]));
     setCompleted((c) => c + 1);
     setSelectedTask(null);
-    setStep(available.length - 1 === 0 ? "summary" : nextStep);
+    setStep(available.length - 1 === 0 ? "summary" : getMusicStep());
   };
 
-  // Bloco de checklist reutilizável
+  // Ao marcar uma subtarefa como concluída → volta para escolher próxima música
+  const handleSubtaskToggle = async (taskId, itemId) => {
+    const currentTask = tasks.find((t) => t.id === taskId);
+    const item = currentTask?.checklist?.find((c) => c.id === itemId);
+    const wasCompleted = item?.completed ?? true;
+
+    await onToggleChecklist?.(taskId, itemId);
+
+    if (!wasCompleted) {
+      // Subtarefa recém concluída → navega para próxima música
+      setCompleted((c) => c + 1);
+      setSelectedTask(null);
+      if (available.length === 0) {
+        setStep("summary");
+      } else if (step === "playlist_working") {
+        setStep(playlist.length >= PLAYLIST_SIZE ? "playlist_done" : "playlist_hunt");
+      } else {
+        setStep(getMusicStep());
+      }
+    }
+    // Se wasCompleted → apenas desmarcou, sem navegar
+  };
+
+  // Bloco de checklist reutilizável (usa handleSubtaskToggle)
   const renderChecklist = (live) =>
     live.checklist?.length > 0 && (
       <div className={styles.taskChecklist}>
-        <span className={styles.taskChecklistLabel}>Subtarefas</span>
+        <span className={styles.taskChecklistLabel}>
+          ✓ Conclua uma subtarefa para ir para a próxima música
+        </span>
         {live.checklist.map((item) => (
           <button
             key={item.id}
             className={`${styles.checklistRow} ${item.completed ? styles.checklistRowDone : ""}`}
-            onClick={() => onToggleChecklist?.(live.id, item.id)}
+            onClick={() => handleSubtaskToggle(live.id, item.id)}
+            disabled={item.completed}
           >
             <span className={styles.checklistBox}>{item.completed ? "✓" : ""}</span>
             <span className={styles.checklistRowText}>{item.description}</span>
@@ -83,7 +117,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
         <span className={styles.headerEmoji}>🎵</span>
         <div className={styles.headerMeta}>
           <span className={styles.headerTitle}>Music Mode</span>
-          <span className={styles.headerSub}>{completed} tarefa(s) concluída(s)</span>
+          <span className={styles.headerSub}>{completed} concluída(s)</span>
         </div>
         <button className={styles.closeBtn} onClick={onClose}>✕</button>
       </div>
@@ -103,11 +137,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
             </div>
             <div className={styles.classGrid}>
               {MUSIC_MODES.map((m) => (
-                <button
-                  key={m.id}
-                  className={styles.classCard}
-                  onClick={() => selectMode(m.id)}
-                >
+                <button key={m.id} className={styles.classCard} onClick={() => selectMode(m.id)}>
                   <span className={styles.classEmoji}>{m.emoji}</span>
                   <div className={styles.classInfo}>
                     <span className={styles.className}>{m.title}</span>
@@ -124,7 +154,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
         ════════════════════════════════════════════════ */}
         {step === "hundred_finding" && (
           <>
-            <div className={styles.infoPill}>🎧 Modo: 100 Músicas</div>
+            <div className={styles.infoPill}>🎧 Modo: 100 Músicas — música {completed + 1}</div>
             <div className={styles.promptBox}>
               <div className={styles.promptTitle}>🎧 Encontre sua música</div>
               <div className={styles.promptText}>
@@ -162,7 +192,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
                 {renderChecklist(live)}
               </div>
               <div className={styles.actions}>
-                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={() => finishTask("hundred_post")}>
+                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={finishTask}>
                   ✅ Tarefa concluída!
                 </button>
                 <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("hundred_select")}>
@@ -174,27 +204,12 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
           );
         })()}
 
-        {step === "hundred_post" && (
-          <>
-            <div className={styles.promptBox}>
-              <div className={styles.promptTitle}>✓ Tarefa concluída!</div>
-              <div className={styles.promptText}>Quer continuar com outra música e tarefa?</div>
-            </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("hundred_finding")}>
-              🎵 Buscar próxima música
-            </button>
-            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("summary")}>
-              Encerrar sessão
-            </button>
-          </>
-        )}
-
         {/* ════════════════════════════════════════════════
             MODO 2 — ÁLBUM
         ════════════════════════════════════════════════ */}
         {step === "album_choose" && (
           <>
-            <div className={styles.infoPill}>💿 Modo: Escolher um Álbum</div>
+            <div className={styles.infoPill}>💿 Modo: Álbum — escolha {completed > 0 ? "o próximo" : "seu"} álbum</div>
             <div className={styles.promptBox}>
               <div className={styles.promptTitle}>💿 Qual álbum você quer ouvir?</div>
               <div className={styles.promptText}>
@@ -256,7 +271,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
                 {renderChecklist(live)}
               </div>
               <div className={styles.actions}>
-                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={() => finishTask("album_post")}>
+                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={finishTask}>
                   ✅ Tarefa concluída!
                 </button>
                 <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("album_select")}>
@@ -268,26 +283,6 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
           );
         })()}
 
-        {step === "album_post" && (
-          <>
-            <div className={styles.promptBox}>
-              <div className={styles.promptTitle}>✓ Tarefa concluída!</div>
-              <div className={styles.promptText}>
-                O álbum <strong>{albumName}</strong> ainda está tocando. Continuar?
-              </div>
-            </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("album_select")}>
-              📋 Próxima tarefa
-            </button>
-            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("album_choose")}>
-              💿 Trocar álbum
-            </button>
-            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setStep("summary")}>
-              Encerrar sessão
-            </button>
-          </>
-        )}
-
         {/* ════════════════════════════════════════════════
             MODO 3 — PLAYLIST PERFEITA DE 10
         ════════════════════════════════════════════════ */}
@@ -297,11 +292,9 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
               ✨ Playlist Perfeita — {playlist.length}/{PLAYLIST_SIZE} músicas
             </div>
             <div className={styles.promptBox}>
-              <div className={styles.promptTitle}>
-                🎵 Encontre a música #{playlist.length + 1}
-              </div>
+              <div className={styles.promptTitle}>🎵 Encontre a música #{playlist.length + 1}</div>
               <div className={styles.promptText}>
-                Vá ao Spotify e encontre uma música especial para sua playlist perfeita. Quando tiver, volte aqui.
+                Vá ao Spotify e encontre uma música especial para sua playlist. Quando tiver, volte aqui.
               </div>
             </div>
             {playlist.length > 0 && (
@@ -314,10 +307,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
                 ))}
               </div>
             )}
-            <button
-              className={`${styles.btn} ${styles.btnPrimary}`}
-              onClick={() => setStep("playlist_enter")}
-            >
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("playlist_enter")}>
               🎵 Encontrei! Registrar música
             </button>
             {playlist.length > 0 && (
@@ -330,14 +320,10 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
 
         {step === "playlist_enter" && (
           <>
-            <div className={styles.infoPill}>
-              ✨ Música {playlist.length + 1}/{PLAYLIST_SIZE}
-            </div>
+            <div className={styles.infoPill}>✨ Música {playlist.length + 1}/{PLAYLIST_SIZE}</div>
             <div className={styles.promptBox}>
               <div className={styles.promptTitle}>📝 Qual é a música?</div>
-              <div className={styles.promptText}>
-                Digite o nome da música (e artista, se quiser).
-              </div>
+              <div className={styles.promptText}>Digite o nome da música (e artista, se quiser).</div>
             </div>
             <div className={styles.actions}>
               <input
@@ -411,7 +397,6 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
                     setDoneIds((p) => new Set([...p, selectedTask.id]));
                     setCompleted((c) => c + 1);
                     setSelectedTask(null);
-                    // playlist já tem o song atual incluído
                     if (playlist.length >= PLAYLIST_SIZE) {
                       setStep("playlist_done");
                     } else if (available.length - 1 === 0) {
@@ -449,9 +434,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
                 </div>
               ))}
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>
-              🎵 Fechar
-            </button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>🎵 Fechar</button>
           </>
         )}
 
