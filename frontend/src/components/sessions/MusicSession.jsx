@@ -26,7 +26,7 @@ const MUSIC_MODES = [
 
 const PLAYLIST_SIZE = 10;
 
-export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist, onClose }) {
+export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
   const [mode, setMode] = useState(null);
   const [step, setStep] = useState("choose_mode");
   const [selectedTask, setSelectedTask] = useState(null);
