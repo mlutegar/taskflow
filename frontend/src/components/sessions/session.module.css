@@ -448,6 +448,19 @@
   opacity: 0.5;
 }
 
+/* ── Subtask inline form ─────────────────────────────── */
+.subtaskInline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: subtaskSlide 0.13s ease;
+}
+
+@keyframes subtaskSlide {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Mobile ───────────────────────────────────────────── */
 @media (max-width: 520px) {
   .body { padding: 14px; gap: 12px; }
