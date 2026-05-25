@@ -304,18 +304,45 @@ export default function ModesPanel({ tasks, onCompleteTask, onAddTask, onAddChec
     catch { return []; }
   });
 
-  // Stats: { [modeId]: number } — persistido em localStorage
+  // Stats: { [modeId]: number }
+  // Início: carrega do localStorage como cache otimista, depois sincroniza com o banco
   const [modeStats, setModeStats] = useState(() => {
     try { return JSON.parse(localStorage.getItem("modeStats") || "{}"); }
     catch { return {}; }
   });
 
-  const handleModeTaskComplete = (modeId) => {
+  // Carrega stats do banco ao montar
+  useEffect(() => {
+    modeStatsApi.list()
+      .then((stats) => {
+        setModeStats(stats);
+        localStorage.setItem("modeStats", JSON.stringify(stats));
+      })
+      .catch(() => {
+        // Mantém localStorage como fallback se o banco falhar
+      });
+  }, []);
+
+  const handleModeTaskComplete = async (modeId) => {
+    // Update otimista imediato na UI e no cache local
     setModeStats((prev) => {
       const updated = { ...prev, [modeId]: (prev[modeId] || 0) + 1 };
       localStorage.setItem("modeStats", JSON.stringify(updated));
       return updated;
     });
+    // Persiste no banco (incremento atômico via RPC)
+    try {
+      const newCount = await modeStatsApi.increment(modeId);
+      // Sincroniza o valor exato retornado pelo banco
+      setModeStats((prev) => {
+        const updated = { ...prev, [modeId]: newCount };
+        localStorage.setItem("modeStats", JSON.stringify(updated));
+        return updated;
+      });
+    } catch (e) {
+      // Falhou no banco — localStorage já tem o valor otimista, ok por ora
+      console.warn("Falha ao salvar stat no banco:", e.message);
+    }
   };
 
   const toggle = (id) => setExpanded((p) => (p === id ? null : id));
