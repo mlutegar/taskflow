@@ -81,6 +81,7 @@ export default function MomentumSession({ tasks, onCompleteTask, onToggleCheckli
                   </div>
                 )}
               </div>
+              <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
               <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
                 ▶ Iniciar timer de 5 minutos
               </button>
