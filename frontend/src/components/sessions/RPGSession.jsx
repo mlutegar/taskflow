@@ -222,6 +222,7 @@ export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, o
             <div className={styles.actions}>
               <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>Retomar timer</button>
               <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={() => completeQuest()}>✅ Completar assim mesmo</button>
+              <SubtaskInline taskId={selectedTask?.id} onAdd={onAddChecklist} />
               <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("dashboard")}>Voltar ao dashboard</button>
             </div>
           </>
