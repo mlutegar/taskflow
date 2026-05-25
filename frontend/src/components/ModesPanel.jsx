@@ -293,7 +293,7 @@ function CreateModeModal({ onSave, onClose }) {
   );
 }
 
-export default function ModesPanel({ tasks, onCompleteTask, onAddTask, onAddChecklist, onToggleChecklist }) {
+export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist }) {
   const [expanded, setExpanded] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
