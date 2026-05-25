@@ -124,9 +124,51 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
                   </div>
                 )}
               </div>
+
+              {showSubtask && (
+                <form onSubmit={handleAddSubtask} className={styles.actions}>
+                  <input
+                    className={styles.input}
+                    value={subtaskText}
+                    onChange={(e) => setSubtaskText(e.target.value)}
+                    placeholder="Descrição da subtarefa..."
+                    autoFocus
+                  />
+                  <div className={styles.actionsRow}>
+                    <button
+                      type="submit"
+                      className={`${styles.btn} ${styles.btnPrimary}`}
+                      disabled={!subtaskText.trim() || savingSubtask}
+                    >
+                      {savingSubtask ? "…" : "✓ Adicionar"}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.btnSecondary}`}
+                      onClick={resetSubtask}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              )}
+
               <div className={styles.actions}>
                 <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={completeTask}>✅ Concluída!</button>
-                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { setSelectedTask(null); setStep("select_task"); }}>Trocar tarefa</button>
+                <button
+                  className={`${styles.btn} ${styles.btnSecondary}`}
+                  onClick={() => { setSelectedTask(null); setStep("select_task"); resetSubtask(); }}
+                >
+                  Trocar tarefa
+                </button>
+                {onAddChecklist && !showSubtask && (
+                  <button
+                    className={`${styles.btn} ${styles.btnSecondary}`}
+                    onClick={() => setShowSubtask(true)}
+                  >
+                    📌 Adicionar subtarefa
+                  </button>
+                )}
               </div>
             </>
           );
