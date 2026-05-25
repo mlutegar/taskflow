@@ -88,6 +88,7 @@ export default function EspressoSession({ tasks, onCompleteTask, onToggleCheckli
                   </div>
                 )}
               </div>
+              <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
               <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
                 ▶ Iniciar sprint de 25 minutos
               </button>
