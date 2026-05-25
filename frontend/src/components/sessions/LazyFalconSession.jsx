@@ -167,6 +167,7 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
               <div className={styles.actions}>
                 <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={doFinalize}>✅ Finalizar (marcar concluída)</button>
                 <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setSubStep("save_note")}>💾 Salvar para depois</button>
+                <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
                 <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("select_task")}>Trocar tarefa</button>
               </div>
             </>
