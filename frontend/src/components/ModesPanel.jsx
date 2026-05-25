@@ -503,10 +503,14 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         <ModeSession
           modeId={activeSession}
           tasks={tasks}
+          routines={routines}
           onCompleteTask={onCompleteTask}
+          onCompleteRoutine={onCompleteRoutine}
           onAddTask={onAddTask}
           onAddChecklist={onAddChecklist}
           onToggleChecklist={onToggleChecklist}
+          onAddRoutineChecklist={onAddRoutineChecklist}
+          onToggleRoutineChecklist={onToggleRoutineChecklist}
           onTaskComplete={handleModeTaskComplete}
           onClose={() => setActiveSession(null)}
         />
