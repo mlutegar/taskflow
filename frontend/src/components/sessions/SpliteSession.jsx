@@ -115,6 +115,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
               <div className={styles.actions}>
                 <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={completeTask}>✅ Concluída!</button>
                 <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { setSelectedTask(null); setStep("select_task"); }}>Trocar tarefa</button>
+                <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
               </div>
             </>
           );
