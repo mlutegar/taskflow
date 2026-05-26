@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
 import SubtaskFlow from "./SubtaskFlow";
 import SubtaskInline from "./SubtaskInline";
 import styles from "./session.module.css";
+import { useSessionPersist } from "../../lib/useSessionPersist";
 
 /**
  * Sessão genérica para modos personalizados criados pelo usuário.
