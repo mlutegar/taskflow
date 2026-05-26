@@ -9,6 +9,8 @@ const ACTIVITIES = [
   "Esticar 5 minutos", "Meditar", "Fazer exercícios rápidos", "Organizar algo", "Responder mensagens",
 ];
 
+const DIARY_MODE_ACTIVITY = "Escrever no diário";
+
 export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
   const [step, setStep] = useState("select_activity");
   const [activity, setActivity] = useState(null);
@@ -17,22 +19,49 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
   const [selectedTask, setSelectedTask] = useState(null);
   const [completed, setCompleted] = useState(0);
   const [doneIds, setDoneIds] = useState(new Set());
+  // Controle do modo diário
+  const [isDiaryMode, setIsDiaryMode] = useState(false);
+  // "first_task" = após escrever, antes da análise | "after_analysis" = após ler análise
+  const [diaryPhase, setDiaryPhase] = useState(null);
 
   const numTasks = cycle;
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
+
+  const selectActivity = (a) => {
+    setActivity(a);
+    if (a === DIARY_MODE_ACTIVITY) {
+      setIsDiaryMode(true);
+      setStep("writing_diary");
+    } else {
+      setIsDiaryMode(false);
+      setStep("doing_activity");
+    }
+  };
 
   const completeTask = async () => {
     await onCompleteTask(selectedTask.id);
     setDoneIds((p) => new Set([...p, selectedTask.id]));
     setCompleted((c) => c + 1);
+    setSelectedTask(null);
+
+    // Modo diário: sempre vai para leitura de análise após cada tarefa
+    if (isDiaryMode) {
+      if (available.length - 1 === 0) {
+        setStep("summary");
+      } else {
+        setDiaryPhase("after_analysis");
+        setStep("reading_analysis");
+      }
+      return;
+    }
+
+    // Modo normal
     const next = taskInCycle + 1;
     if (next >= numTasks || available.length - 1 === 0) {
       setTaskInCycle(0);
-      setSelectedTask(null);
       setStep(available.length - 1 === 0 ? "summary" : "cycle_done");
     } else {
       setTaskInCycle(next);
-      setSelectedTask(null);
       setStep("select_task");
     }
   };
@@ -43,12 +72,17 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
         <span className={styles.headerEmoji}>🔪</span>
         <div className={styles.headerMeta}>
           <span className={styles.headerTitle}>Splite Mode</span>
-          <span className={styles.headerSub}>{activity ? `${activity} • ` : ""}Ciclo {cycle} • {completed} concluída(s)</span>
+          <span className={styles.headerSub}>
+            {activity ? `${activity} • ` : ""}
+            {isDiaryMode ? `${completed} tarefa(s) concluída(s)` : `Ciclo ${cycle} • ${completed} concluída(s)`}
+          </span>
         </div>
         <button className={styles.closeBtn} onClick={onClose}>✕</button>
       </div>
 
       <div className={styles.body}>
+
+        {/* ── Seleção de atividade ── */}
         {step === "select_activity" && (
           <>
             <div className={styles.promptBox}>
@@ -57,7 +91,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
             </div>
             <div className={styles.activityList}>
               {ACTIVITIES.map((a) => (
-                <button key={a} className={styles.activityItem} onClick={() => { setActivity(a); setStep("doing_activity"); }}>
+                <button key={a} className={styles.activityItem} onClick={() => selectActivity(a)}>
                   {a}
                 </button>
               ))}
@@ -65,6 +99,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
           </>
         )}
 
+        {/* ── Modo normal: fazer atividade ── */}
         {step === "doing_activity" && (
           <>
             <div className={styles.cycleBadge}>Ciclo {cycle}</div>
@@ -81,18 +116,74 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
           </>
         )}
 
-        {step === "select_task" && (
+        {/* ── Modo diário: escrever o diário ── */}
+        {step === "writing_diary" && (
           <>
-            <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
-            <TaskSelector tasks={available} onSelect={(t) => { setSelectedTask(t); setStep("working"); }} onCancel={() => setStep("doing_activity")} />
+            <div className={styles.promptBox}>
+              <div className={styles.promptTitle}>📓 Escreva no seu diário</div>
+              <div className={styles.promptText}>
+                Abra seu diário e escreva livremente. Quando terminar, clique em "Fiz!" para partir para a primeira tarefa.
+              </div>
+            </div>
+            <button
+              className={`${styles.btn} ${styles.btnPrimary}`}
+              onClick={() => { setDiaryPhase("first_task"); setStep("select_task"); }}
+            >
+              ✅ Escrevi! Partir para a tarefa
+            </button>
+            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setStep("summary")}>Encerrar</button>
           </>
         )}
 
+        {/* ── Modo diário: ler análise ── */}
+        {step === "reading_analysis" && (
+          <>
+            <div className={styles.promptBox}>
+              <div className={styles.promptTitle}>🔍 Leia a análise do seu diário</div>
+              <div className={styles.promptText}>
+                Abra a análise gerada do seu diário e leia com atenção. Quando terminar, parta para a próxima tarefa.
+              </div>
+            </div>
+            <button
+              className={`${styles.btn} ${styles.btnPrimary}`}
+              onClick={() => setStep("select_task")}
+            >
+              ✅ Li! Partir para a tarefa
+            </button>
+            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setStep("summary")}>Encerrar</button>
+          </>
+        )}
+
+        {/* ── Selecionar tarefa ── */}
+        {step === "select_task" && (
+          <>
+            {isDiaryMode ? (
+              <div className={styles.cycleBadge}>
+                {diaryPhase === "first_task" ? "📓 Após escrever — Tarefa 1" : `🔍 Após análise — Tarefa ${completed + 1}`}
+              </div>
+            ) : (
+              <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
+            )}
+            <TaskSelector
+              tasks={available}
+              onSelect={(t) => { setSelectedTask(t); setStep("working"); }}
+              onCancel={() => setStep(isDiaryMode ? (diaryPhase === "first_task" ? "writing_diary" : "reading_analysis") : "doing_activity")}
+            />
+          </>
+        )}
+
+        {/* ── Trabalhando na tarefa ── */}
         {step === "working" && selectedTask && (() => {
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
           return (
             <>
-              <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
+              {isDiaryMode ? (
+                <div className={styles.cycleBadge}>
+                  {diaryPhase === "first_task" ? "📓 Tarefa após diário" : `🔍 Tarefa após análise`}
+                </div>
+              ) : (
+                <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
+              )}
               <div className={styles.taskDisplay}>
                 <span className={styles.taskName}>{live.title}</span>
                 {live.description && <span className={styles.taskMeta}>{live.description}</span>}
@@ -121,6 +212,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
           );
         })()}
 
+        {/* ── Ciclo completo (modo normal) ── */}
         {step === "cycle_done" && (
           <>
             <div className={styles.promptBox}>
@@ -132,16 +224,21 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
           </>
         )}
 
+        {/* ── Resumo final ── */}
         {step === "summary" && (
           <>
             <div className={styles.summaryBox}>
               <span className={styles.summaryEmoji}>🔪</span>
               <div className={styles.summaryTitle}>Sessão encerrada!</div>
-              <div className={styles.summaryText}>{completed} tarefa(s) em {cycle} ciclo(s) com "{activity}".</div>
+              {isDiaryMode
+                ? <div className={styles.summaryText}>{completed} tarefa(s) concluída(s) no modo diário 📓</div>
+                : <div className={styles.summaryText}>{completed} tarefa(s) em {cycle} ciclo(s) com "{activity}".</div>
+              }
             </div>
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>Fechar</button>
           </>
         )}
+
       </div>
     </div>
   );
