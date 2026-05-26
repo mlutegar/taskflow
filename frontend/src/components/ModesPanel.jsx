@@ -295,7 +295,7 @@ function CreateModeModal({ onSave, onClose }) {
 
 export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist }) {
   const [expanded, setExpanded] = useState(null);
-  const [activeSession, setActiveSession] = useState(null);
+  const [activeSession, setActiveSession] = useState(null); // objeto completo do modo
   const [showCreate, setShowCreate] = useState(false);
   const [sortBy, setSortBy] = useState("default"); // "default" | "tasks"
 
