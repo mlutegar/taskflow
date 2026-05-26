@@ -182,25 +182,20 @@ export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, o
                 <span className={styles.taskName}>{live.title}</span>
                 {live.description && <span className={styles.taskMeta}>{live.description}</span>}
                 {live.checklist?.length > 0 && (
-                  <div className={styles.taskChecklist}>
-                    <span className={styles.taskChecklistLabel}>Subtarefas</span>
-                    {live.checklist.map((item) => (
-                      <button
-                        key={item.id}
-                        className={`${styles.checklistRow} ${item.completed ? styles.checklistRowDone : ""}`}
-                        onClick={() => onToggleChecklist?.(live.id, item.id)}
-                      >
-                        <span className={styles.checklistBox}>{item.completed ? "✓" : ""}</span>
-                        <span className={styles.checklistRowText}>{item.description}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <SubtaskFlow
+                    checklist={live.checklist}
+                    onToggle={(itemId) => onToggleChecklist?.(live.id, itemId)}
+                    onAllDone={completeTask}
+                    onSkip={() => setStep("timing")}
+                  />
                 )}
               </div>
               <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
-              <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
-                ▶ Iniciar quest ({cls.focus} min)
-              </button>
+              {!live.checklist?.length && (
+                <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
+                  ▶ Iniciar quest ({cls.focus} min)
+                </button>
+              )}
             </>
           );
         })()}
