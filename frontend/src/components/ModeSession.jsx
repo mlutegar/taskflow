@@ -19,7 +19,7 @@ const SESSION_MAP = {
   lazyfal: LazyFalconSession,
 };
 
-export default function ModeSession({ modeId, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }) {
+export default function ModeSession({ modeId, mode, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }) {
   const [quickAdd, setQuickAdd] = useState(false);
   const [qaMode, setQaMode] = useState("task"); // "task" | "subtask"
   const [qaTitle, setQaTitle] = useState("");
