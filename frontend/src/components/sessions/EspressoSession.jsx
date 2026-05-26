@@ -1,19 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
 import CountdownTimer from "../CountdownTimer";
 import SubtaskInline from "./SubtaskInline";
 import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
+import { useSessionPersist } from "../../lib/useSessionPersist";
 
 export default function EspressoSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  const [step, setStep] = useState("coffee_check");
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [completed, setCompleted] = useState(0);
-  const [coffees, setCoffees] = useState(0);
-  const [sprints, setSprints] = useState(0);
-  const [doneIds, setDoneIds] = useState(new Set());
+  const { saved, persist, clearSaved } = useSessionPersist("espresso");
+
+  const [step,        setStep]        = useState(saved?.step      ?? "coffee_check");
+  const [completed,   setCompleted]   = useState(saved?.completed ?? 0);
+  const [coffees,     setCoffees]     = useState(saved?.coffees   ?? 0);
+  const [sprints,     setSprints]     = useState(saved?.sprints   ?? 0);
+  const [doneIds,     setDoneIds]     = useState(() => new Set(saved?.doneIds ?? []));
+  const [selectedTask, setSelectedTask] = useState(() => {
+    if (!saved?.selectedTaskId) return null;
+    return tasks.find((t) => t.id === saved.selectedTaskId) || null;
+  });
+  const [wasRestored, setWasRestored] = useState(!!saved);
 
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
+
+  useEffect(() => {
+    if (step === "summary") return;
+    persist({ step, completed, coffees, sprints, doneIds: [...doneIds], selectedTaskId: selectedTask?.id ?? null });
+  }, [step, completed, coffees, sprints, doneIds, selectedTask]); // eslint-disable-line
+
+  const handleClose        = () => { clearSaved(); onClose(); };
+  const handleSummaryClose  = () => { clearSaved(); onClose(); };
 
   const completeTask = async () => {
     await onCompleteTask(selectedTask.id);
@@ -31,10 +46,18 @@ export default function EspressoSession({ tasks, onCompleteTask, onToggleCheckli
           <span className={styles.headerTitle}>Espresso Sprint</span>
           <span className={styles.headerSub}>Sprint {sprints + 1} • ☕ {coffees} • ✅ {completed}</span>
         </div>
-        <button className={styles.closeBtn} onClick={onClose}>✕</button>
+        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
       </div>
 
       <div className={styles.body}>
+
+        {wasRestored && step !== "coffee_check" && step !== "summary" && (
+          <div className={styles.resumeBanner}>
+            ↩ Sessão restaurada — Sprint {sprints + 1}, ☕ {coffees}, {completed} tarefa(s)
+            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
+          </div>
+        )}
+
         {step === "coffee_check" && (
           <>
             <div className={styles.promptBox}>
@@ -46,7 +69,7 @@ export default function EspressoSession({ tasks, onCompleteTask, onToggleCheckli
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { setCoffees(1); setStep("select_task"); }}>
               ☕ Sim, estou com café!
             </button>
-            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={onClose}>
+            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleClose}>
               Sem café, sem sprint!
             </button>
           </>
@@ -130,7 +153,7 @@ export default function EspressoSession({ tasks, onCompleteTask, onToggleCheckli
               <div className={styles.summaryTitle}>Sessão encerrada!</div>
               <div className={styles.summaryText}>{sprints} sprint(s) • {coffees} café(s) • {completed} tarefa(s)</div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
           </>
         )}
       </div>
