@@ -7,6 +7,7 @@ import MomentumSession from "./sessions/MomentumSession";
 import EspressoSession from "./sessions/EspressoSession";
 import RPGSession from "./sessions/RPGSession";
 import LazyFalconSession from "./sessions/LazyFalconSession";
+import CustomModeSession from "./sessions/CustomModeSession";
 
 const SESSION_MAP = {
   music: MusicSession,
