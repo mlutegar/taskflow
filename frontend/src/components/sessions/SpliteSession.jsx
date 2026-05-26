@@ -31,6 +31,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
     setActivity(a);
     if (a === DIARY_MODE_ACTIVITY) {
       setIsDiaryMode(true);
+      setNextDiaryStep("reading_analysis"); // após a 1ª tarefa vai para "ler análise"
       setStep("writing_diary");
     } else {
       setIsDiaryMode(false);
