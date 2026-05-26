@@ -45,13 +45,14 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
     setCompleted((c) => c + 1);
     setSelectedTask(null);
 
-    // Modo diário: sempre vai para leitura de análise após cada tarefa
+    // Modo diário: alterna entre "escrever" e "ler análise" após cada tarefa
     if (isDiaryMode) {
       if (available.length - 1 === 0) {
         setStep("summary");
       } else {
-        setDiaryPhase("after_analysis");
-        setStep("reading_analysis");
+        // vai para o próximo passo do diário e já prepara o alternado para depois
+        setStep(nextDiaryStep);
+        setNextDiaryStep(nextDiaryStep === "reading_analysis" ? "writing_diary" : "reading_analysis");
       }
       return;
     }
