@@ -101,10 +101,19 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
           <span className={styles.headerTitle}>Lazy Falcon Mode</span>
           <span className={styles.headerSub}>Ciclo {cycle} • ✅ {completed} • 💾 {saved.length}</span>
         </div>
-        <button className={styles.closeBtn} onClick={onClose}>✕</button>
+        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
       </div>
 
       <div className={styles.body}>
+
+        {/* Banner de sessão restaurada */}
+        {wasRestored && step !== "select_activity" && step !== "summary" && (
+          <div className={styles.resumeBanner}>
+            ↩ Sessão restaurada — {activity ? `${activity} • ` : ""}Ciclo {cycle}, {completed} tarefa(s) concluída(s)
+            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
+          </div>
+        )}
+
         {saved.length > 0 && step !== "summary" && (
           <>
             <div>
