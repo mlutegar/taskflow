@@ -33,6 +33,24 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
   const numTasks = cycle;
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
 
+  // ── Persistir no localStorage toda vez que o estado relevante mudar ─────
+  useEffect(() => {
+    if (step === "summary") return;
+    persist({
+      step,
+      activity,
+      cycle,
+      taskInCycle,
+      completed,
+      doneIds:        [...doneIds],
+      selectedTaskId: selectedTask?.id ?? null,
+      isDiaryMode,
+      nextDiaryStep,
+    });
+  }, [step, activity, cycle, taskInCycle, completed, doneIds, selectedTask, isDiaryMode, nextDiaryStep]); // eslint-disable-line
+
+  const handleClose = () => { clearSaved(); onClose(); };
+
   const selectActivity = (a) => {
     setActivity(a);
     if (a === DIARY_MODE_ACTIVITY) {
