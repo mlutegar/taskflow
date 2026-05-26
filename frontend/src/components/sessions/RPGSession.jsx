@@ -119,6 +119,14 @@ export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, o
       </div>
 
       <div className={styles.body}>
+
+        {wasRestored && step !== "dashboard" && step !== "create" && step !== "quest_result" && (
+          <div className={styles.resumeBanner}>
+            ↩ Sessão RPG restaurada — {char?.name ?? "personagem"} retomando quest
+            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
+          </div>
+        )}
+
         {step === "create" && (
           <>
             <div className={styles.promptBox}>
