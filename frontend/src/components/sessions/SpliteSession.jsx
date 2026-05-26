@@ -190,7 +190,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
             <>
               {isDiaryMode ? (
                 <div className={styles.cycleBadge}>
-                  {diaryPhase === "first_task" ? "📓 Tarefa após diário" : `🔍 Tarefa após análise`}
+                  {nextDiaryStep === "writing_diary" ? "🔍 Tarefa após análise" : "📓 Tarefa após diário"}
                 </div>
               ) : (
                 <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
