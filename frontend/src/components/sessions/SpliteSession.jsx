@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
 import SubtaskInline from "./SubtaskInline";
 import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
+import { useSessionPersist } from "../../lib/useSessionPersist";
 
 const ACTIVITIES = [
   "Ler diário", "Escrever no diário", "Beber água", "Jogar Spelunky",
@@ -13,17 +14,21 @@ const ACTIVITIES = [
 const DIARY_MODE_ACTIVITY = "Escrever no diário";
 
 export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  const [step, setStep] = useState("select_activity");
-  const [activity, setActivity] = useState(null);
-  const [cycle, setCycle] = useState(1);
-  const [taskInCycle, setTaskInCycle] = useState(0);
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [completed, setCompleted] = useState(0);
-  const [doneIds, setDoneIds] = useState(new Set());
-  // Controle do modo diário
-  const [isDiaryMode, setIsDiaryMode] = useState(false);
-  // Qual passo do diário aparece DEPOIS da próxima tarefa concluída
-  const [nextDiaryStep, setNextDiaryStep] = useState("reading_analysis");
+  const { saved, persist, clearSaved } = useSessionPersist("splite");
+
+  const [step,          setStep]          = useState(saved?.step          ?? "select_activity");
+  const [activity,      setActivity]      = useState(saved?.activity      ?? null);
+  const [cycle,         setCycle]         = useState(saved?.cycle         ?? 1);
+  const [taskInCycle,   setTaskInCycle]   = useState(saved?.taskInCycle   ?? 0);
+  const [selectedTask,  setSelectedTask]  = useState(() => {
+    if (!saved?.selectedTaskId) return null;
+    return tasks.find((t) => t.id === saved.selectedTaskId) || null;
+  });
+  const [completed,     setCompleted]     = useState(saved?.completed     ?? 0);
+  const [doneIds,       setDoneIds]       = useState(() => new Set(saved?.doneIds ?? []));
+  const [isDiaryMode,   setIsDiaryMode]   = useState(saved?.isDiaryMode   ?? false);
+  const [nextDiaryStep, setNextDiaryStep] = useState(saved?.nextDiaryStep ?? "reading_analysis");
+  const [wasRestored,   setWasRestored]   = useState(!!saved);
 
   const numTasks = cycle;
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
