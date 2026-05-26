@@ -287,7 +287,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
                 : <div className={styles.summaryText}>{completed} tarefa(s) em {cycle} ciclo(s) com "{activity}".</div>
               }
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { clearSaved(); onClose(); }}>Fechar</button>
           </>
         )}
 
