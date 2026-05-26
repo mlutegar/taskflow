@@ -158,6 +158,12 @@ class SpliteMode(BaseMode):
                 for i, date_str in enumerate(dates, 1):
                     console.print(f"  [bright_cyan]{i}.[/bright_cyan] {date_str}")
                 console.print("")
+            elif self.chosen_activity == "Escrever no diário":
+                dates = [self._generate_random_diary_date() for _ in range(cycle)]
+                console.print("[bold_yellow]✍️  Data(s) sugerida(s) para escrever:[/bold_yellow]")
+                for i, date_str in enumerate(dates, 1):
+                    console.print(f"  [bright_cyan]{i}.[/bright_cyan] {date_str}")
+                console.print("")
 
             pause("Press ENTER when you've done the activity... ")
 
