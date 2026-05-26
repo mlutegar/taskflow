@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
 import CountdownTimer from "../CountdownTimer";
 import SubtaskInline from "./SubtaskInline";
+import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
 
 const CLASSES = {
