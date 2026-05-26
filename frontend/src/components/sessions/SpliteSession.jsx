@@ -161,7 +161,9 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
           <>
             {isDiaryMode ? (
               <div className={styles.cycleBadge}>
-                {diaryPhase === "first_task" ? "📓 Após escrever — Tarefa 1" : `🔍 Após análise — Tarefa ${completed + 1}`}
+                {/* nextDiaryStep já aponta para o PRÓXIMO, então o atual foi o oposto */}
+                {nextDiaryStep === "writing_diary" ? "🔍 Após análise — Tarefa" : "📓 Após escrever — Tarefa"}
+                {` ${completed + 1}`}
               </div>
             ) : (
               <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
@@ -169,7 +171,14 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
             <TaskSelector
               tasks={available}
               onSelect={(t) => { setSelectedTask(t); setStep("working"); }}
-              onCancel={() => setStep(isDiaryMode ? (diaryPhase === "first_task" ? "writing_diary" : "reading_analysis") : "doing_activity")}
+              onCancel={() => {
+                if (isDiaryMode) {
+                  // volta para o passo que estava antes (oposto do nextDiaryStep)
+                  setStep(nextDiaryStep === "writing_diary" ? "reading_analysis" : "writing_diary");
+                } else {
+                  setStep("doing_activity");
+                }
+              }}
             />
           </>
         )}
