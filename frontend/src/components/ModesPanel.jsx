@@ -501,7 +501,8 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
 
       {activeSession && (
         <ModeSession
-          modeId={activeSession}
+          modeId={activeSession.id}
+          mode={activeSession}
           tasks={tasks}
           routines={routines}
           onCompleteTask={onCompleteTask}
