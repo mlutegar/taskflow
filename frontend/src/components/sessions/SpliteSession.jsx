@@ -129,7 +129,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
             </div>
             <button
               className={`${styles.btn} ${styles.btnPrimary}`}
-              onClick={() => { setDiaryPhase("first_task"); setStep("select_task"); }}
+              onClick={() => setStep("select_task")}
             >
               ✅ Escrevi! Partir para a tarefa
             </button>
