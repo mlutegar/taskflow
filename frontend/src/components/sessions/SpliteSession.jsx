@@ -103,7 +103,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
             {isDiaryMode ? `${completed} tarefa(s) concluída(s)` : `Ciclo ${cycle} • ${completed} concluída(s)`}
           </span>
         </div>
-        <button className={styles.closeBtn} onClick={onClose}>✕</button>
+        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
       </div>
 
       <div className={styles.body}>
