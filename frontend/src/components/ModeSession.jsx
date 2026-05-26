@@ -99,12 +99,26 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
   };
 
   const Session = SESSION_MAP[modeId];
-  if (!Session) return null;
+
+  // Modo personalizado: usa sessão genérica se não há entrada no mapa
+  const isCustom = !Session && mode?.isCustom;
+  if (!Session && !isCustom) return null;
 
   return (
     <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={styles.modal}>
-        <Session tasks={items} onCompleteTask={wrappedCompleteTask} onToggleChecklist={wrappedToggleChecklist} onAddChecklist={wrappedAddChecklist} onClose={onClose} />
+        {isCustom ? (
+          <CustomModeSession
+            mode={mode}
+            tasks={items}
+            onCompleteTask={wrappedCompleteTask}
+            onToggleChecklist={wrappedToggleChecklist}
+            onAddChecklist={wrappedAddChecklist}
+            onClose={onClose}
+          />
+        ) : (
+          <Session tasks={items} onCompleteTask={wrappedCompleteTask} onToggleChecklist={wrappedToggleChecklist} onAddChecklist={wrappedAddChecklist} onClose={onClose} />
+        )}
 
         {/* ── Quick-Add bar ─────────────────────────────────── */}
         <div className={styles.quickAddBar}>
