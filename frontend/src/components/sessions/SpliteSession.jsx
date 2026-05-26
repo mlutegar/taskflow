@@ -187,6 +187,8 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
         {/* ── Trabalhando na tarefa ── */}
         {step === "working" && selectedTask && (() => {
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
+          const hasChecklist = live.checklist?.length > 0;
+
           return (
             <>
               {isDiaryMode ? (
@@ -196,28 +198,35 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
               ) : (
                 <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
               )}
+
               <div className={styles.taskDisplay}>
                 <span className={styles.taskName}>{live.title}</span>
                 {live.description && <span className={styles.taskMeta}>{live.description}</span>}
-                {live.checklist?.length > 0 && (
-                  <div className={styles.taskChecklist}>
-                    <span className={styles.taskChecklistLabel}>Subtarefas</span>
-                    {live.checklist.map((item) => (
-                      <button
-                        key={item.id}
-                        className={`${styles.checklistRow} ${item.completed ? styles.checklistRowDone : ""}`}
-                        onClick={() => onToggleChecklist?.(live.id, item.id)}
-                      >
-                        <span className={styles.checklistBox}>{item.completed ? "✓" : ""}</span>
-                        <span className={styles.checklistRowText}>{item.description}</span>
-                      </button>
-                    ))}
-                  </div>
+
+                {/* Subtarefas com auto-avanço */}
+                {hasChecklist && (
+                  <SubtaskFlow
+                    checklist={live.checklist}
+                    onToggle={(itemId) => onToggleChecklist?.(live.id, itemId)}
+                    onAllDone={completeTask}
+                    onSkip={completeTask}
+                  />
                 )}
               </div>
+
               <div className={styles.actions}>
-                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={completeTask}>✅ Concluída!</button>
-                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { setSelectedTask(null); setStep("select_task"); }}>Trocar tarefa</button>
+                {/* Só mostra "Concluída" direto se não houver checklist */}
+                {!hasChecklist && (
+                  <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={completeTask}>
+                    ✅ Concluída!
+                  </button>
+                )}
+                <button
+                  className={`${styles.btn} ${styles.btnSecondary}`}
+                  onClick={() => { setSelectedTask(null); setStep("select_task"); }}
+                >
+                  Trocar tarefa
+                </button>
                 <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
               </div>
             </>
