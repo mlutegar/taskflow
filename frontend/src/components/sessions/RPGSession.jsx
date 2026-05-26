@@ -115,7 +115,7 @@ export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, o
           <span className={styles.headerTitle}>RPG Class Mode</span>
           <span className={styles.headerSub}>{char ? `${char.name} • Lv.${level} ${lvName}` : "Novo personagem"}</span>
         </div>
-        <button className={styles.closeBtn} onClick={onClose}>✕</button>
+        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
       </div>
 
       <div className={styles.body}>
