@@ -241,7 +241,7 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
               <div className={styles.summaryTitle}>Sessão encerrada!</div>
               <div className={styles.summaryText}>{completed} concluída(s) • {saved.length} salva(s) • {cycle} ciclo(s)</div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { clearSess(); onClose(); }}>Fechar</button>
           </>
         )}
       </div>
