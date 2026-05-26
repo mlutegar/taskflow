@@ -260,7 +260,7 @@ export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, o
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { setSelectedTask(null); setDifficulty(null); setStep("dashboard"); }}>
               Voltar ao Dashboard
             </button>
-            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onClose}>Encerrar sessão</button>
+            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { clearSess(); onClose(); }}>Encerrar sessão</button>
           </>
         )}
       </div>
