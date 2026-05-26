@@ -108,6 +108,14 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
 
       <div className={styles.body}>
 
+        {/* Banner de sessão restaurada */}
+        {wasRestored && step !== "select_activity" && step !== "summary" && (
+          <div className={styles.resumeBanner}>
+            ↩ Sessão restaurada — {activity ? `${activity} • ` : ""}Ciclo {cycle}, {completed} tarefa(s) concluída(s)
+            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
+          </div>
+        )}
+
         {/* ── Seleção de atividade ── */}
         {step === "select_activity" && (
           <>
