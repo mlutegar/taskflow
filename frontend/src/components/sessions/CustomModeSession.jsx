@@ -199,7 +199,7 @@ export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggl
                   : "Sessão encerrada sem tarefas concluídas."}
               </div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
           </>
         )}
 
