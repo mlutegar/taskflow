@@ -4,6 +4,7 @@ import CountdownTimer from "../CountdownTimer";
 import SubtaskInline from "./SubtaskInline";
 import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
+import { useSessionPersist } from "../../lib/useSessionPersist";
 
 const CLASSES = {
   warrior: { name: "Warrior", emoji: "⚔️", desc: "Foco intenso e resistência", focus: 30, color: "#e05252" },
