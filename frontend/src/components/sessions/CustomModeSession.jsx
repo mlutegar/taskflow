@@ -52,7 +52,7 @@ export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggl
           <span className={styles.headerTitle}>{mode?.name || "Modo Personalizado"}</span>
           <span className={styles.headerSub}>{completed} tarefa(s) concluída(s)</span>
         </div>
-        <button className={styles.closeBtn} onClick={onClose}>✕</button>
+        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
       </div>
 
       <div className={styles.body}>
