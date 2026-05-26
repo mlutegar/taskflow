@@ -91,25 +91,15 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
     // Se wasCompleted → apenas desmarcou, sem navegar
   };
 
-  // Bloco de checklist reutilizável (usa handleSubtaskToggle)
+  // Bloco de checklist reutilizável com auto-avanço (usa handleSubtaskToggle)
   const renderChecklist = (live) =>
     live.checklist?.length > 0 && (
-      <div className={styles.taskChecklist}>
-        <span className={styles.taskChecklistLabel}>
-          ✓ Conclua uma subtarefa para ir para a próxima música
-        </span>
-        {live.checklist.map((item) => (
-          <button
-            key={item.id}
-            className={`${styles.checklistRow} ${item.completed ? styles.checklistRowDone : ""}`}
-            onClick={() => handleSubtaskToggle(live.id, item.id)}
-            disabled={item.completed}
-          >
-            <span className={styles.checklistBox}>{item.completed ? "✓" : ""}</span>
-            <span className={styles.checklistRowText}>{item.description}</span>
-          </button>
-        ))}
-      </div>
+      <SubtaskFlow
+        checklist={live.checklist}
+        onToggle={(itemId) => handleSubtaskToggle(live.id, itemId)}
+        onAllDone={completeTask}
+        onSkip={completeTask}
+      />
     );
 
   return (
