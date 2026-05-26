@@ -40,6 +40,22 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
   const numTasks = cycle;
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
 
+  // ── Persistir estado de sessão ───────────────────────────────────────────
+  useEffect(() => {
+    if (step === "summary") return;
+    persistSess({
+      step,
+      activity,
+      cycle,
+      taskInCycle,
+      completed,
+      doneIds:        [...doneIds],
+      selectedTaskId: selectedTask?.id ?? null,
+    });
+  }, [step, activity, cycle, taskInCycle, completed, doneIds, selectedTask]); // eslint-disable-line
+
+  const handleClose = () => { clearSess(); onClose(); };
+
   const doSave = (note) => {
     const existing = saved.findIndex((s) => s.task_id === selectedTask.id);
     let updated;
