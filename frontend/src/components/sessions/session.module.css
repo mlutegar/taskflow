@@ -448,6 +448,82 @@
   opacity: 0.5;
 }
 
+/* ── SubtaskFlow ─────────────────────────────────────── */
+.subtaskFlow {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.subtaskProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.subtaskProgressLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.subtaskProgressBar {
+  height: 4px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.subtaskProgressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  min-width: 0;
+}
+
+.subtaskCurrent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: rgba(124,110,245,0.10);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  margin: 2px 0;
+}
+
+.subtaskCurrentArrow {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.subtaskCurrentText {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.checklistRowPending {
+  opacity: 0.4;
+}
+
+.subtaskFlowDone {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--success);
+  padding: 6px 0;
+}
+
 /* ── Subtask inline form ─────────────────────────────── */
 .subtaskInline {
   display: flex;
