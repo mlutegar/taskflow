@@ -33,23 +33,43 @@ function loadChar() { try { return JSON.parse(localStorage.getItem(LS_KEY)); } c
 function saveChar(d) { localStorage.setItem(LS_KEY, JSON.stringify(d)); }
 
 export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  const [step, setStep] = useState("loading");
-  const [char, setChar] = useState(null);
-  const [charName, setCharName] = useState("");
-  const [selClass, setSelClass] = useState("warrior");
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [difficulty, setDifficulty] = useState(null);
-  const [xpGained, setXpGained] = useState(0);
-  const [leveledUp, setLeveledUp] = useState(false);
-  const [doneIds, setDoneIds] = useState(new Set());
+  const { saved: sessState, persist: persistSess, clearSaved: clearSess } = useSessionPersist("rpg");
 
+  const [step,         setStep]         = useState("loading");
+  const [char,         setChar]         = useState(null);
+  const [charName,     setCharName]     = useState("");
+  const [selClass,     setSelClass]     = useState("warrior");
+  const [selectedTask, setSelectedTask] = useState(() => {
+    if (!sessState?.selectedTaskId) return null;
+    return tasks.find((t) => t.id === sessState.selectedTaskId) || null;
+  });
+  const [difficulty,  setDifficulty]  = useState(sessState?.difficulty ?? null);
+  const [xpGained,    setXpGained]    = useState(0);
+  const [leveledUp,   setLeveledUp]   = useState(false);
+  const [doneIds,     setDoneIds]     = useState(() => new Set(sessState?.doneIds ?? []));
+  const [wasRestored, setWasRestored] = useState(!!sessState);
+
+  // Carrega personagem e restaura step de sessão
   useEffect(() => {
     const saved = loadChar();
-    if (saved) { setChar(saved); setStep("dashboard"); }
-    else setStep("create");
-  }, []);
+    if (saved) {
+      setChar(saved);
+      // Restaura step de sessão se havia uma em progresso
+      setStep(sessState?.step ?? "dashboard");
+    } else {
+      setStep("create");
+    }
+  }, []); // eslint-disable-line
 
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
+
+  // Persistir estado de sessão
+  useEffect(() => {
+    if (!char || step === "loading" || step === "quest_result") return;
+    persistSess({ step, doneIds: [...doneIds], selectedTaskId: selectedTask?.id ?? null, difficulty });
+  }, [step, doneIds, selectedTask, difficulty]); // eslint-disable-line
+
+  const handleClose = () => { clearSess(); onClose(); };
 
   const createChar = () => {
     if (!charName.trim()) return;
