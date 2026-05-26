@@ -57,6 +57,13 @@ export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggl
 
       <div className={styles.body}>
 
+        {wasRestored && step !== "intro" && step !== "summary" && (
+          <div className={styles.resumeBanner}>
+            ↩ Sessão restaurada — {completed} tarefa(s) concluída(s)
+            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
+          </div>
+        )}
+
         {/* ── Introdução ── */}
         {step === "intro" && (
           <>
