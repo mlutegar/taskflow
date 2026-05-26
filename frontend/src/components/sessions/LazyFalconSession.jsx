@@ -150,19 +150,12 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
                 <span className={styles.taskName}>{live.title}</span>
                 {live.description && <span className={styles.taskMeta}>{live.description}</span>}
                 {live.checklist?.length > 0 && (
-                  <div className={styles.taskChecklist}>
-                    <span className={styles.taskChecklistLabel}>Subtarefas</span>
-                    {live.checklist.map((item) => (
-                      <button
-                        key={item.id}
-                        className={`${styles.checklistRow} ${item.completed ? styles.checklistRowDone : ""}`}
-                        onClick={() => onToggleChecklist?.(live.id, item.id)}
-                      >
-                        <span className={styles.checklistBox}>{item.completed ? "✓" : ""}</span>
-                        <span className={styles.checklistRowText}>{item.description}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <SubtaskFlow
+                    checklist={live.checklist}
+                    onToggle={(itemId) => onToggleChecklist?.(live.id, itemId)}
+                    onAllDone={doFinalize}
+                    onSkip={doFinalize}
+                  />
                 )}
               </div>
               <div className={styles.actions}>
