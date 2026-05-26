@@ -1,17 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
 import CountdownTimer from "../CountdownTimer";
 import SubtaskInline from "./SubtaskInline";
 import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
+import { useSessionPersist } from "../../lib/useSessionPersist";
 
 export default function MomentumSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  const [step, setStep] = useState("phone_check");
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [completed, setCompleted] = useState(0);
-  const [doneIds, setDoneIds] = useState(new Set());
+  const { saved, persist, clearSaved } = useSessionPersist("momentum");
+
+  const [step,        setStep]        = useState(saved?.step      ?? "phone_check");
+  const [completed,   setCompleted]   = useState(saved?.completed ?? 0);
+  const [doneIds,     setDoneIds]     = useState(() => new Set(saved?.doneIds ?? []));
+  const [selectedTask, setSelectedTask] = useState(() => {
+    if (!saved?.selectedTaskId) return null;
+    return tasks.find((t) => t.id === saved.selectedTaskId) || null;
+  });
+  const [wasRestored, setWasRestored] = useState(!!saved);
 
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
+
+  // Persistir sempre que estado mudar
+  useEffect(() => {
+    if (step === "summary") return;
+    persist({ step, completed, doneIds: [...doneIds], selectedTaskId: selectedTask?.id ?? null });
+  }, [step, completed, doneIds, selectedTask]); // eslint-disable-line
+
+  const handleClose       = () => { clearSaved(); onClose(); };
+  const handleSummaryClose = () => { clearSaved(); onClose(); };
 
   const completeTask = async () => {
     await onCompleteTask(selectedTask.id);
@@ -29,10 +45,18 @@ export default function MomentumSession({ tasks, onCompleteTask, onToggleCheckli
           <span className={styles.headerTitle}>Momentum Mode</span>
           <span className={styles.headerSub}>{completed} tarefa(s) concluída(s)</span>
         </div>
-        <button className={styles.closeBtn} onClick={onClose}>✕</button>
+        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
       </div>
 
       <div className={styles.body}>
+
+        {wasRestored && step !== "phone_check" && step !== "summary" && (
+          <div className={styles.resumeBanner}>
+            ↩ Sessão restaurada — {completed} tarefa(s) concluída(s)
+            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
+          </div>
+        )}
+
         {step === "phone_check" && (
           <>
             <div className={styles.promptBox}>
@@ -44,7 +68,7 @@ export default function MomentumSession({ tasks, onCompleteTask, onToggleCheckli
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("select_task")}>
               ✅ Celular está longe
             </button>
-            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={onClose}>
+            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleClose}>
               Não, preciso guardar primeiro
             </button>
           </>
@@ -117,7 +141,7 @@ export default function MomentumSession({ tasks, onCompleteTask, onToggleCheckli
               <div className={styles.summaryTitle}>Momentum gerado!</div>
               <div className={styles.summaryText}>{completed > 0 ? `${completed} tarefa(s) concluída(s).` : "Você apareceu. Isso importa."}</div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
           </>
         )}
       </div>
