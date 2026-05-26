@@ -60,32 +60,28 @@ export default function MomentumSession({ tasks, onCompleteTask, onToggleCheckli
 
         {step === "ready_timer" && selectedTask && (() => {
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
+          const hasChecklist = live.checklist?.length > 0;
           return (
             <>
               <div className={styles.infoPill}>⚡ Objetivo: apenas COMEÇAR. Mínimo esforço!</div>
               <div className={styles.taskDisplay}>
                 <span className={styles.taskName}>{live.title}</span>
                 {live.description && <span className={styles.taskMeta}>{live.description}</span>}
-                {live.checklist?.length > 0 && (
-                  <div className={styles.taskChecklist}>
-                    <span className={styles.taskChecklistLabel}>Subtarefas</span>
-                    {live.checklist.map((item) => (
-                      <button
-                        key={item.id}
-                        className={`${styles.checklistRow} ${item.completed ? styles.checklistRowDone : ""}`}
-                        onClick={() => onToggleChecklist?.(live.id, item.id)}
-                      >
-                        <span className={styles.checklistBox}>{item.completed ? "✓" : ""}</span>
-                        <span className={styles.checklistRowText}>{item.description}</span>
-                      </button>
-                    ))}
-                  </div>
+                {hasChecklist && (
+                  <SubtaskFlow
+                    checklist={live.checklist}
+                    onToggle={(itemId) => onToggleChecklist?.(live.id, itemId)}
+                    onAllDone={completeTask}
+                    onSkip={() => setStep("timing")}
+                  />
                 )}
               </div>
               <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
-              <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
-                ▶ Iniciar timer de 5 minutos
-              </button>
+              {!hasChecklist && (
+                <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("timing")}>
+                  ▶ Iniciar timer de 5 minutos
+                </button>
+              )}
             </>
           );
         })()}
