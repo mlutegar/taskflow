@@ -1,26 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
 import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
+import { useSessionPersist } from "../../lib/useSessionPersist";
 
 export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  const [step, setStep] = useState("intro");
-  const [cycle, setCycle] = useState(1);
-  const [taskInCycle, setTaskInCycle] = useState(0);
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [completed, setCompleted] = useState(0);
-  const [doneIds, setDoneIds] = useState(new Set());
-  const [showSubtask, setShowSubtask] = useState(false);
-  const [subtaskText, setSubtaskText] = useState("");
-  const [savingSubtask, setSavingSubtask] = useState(false);
+  const { saved, persist, clearSaved } = useSessionPersist("tiktok");
 
+  // ── Estado — inicializa do localStorage se houver sessão salva ──────────
+  const [step,        setStep]        = useState(saved?.step        ?? "intro");
+  const [cycle,       setCycle]       = useState(saved?.cycle       ?? 1);
+  const [taskInCycle, setTaskInCycle] = useState(saved?.taskInCycle ?? 0);
+  const [completed,   setCompleted]   = useState(saved?.completed   ?? 0);
+  const [doneIds,     setDoneIds]     = useState(() => new Set(saved?.doneIds ?? []));
+  const [selectedTask, setSelectedTask] = useState(() => {
+    if (!saved?.selectedTaskId) return null;
+    return tasks.find((t) => t.id === saved.selectedTaskId) || null;
+  });
+  const [showSubtask,   setShowSubtask]   = useState(false);
+  const [subtaskText,   setSubtaskText]   = useState("");
+  const [savingSubtask, setSavingSubtask] = useState(false);
+  const [wasRestored,   setWasRestored]   = useState(!!saved);
+
+  // ── Persistir no localStorage toda vez que o estado relevante mudar ─────
+  useEffect(() => {
+    if (step === "summary") return; // sessão encerrada — não vale a pena salvar
+    persist({
+      step,
+      cycle,
+      taskInCycle,
+      completed,
+      doneIds:        [...doneIds],
+      selectedTaskId: selectedTask?.id ?? null,
+    });
+  }, [step, cycle, taskInCycle, completed, doneIds, selectedTask]); // eslint-disable-line
+
+  // ── Derivados ────────────────────────────────────────────────────────────
   const numVideos = cycle * 5;
-  const numTasks = cycle;
+  const numTasks  = cycle;
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
 
   const resetSubtask = () => { setShowSubtask(false); setSubtaskText(""); };
 
-  // Avança fase após concluir a TAREFA inteira (marca como done, remove de available)
+  // ── Handlers de conclusão ────────────────────────────────────────────────
   const advanceAfterTaskComplete = (removedTaskId) => {
     resetSubtask();
     setCompleted((c) => c + 1);
@@ -37,7 +59,6 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
     }
   };
 
-  // Avança fase após concluir uma SUBTAREFA (tarefa continua ativa, disponível nos próximos ciclos)
   const advanceAfterSubtaskComplete = () => {
     resetSubtask();
     setCompleted((c) => c + 1);
@@ -59,19 +80,12 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
     advanceAfterTaskComplete(selectedTask.id);
   };
 
-  // Ao marcar uma subtarefa como concluída → avança a fase automaticamente
   const handleSubtaskToggle = async (taskId, itemId) => {
     const currentTask = tasks.find((t) => t.id === taskId);
     const item = currentTask?.checklist?.find((c) => c.id === itemId);
     const wasCompleted = item?.completed ?? true;
-
     await onToggleChecklist?.(taskId, itemId);
-
-    if (!wasCompleted) {
-      // Acabou de concluir uma subtarefa → avança fase
-      advanceAfterSubtaskComplete();
-    }
-    // Se wasCompleted = true → só desmarcou, sem avançar
+    if (!wasCompleted) advanceAfterSubtaskComplete();
   };
 
   const handleAddSubtask = async (e) => {
@@ -87,6 +101,18 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
     }
   };
 
+  // ── Encerrar — limpa o estado salvo ─────────────────────────────────────
+  const handleClose = () => {
+    clearSaved();
+    onClose();
+  };
+
+  const handleSummaryClose = () => {
+    clearSaved();
+    onClose();
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className={styles.root}>
       <div className={styles.header}>
@@ -95,10 +121,19 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
           <span className={styles.headerTitle}>TikTok Mode</span>
           <span className={styles.headerSub}>Ciclo {cycle} • {completed} concluída(s)</span>
         </div>
-        <button className={styles.closeBtn} onClick={onClose}>✕</button>
+        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
       </div>
 
       <div className={styles.body}>
+
+        {/* Banner de sessão restaurada */}
+        {wasRestored && step !== "intro" && step !== "summary" && (
+          <div className={styles.resumeBanner}>
+            ↩ Sessão restaurada — Ciclo {cycle}, {completed} tarefa(s) concluída(s)
+            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
+          </div>
+        )}
+
         {step === "intro" && (
           <>
             <div className={styles.promptBox}>
@@ -158,16 +193,12 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
         {step === "working" && selectedTask && (() => {
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
           const hasChecklist = live.checklist?.length > 0;
-
           return (
             <>
               <div className={styles.cycleBadge}>Ciclo {cycle} — {taskInCycle + 1} de {numTasks}</div>
-
               <div className={styles.taskDisplay}>
                 <span className={styles.taskName}>{live.title}</span>
                 {live.description && <span className={styles.taskMeta}>{live.description}</span>}
-
-                {/* Subtarefas com auto-avanço: cada subtarefa concluída avança a fase */}
                 {hasChecklist ? (
                   <SubtaskFlow
                     checklist={live.checklist}
@@ -177,7 +208,7 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
                   />
                 ) : (
                   <div className={styles.taskMeta} style={{ marginTop: 4 }}>
-                    💡 Sem subtarefas — adicione uma abaixo para avançar por subtarefa, ou conclua a tarefa direto.
+                    💡 Sem subtarefas — adicione uma abaixo ou conclua a tarefa direto.
                   </div>
                 )}
               </div>
@@ -192,41 +223,19 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
                     autoFocus
                   />
                   <div className={styles.actionsRow}>
-                    <button
-                      type="submit"
-                      className={`${styles.btn} ${styles.btnPrimary}`}
-                      disabled={!subtaskText.trim() || savingSubtask}
-                    >
+                    <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={!subtaskText.trim() || savingSubtask}>
                       {savingSubtask ? "…" : "✓ Adicionar"}
                     </button>
-                    <button
-                      type="button"
-                      className={`${styles.btn} ${styles.btnSecondary}`}
-                      onClick={resetSubtask}
-                    >
-                      Cancelar
-                    </button>
+                    <button type="button" className={`${styles.btn} ${styles.btnSecondary}`} onClick={resetSubtask}>Cancelar</button>
                   </div>
                 </form>
               )}
 
               <div className={styles.actions}>
-                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={completeTask}>
-                  ✅ Concluir tarefa
-                </button>
-                <button
-                  className={`${styles.btn} ${styles.btnSecondary}`}
-                  onClick={() => { setSelectedTask(null); setStep("select_task"); resetSubtask(); }}
-                >
-                  Trocar tarefa
-                </button>
+                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={completeTask}>✅ Concluir tarefa</button>
+                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { setSelectedTask(null); setStep("select_task"); resetSubtask(); }}>Trocar tarefa</button>
                 {onAddChecklist && !showSubtask && (
-                  <button
-                    className={`${styles.btn} ${styles.btnSecondary}`}
-                    onClick={() => setShowSubtask(true)}
-                  >
-                    📌 Adicionar subtarefa
-                  </button>
+                  <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setShowSubtask(true)}>📌 Adicionar subtarefa</button>
                 )}
               </div>
             </>
@@ -237,19 +246,12 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
           <>
             <div className={styles.promptBox}>
               <div className={styles.promptTitle}>🎉 Ciclo {cycle} completo!</div>
-              <div className={styles.promptText}>
-                Próximo: {(cycle + 1) * 5} vídeos → {cycle + 1} tarefa(s) ou subtarefa(s)
-              </div>
+              <div className={styles.promptText}>Próximo: {(cycle + 1) * 5} vídeos → {cycle + 1} tarefa(s) ou subtarefa(s)</div>
             </div>
-            <button
-              className={`${styles.btn} ${styles.btnPrimary}`}
-              onClick={() => { setCycle((c) => c + 1); setStep("watching"); }}
-            >
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { setCycle((c) => c + 1); setStep("watching"); }}>
               📱 Próximo ciclo
             </button>
-            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("summary")}>
-              Encerrar
-            </button>
+            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("summary")}>Encerrar</button>
           </>
         )}
 
@@ -260,7 +262,7 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
               <div className={styles.summaryTitle}>Sessão encerrada!</div>
               <div className={styles.summaryText}>{completed} tarefa(s)/subtarefa(s) em {cycle} ciclo(s).</div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
           </>
         )}
       </div>
