@@ -425,7 +425,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
                 <div className={styles.cardActions}>
                   <button
                     className={styles.startBtn}
-                    onClick={() => setActiveSession(mode.id)}
+                    onClick={() => setActiveSession(mode)}
                     title={`Iniciar ${mode.name}`}
                   >
                     ▶ Iniciar
