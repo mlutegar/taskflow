@@ -21,8 +21,8 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
   const [doneIds, setDoneIds] = useState(new Set());
   // Controle do modo diário
   const [isDiaryMode, setIsDiaryMode] = useState(false);
-  // "first_task" = após escrever, antes da análise | "after_analysis" = após ler análise
-  const [diaryPhase, setDiaryPhase] = useState(null);
+  // Qual passo do diário aparece DEPOIS da próxima tarefa concluída
+  const [nextDiaryStep, setNextDiaryStep] = useState("reading_analysis");
 
   const numTasks = cycle;
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
