@@ -158,7 +158,6 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
         {step === "working" && selectedTask && (() => {
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
           const hasChecklist = live.checklist?.length > 0;
-          const pendingItems = live.checklist?.filter((c) => !c.completed) ?? [];
 
           return (
             <>
@@ -168,28 +167,14 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
                 <span className={styles.taskName}>{live.title}</span>
                 {live.description && <span className={styles.taskMeta}>{live.description}</span>}
 
+                {/* Subtarefas com auto-avanço: cada subtarefa concluída avança a fase */}
                 {hasChecklist ? (
-                  <div className={styles.taskChecklist}>
-                    <span className={styles.taskChecklistLabel}>
-                      ✓ Conclua uma subtarefa para avançar de fase
-                    </span>
-                    {live.checklist.map((item) => (
-                      <button
-                        key={item.id}
-                        className={`${styles.checklistRow} ${item.completed ? styles.checklistRowDone : ""}`}
-                        onClick={() => handleSubtaskToggle(live.id, item.id)}
-                        disabled={item.completed}
-                      >
-                        <span className={styles.checklistBox}>{item.completed ? "✓" : ""}</span>
-                        <span className={styles.checklistRowText}>{item.description}</span>
-                      </button>
-                    ))}
-                    {pendingItems.length === 0 && (
-                      <span className={styles.taskMeta} style={{ marginTop: 4 }}>
-                        Todas as subtarefas concluídas! Use "Concluir tarefa" abaixo.
-                      </span>
-                    )}
-                  </div>
+                  <SubtaskFlow
+                    checklist={live.checklist}
+                    onToggle={(itemId) => handleSubtaskToggle(live.id, itemId)}
+                    onAllDone={completeTask}
+                    onSkip={completeTask}
+                  />
                 ) : (
                   <div className={styles.taskMeta} style={{ marginTop: 4 }}>
                     💡 Sem subtarefas — adicione uma abaixo para avançar por subtarefa, ou conclua a tarefa direto.
