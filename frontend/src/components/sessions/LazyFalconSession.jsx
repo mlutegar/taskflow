@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
 import SubtaskInline from "./SubtaskInline";
 import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
+import { useSessionPersist } from "../../lib/useSessionPersist";
 
 const ACTIVITIES = [
   "Ler diário", "Escrever no diário", "Beber água", "Jogar Spelunky",
@@ -10,22 +11,31 @@ const ACTIVITIES = [
   "Esticar 5 minutos", "Meditar", "Fazer exercícios rápidos", "Organizar algo", "Responder mensagens",
 ];
 
+// Tarefas "salvas para depois" (feature do LazyFalcon, separada do estado de sessão)
 const LS_KEY = "taskflow_lazyfal_saved";
-
 function loadSaved() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } }
 function persistSaved(d) { localStorage.setItem(LS_KEY, JSON.stringify(d)); }
 
 export default function LazyFalconSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  const [step, setStep] = useState("select_activity");
-  const [activity, setActivity] = useState(null);
-  const [cycle, setCycle] = useState(1);
-  const [taskInCycle, setTaskInCycle] = useState(0);
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [completed, setCompleted] = useState(0);
-  const [doneIds, setDoneIds] = useState(new Set());
-  const [saved, setSaved] = useState(() => loadSaved());
+  // Persistência do estado de sessão (ciclo, progresso, etc.)
+  const { saved: sessState, persist: persistSess, clearSaved: clearSess } = useSessionPersist("lazyfal");
+
+  const [step,        setStep]        = useState(sessState?.step        ?? "select_activity");
+  const [activity,    setActivity]    = useState(sessState?.activity    ?? null);
+  const [cycle,       setCycle]       = useState(sessState?.cycle       ?? 1);
+  const [taskInCycle, setTaskInCycle] = useState(sessState?.taskInCycle ?? 0);
+  const [selectedTask, setSelectedTask] = useState(() => {
+    if (!sessState?.selectedTaskId) return null;
+    return tasks.find((t) => t.id === sessState.selectedTaskId) || null;
+  });
+  const [completed,   setCompleted]   = useState(sessState?.completed   ?? 0);
+  const [doneIds,     setDoneIds]     = useState(() => new Set(sessState?.doneIds ?? []));
+  const [wasRestored, setWasRestored] = useState(!!sessState);
+
+  // Estado das tarefas salvas para depois (feature específica do LazyFalcon)
+  const [saved,     setSaved]     = useState(() => loadSaved());
   const [noteInput, setNoteInput] = useState("");
-  const [subStep, setSubStep] = useState(null);
+  const [subStep,   setSubStep]   = useState(null);
 
   const numTasks = cycle;
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
