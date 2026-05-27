@@ -447,10 +447,9 @@ class BaseMode(ABC):
                 break
 
     def _manage_checklist(self, task: Task) -> bool:
-        """Permite marcar itens do checklist com auto-avanço para o próximo item.
+        """Permite marcar/desmarcar qualquer item do checklist livremente.
 
-        Apresenta cada item pendente sequencialmente. Ao completar um item,
-        avança automaticamente para o próximo sem precisar voltar ao menu.
+        O usuário escolhe qual subtarefa quer concluir — sem ordem forçada.
 
         Returns:
             True se o checklist foi 100% completado e conta como tarefa concluída para o ciclo
@@ -459,74 +458,59 @@ class BaseMode(ABC):
         from questionary import select
         from taskflow.utils import print_success, print_info
 
-        # Mostrar visão geral do checklist
-        completed, total = task.checklist_progress
-        console.print(f"\n[bold_cyan]Checklist: {task.title}[/bold_cyan]")
-        console.print(f"[dim]Progresso: {completed}/{total} itens completos[/dim]\n")
+        while True:
+            # Mostrar visão geral do checklist
+            completed, total = task.checklist_progress
+            console.print(f"\n[bold_cyan]Checklist: {task.title}[/bold_cyan]")
+            console.print(f"[dim]Progresso: {completed}/{total} itens completos[/dim]\n")
 
-        for i, item in enumerate(task.checklist, 1):
-            status = "[bright_green]✓[/bright_green]" if item.completed else "[bright_red]○[/bright_red]"
-            console.print(f"  {status} {i}. {item.description}")
+            for i, item in enumerate(task.checklist, 1):
+                status = "[bright_green]✓[/bright_green]" if item.completed else "[bright_red]○[/bright_red]"
+                console.print(f"  {status} {i}. {item.description}")
 
-        console.print("")
+            console.print("")
 
-        # Auto-avanço: percorrer itens pendentes sequencialmente
-        for i, item in enumerate(task.checklist):
-            if item.completed:
-                continue  # Pular itens já completos
+            # Verificar se todos estão completos
+            all_done = completed == total
 
-            console.print(f"\n[bold_yellow]→ Subtarefa {i + 1}/{total}: {item.description}[/bold_yellow]")
+            if all_done:
+                print_success("🎉 Checklist 100% completo!")
+                choices = [
+                    {"name": "✅ Contar como tarefa concluída (ciclo)", "value": "finish_and_count"},
+                    {"name": "🔙 Voltar", "value": "back"},
+                ]
+                action = select("", choices=choices).ask()
 
-            choices = [
-                {"name": "✅ Concluída! → avançar para a próxima", "value": "complete"},
-                {"name": "⏭  Pular (manter pendente)", "value": "skip"},
-                {"name": "🔙 Sair do checklist", "value": "exit"},
-            ]
+                if action == "finish_and_count":
+                    print_success("Contando como tarefa concluída para o ciclo!")
+                    self.tasks_completed += 1
+                    return True
+                return False
 
-            action = select("", choices=choices).ask()
+            # Montar menu de seleção livre — qualquer subtarefa pode ser escolhida
+            item_choices = []
+            for i, item in enumerate(task.checklist):
+                status = "✓" if item.completed else "○"
+                label = f"{status} {i + 1}. {item.description}"
+                item_choices.append({"name": label, "value": i})
 
-            if action == "complete":
-                # Marcar como completo e avançar automaticamente
-                if not item.completed:
-                    task.toggle_checklist_item(i)
-                    self.storage.update_task(task)
-                completed_now, _ = task.checklist_progress
-                print_success(f"✓ Item concluído! ({completed_now}/{total})")
-                # Loop continua para o próximo item automaticamente
+            item_choices.append({"name": "💾 Salvar e sair", "value": "exit"})
 
-            elif action == "skip":
-                # Avança sem marcar
-                continue
+            selected = select("Selecione a subtarefa para marcar/desmarcar (qualquer ordem):", choices=item_choices).ask()
 
-            elif action == "exit" or action is None:
-                # Salvar progresso e sair
+            if selected == "exit" or selected is None:
                 self.storage.update_task(task)
                 completed_now, _ = task.checklist_progress
                 print_info(f"Progresso salvo: {completed_now}/{total} itens completos.")
                 return False
 
-        # Todos os itens foram percorridos — verificar estado final
-        completed_final, total_final = task.checklist_progress
-        all_done = completed_final == total_final
-
-        console.print(f"\n[dim]Progresso final: {completed_final}/{total_final} completos[/dim]\n")
-
-        if all_done:
-            print_success("🎉 Checklist 100% completo!")
-            choices = [
-                {"name": "✅ Contar como tarefa concluída (ciclo)", "value": "finish_and_count"},
-                {"name": "🔙 Voltar", "value": "back"},
-            ]
-            action = select("", choices=choices).ask()
-
-            if action == "finish_and_count":
-                print_success("Contando como tarefa concluída para o ciclo!")
-                self.tasks_completed += 1
-                return True
-            return False
-        else:
-            print_info(f"Progresso salvo: {completed_final}/{total_final} itens completos.")
-            return False
+            # Marcar ou desmarcar o item selecionado
+            task.toggle_checklist_item(selected)
+            self.storage.update_task(task)
+            completed_now, _ = task.checklist_progress
+            item_name = task.checklist[selected].description
+            new_status = "concluído ✓" if task.checklist[selected].completed else "desmarcado ○"
+            print_success(f"'{item_name}' → {new_status}  ({completed_now}/{total})")
 
     def complete_task(self, task: Task) -> bool:
         """Handle task completion with improved checklist support"""
