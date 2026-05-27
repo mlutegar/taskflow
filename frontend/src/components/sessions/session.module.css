@@ -545,6 +545,46 @@
   opacity: 0.4;
 }
 
+/* Subtarefa pendente clicável — qualquer ordem */
+.subtaskPendingBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin: 3px 0;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+  color: var(--text);
+}
+
+.subtaskPendingBtn:hover {
+  background: rgba(124,110,245,0.08);
+  border-color: var(--accent);
+}
+
+.subtaskPendingBtn:active {
+  background: rgba(124,110,245,0.16);
+}
+
+.subtaskDoneHint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.subtaskPendingBtn:hover .subtaskDoneHint {
+  opacity: 1;
+}
+
 .subtaskFlowDone {
   font-size: 13px;
   font-weight: 600;
