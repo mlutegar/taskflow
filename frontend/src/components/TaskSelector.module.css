@@ -5,6 +5,7 @@
   overflow: hidden;
 }
 
+/* ── Cabeçalho ── */
 .header {
   display: flex;
   align-items: center;
@@ -22,6 +23,31 @@
   letter-spacing: 0.05em;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filterToggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.filterToggle:hover { color: var(--text); border-color: var(--accent); }
+.filterToggleActive {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(124,110,245,0.08);
+}
+
 .closeBtn {
   background: none;
   border: none;
@@ -35,6 +61,89 @@
 }
 .closeBtn:hover { color: var(--text); background: var(--border); }
 
+/* ── Painel de filtros ── */
+.filterPanel {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  min-width: 72px;
+  flex-shrink: 0;
+}
+
+.sortSelect {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.sortSelect:hover { border-color: var(--accent); }
+.sortSelect:focus { outline: none; border-color: var(--accent); }
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  padding: 3px 9px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.chip:hover { color: var(--text); border-color: var(--accent); }
+
+.chipActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(124,110,245,0.10);
+}
+
+.resetBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 2px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  align-self: flex-start;
+  transition: color 0.15s;
+}
+.resetBtn:hover { color: var(--critical); }
+
+/* ── Lista ── */
 .empty {
   display: flex;
   flex-direction: column;
@@ -49,7 +158,7 @@
 .list {
   display: flex;
   flex-direction: column;
-  max-height: 300px;
+  max-height: 320px;
   overflow-y: auto;
 }
 
@@ -102,17 +211,52 @@
   white-space: nowrap;
 }
 
-.badge {
-  font-size: 11px;
-  font-weight: 600;
-  flex-shrink: 0;
-  padding-top: 2px;
+/* Subtarefas com mini barra de progresso */
+.subtaskRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 1px;
 }
 
 .subtaskCount {
   font-size: 10.5px;
   color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.miniBar {
+  flex: 1;
+  max-width: 60px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.miniBarFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.subtaskPct {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.dueDate {
+  font-size: 10.5px;
   margin-top: 1px;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+  padding-top: 2px;
 }
 
 .groupLabel {
