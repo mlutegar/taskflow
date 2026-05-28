@@ -80,7 +80,13 @@ export const tasksApi = {
     return null;
   },
 
-  complete: (id) => tasksApi.update(id, { completed: true }),
+  complete: (id, currentTask) => {
+    if (currentTask?.recurrence) {
+      const nextDate = computeNextDueDate(currentTask.due_date, currentTask.recurrence);
+      return tasksApi.update(id, { due_date: nextDate, completed: false });
+    }
+    return tasksApi.update(id, { completed: true });
+  },
 
   reopen: (id) => tasksApi.update(id, { completed: false }),
 
