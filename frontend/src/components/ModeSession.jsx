@@ -20,6 +20,7 @@ const SESSION_MAP = {
   rpg: RPGSession,
   lazyfal: LazyFalconSession,
   caferitual: CafeRitualSession,
+  tabhop: TabHopSession,
 };
 
 export default function ModeSession({ modeId, mode, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }) {
