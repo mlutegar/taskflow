@@ -159,6 +159,11 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
                 📅 {formatDate(task.due_date)}{overdue && " · Atrasada"}
               </span>
             )}
+            {task.recurrence && (
+              <span className={styles.recurrenceBadge}>
+                🔄 {RECURRENCE_LABELS[task.recurrence]}
+              </span>
+            )}
             {task.checklist_count > 0 && (
               <span className={styles.metaItem}>
                 ☑ {task.checklist_completed_count}/{task.checklist_count}
