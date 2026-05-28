@@ -114,6 +114,17 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
               onChange={(e) => setEditData((d) => ({ ...d, due_date: e.target.value }))}
             />
           </div>
+          <select
+            className={styles.editSelect}
+            value={editData.recurrence}
+            onChange={(e) => setEditData((d) => ({ ...d, recurrence: e.target.value }))}
+          >
+            <option value="">Sem repetição</option>
+            <option value="daily">🔄 Todo dia</option>
+            <option value="weekly">🔄 Toda semana</option>
+            <option value="biweekly">🔄 A cada 2 semanas</option>
+            <option value="monthly">🔄 Todo mês</option>
+          </select>
           <div className={styles.editActions}>
             <button className={styles.btnSave} onClick={handleSaveEdit} disabled={saving || !editData.title.trim()}>
               {saving ? "Salvando..." : "Salvar"}
