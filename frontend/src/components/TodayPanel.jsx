@@ -105,8 +105,8 @@ export default function TodayPanel({ tasks, onComplete, onReopen }) {
       <div className={styles.header}>
         <div className={styles.titleRow}>
           <span className={styles.title}>Tarefas de Hoje</span>
-          <span className={`${styles.slot} ${todayIds.length >= DAILY_LIMIT ? styles.slotFull : ""}`}>
-            {todayIds.length}/{DAILY_LIMIT}
+          <span className={`${styles.slot} ${count >= DAILY_LIMIT ? styles.slotFull : ""}`}>
+            {count}/{DAILY_LIMIT}
           </span>
         </div>
         {canAdd && (
