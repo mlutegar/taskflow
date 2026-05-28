@@ -1,5 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import styles from "./TaskCard.module.css";
+
+const RECURRENCE_LABELS = {
+  daily: "Todo dia",
+  weekly: "Toda semana",
+  biweekly: "A cada 2 semanas",
+  monthly: "Todo mês",
+};
 
 const PRIORITY_MAP = {
   1: { label: "Crítica", cls: "critical" },
