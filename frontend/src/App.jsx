@@ -56,7 +56,24 @@ export default function App() {
       const params = {};
       if (taskFilter) params.status = taskFilter;
       if (taskSort) params.sort = taskSort;
-      setTasks(await tasksApi.list(params));
+      let data = await tasksApi.list(params);
+
+      if (taskSort === "overdue") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        data = [...data].sort((a, b) => {
+          const aOverdue = a.due_date && new Date(a.due_date) < today;
+          const bOverdue = b.due_date && new Date(b.due_date) < today;
+          if (aOverdue && !bOverdue) return -1;
+          if (!aOverdue && bOverdue) return 1;
+          if (!a.due_date && !b.due_date) return (a.priority ?? 99) - (b.priority ?? 99);
+          if (!a.due_date) return 1;
+          if (!b.due_date) return -1;
+          return new Date(a.due_date) - new Date(b.due_date);
+        });
+      }
+
+      setTasks(data);
     } catch (e) {
       setTasksError(e.message);
     } finally {
