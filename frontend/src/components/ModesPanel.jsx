@@ -458,6 +458,13 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
                       )}
                     </div>
                     <span className={styles.cardTagline}>{mode.tagline}</span>
+                    {mode.context?.length > 0 && (
+                      <div className={styles.contextTags}>
+                        {mode.context.map((tag) => (
+                          <span key={tag} className={styles.contextTag}>{tag}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <span className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`}>›</span>
                 </button>
