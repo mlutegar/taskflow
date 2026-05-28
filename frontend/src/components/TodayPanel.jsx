@@ -123,7 +123,7 @@ export default function TodayPanel({ tasks, onComplete, onReopen }) {
             <div className={styles.progressFill} style={{ width: `${pct}%` }} />
           </div>
           <span className={styles.progressLabel}>
-            {completedCount} de {todayIds.length} concluída{todayIds.length !== 1 ? "s" : ""}
+            {completedCount} de {count} concluída{count !== 1 ? "s" : ""}
           </span>
         </div>
       )}
