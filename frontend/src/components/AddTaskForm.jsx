@@ -71,6 +71,20 @@ export default function AddTaskForm({ onSubmit, onCancel }) {
             onChange={(e) => setDueDate(e.target.value)}
           />
         </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Repetição</label>
+          <select
+            className={styles.select}
+            value={recurrence}
+            onChange={(e) => setRecurrence(e.target.value)}
+          >
+            <option value="">Sem repetição</option>
+            <option value="daily">Todo dia</option>
+            <option value="weekly">Toda semana</option>
+            <option value="biweekly">A cada 2 semanas</option>
+            <option value="monthly">Todo mês</option>
+          </select>
+        </div>
       </div>
 
       <div className={styles.actions}>
