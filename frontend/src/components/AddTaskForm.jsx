@@ -6,6 +6,7 @@ export default function AddTaskForm({ onSubmit, onCancel }) {
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState(4);
   const [dueDate, setDueDate] = useState("");
+  const [recurrence, setRecurrence] = useState("");
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -18,6 +19,7 @@ export default function AddTaskForm({ onSubmit, onCancel }) {
         description: description.trim() || null,
         priority: Number(priority),
         due_date: dueDate || null,
+        recurrence: recurrence || null,
       });
     } finally {
       setSaving(false);
