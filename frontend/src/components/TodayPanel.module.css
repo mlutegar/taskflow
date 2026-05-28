@@ -1,0 +1,218 @@
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+/* ── Cabeçalho ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+
+.slot {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(124, 110, 245, 0.12);
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.slotFull {
+  color: var(--success);
+  background: rgba(78, 204, 163, 0.12);
+}
+
+.addBtn {
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+.addBtn:hover { background: var(--accent-hover); }
+.addBtn:active { transform: scale(0.97); }
+
+/* ── Barra de progresso ── */
+.progressWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.progressBar {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.progressLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Picker ── */
+.pickerWrap {
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Vazia ── */
+.empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.emptyLink {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+.emptyLink:hover { opacity: 0.75; }
+
+/* ── Lista ── */
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Item ── */
+.taskItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.13s;
+}
+.taskItem:last-child { border-bottom: none; }
+.taskItem:hover { background: rgba(124, 110, 245, 0.04); }
+
+.taskDone .taskTitle {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.checkBtn {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.checkBtn:hover { opacity: 0.8; }
+
+.taskInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.taskTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.taskSub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.removeBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: color 0.15s, background 0.15s;
+  opacity: 0;
+}
+.taskItem:hover .removeBtn { opacity: 1; }
+.removeBtn:hover { color: var(--critical); background: rgba(224, 82, 82, 0.1); }
+
+/* ── Limite ── */
+.limitMsg {
+  padding: 8px 16px;
+  font-size: 11px;
+  color: var(--success);
+  font-weight: 600;
+  text-align: center;
+  background: rgba(78, 204, 163, 0.06);
+  border-top: 1px solid var(--border);
+}
+
+/* ── Mobile ── */
+@media (max-width: 520px) {
+  .header { padding: 10px 12px; }
+  .progressWrap { padding: 6px 12px; }
+  .taskItem { padding: 10px 12px; }
+  .empty { padding: 12px; }
+  .removeBtn { opacity: 1; }
+}
