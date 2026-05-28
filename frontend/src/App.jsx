@@ -448,6 +448,55 @@ export default function App() {
           />
         )}
       </main>
+
+      {undoTask && (
+        <UndoToast
+          task={undoTask.task}
+          expiresAt={undoTask.expiresAt}
+          onUndo={handleUndoDelete}
+          onDismiss={() => {
+            if (undoTimerRef.current) {
+              clearTimeout(undoTimerRef.current.timerId);
+              tasksApi.delete(undoTimerRef.current.taskId).catch(() => {});
+              undoTimerRef.current = null;
+            }
+            setUndoTask(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function UndoToast({ task, expiresAt, onUndo, onDismiss }) {
+  const [pct, setPct] = useState(100);
+
+  useEffect(() => {
+    const total = expiresAt - Date.now();
+    const interval = setInterval(() => {
+      const remaining = expiresAt - Date.now();
+      setPct(Math.max(0, (remaining / total) * 100));
+      if (remaining <= 0) clearInterval(interval);
+    }, 50);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  return (
+    <div className={styles.undoToast}>
+      <div className={styles.undoBar} style={{ width: `${pct}%` }} />
+      <div className={styles.undoContent}>
+        <span className={styles.undoText}>
+          🗑 <strong>{task.title}</strong> excluída
+        </span>
+        <div className={styles.undoActions}>
+          <button className={styles.undoBtn} onClick={onUndo}>
+            ↩ Desfazer
+          </button>
+          <button className={styles.undoDismiss} onClick={onDismiss}>
+            ✕
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
