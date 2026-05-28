@@ -7,6 +7,7 @@ import MomentumSession from "./sessions/MomentumSession";
 import EspressoSession from "./sessions/EspressoSession";
 import RPGSession from "./sessions/RPGSession";
 import LazyFalconSession from "./sessions/LazyFalconSession";
+import CafeRitualSession from "./sessions/CafeRitualSession";
 import CustomModeSession from "./sessions/CustomModeSession";
 
 const SESSION_MAP = {
@@ -17,6 +18,7 @@ const SESSION_MAP = {
   espresso: EspressoSession,
   rpg: RPGSession,
   lazyfal: LazyFalconSession,
+  caferitual: CafeRitualSession,
 };
 
 export default function ModeSession({ modeId, mode, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }) {
