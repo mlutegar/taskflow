@@ -104,9 +104,38 @@ export default function App() {
     setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
   };
 
-  const handleDeleteTask = async (id) => {
-    await tasksApi.delete(id);
+  const handleDeleteTask = (id) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+
+    // Se já havia um undo pendente, confirma o delete anterior agora
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current.timerId);
+      tasksApi.delete(undoTimerRef.current.taskId).catch(() => {});
+    }
+
+    // Remove da UI imediatamente
     setTasks((prev) => prev.filter((t) => t.id !== id));
+
+    const UNDO_MS = 5000;
+    const expiresAt = Date.now() + UNDO_MS;
+    setUndoTask({ task, expiresAt });
+
+    const timerId = setTimeout(() => {
+      tasksApi.delete(id).catch(() => {});
+      setUndoTask(null);
+      undoTimerRef.current = null;
+    }, UNDO_MS);
+
+    undoTimerRef.current = { timerId, taskId: id };
+  };
+
+  const handleUndoDelete = () => {
+    if (!undoTimerRef.current || !undoTask) return;
+    clearTimeout(undoTimerRef.current.timerId);
+    undoTimerRef.current = null;
+    setTasks((prev) => [undoTask.task, ...prev]);
+    setUndoTask(null);
   };
 
   const handleUpdateTask = async (id, data) => {
