@@ -7,6 +7,7 @@ import RoutineList from "./components/RoutineList";
 import RoutineHeatmap from "./components/RoutineHeatmap";
 import AddRoutineForm from "./components/AddRoutineForm";
 import ModesPanel from "./components/ModesPanel";
+import TodayPanel from "./components/TodayPanel";
 import styles from "./App.module.css";
 
 const TASK_FILTERS = [
