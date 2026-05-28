@@ -254,7 +254,7 @@ export default function App() {
               onClick={() => setTab("modes")}
             >
               Modos
-              <span className={styles.tabBadge}>8</span>
+              <span className={styles.tabBadge}>9</span>
             </button>
           </nav>
 
