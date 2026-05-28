@@ -1,5 +1,19 @@
 import { supabase } from "../lib/supabase";
 
+const RECURRENCE_DAYS = { daily: 1, weekly: 7, biweekly: 14 };
+
+function computeNextDueDate(currentDueDate, recurrence) {
+  const base = currentDueDate
+    ? new Date(currentDueDate + "T12:00:00")
+    : new Date();
+  if (recurrence === "monthly") {
+    base.setMonth(base.getMonth() + 1);
+  } else {
+    base.setDate(base.getDate() + (RECURRENCE_DAYS[recurrence] ?? 7));
+  }
+  return base.toISOString().split("T")[0];
+}
+
 function shapeTask(task) {
   const checklist = (task.checklist ?? []).sort((a, b) => a.order - b.order || a.id - b.id);
   return {
