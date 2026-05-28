@@ -282,6 +282,12 @@ export default function App() {
       <main className={styles.main}>
         {tab === "tasks" && (
           <>
+            <TodayPanel
+              tasks={tasks}
+              onComplete={handleCompleteTask}
+              onReopen={handleReopenTask}
+            />
+
             {showTaskForm && (
               <div className={styles.formWrapper}>
                 <AddTaskForm onSubmit={handleCreateTask} onCancel={() => setShowTaskForm(false)} />
