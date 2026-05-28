@@ -161,7 +161,7 @@ export default function TodayPanel({ tasks, onComplete, onReopen }) {
               onRemove={handleRemove}
             />
           ))}
-          {todayIds.length >= DAILY_LIMIT && (
+          {count >= DAILY_LIMIT && (
             <div className={styles.limitMsg}>
               Limite diário de {DAILY_LIMIT} tarefas atingido
             </div>
