@@ -3,16 +3,17 @@ import styles from "./session.module.css";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 
 const COLOR = "#2d9bf0";
+const COLOR_BG = "rgba(45,155,240,0.08)";
 
 export default function TabHopSession({ onClose }) {
   const { saved, persist, clearSaved } = useSessionPersist("tabhop");
 
-  const [step,         setStep]         = useState(saved?.step         ?? "context");
-  const [tabs,         setTabs]         = useState(saved?.tabs         ?? []);
-  const [currentIdx,   setCurrentIdx]   = useState(saved?.currentIdx   ?? 0);
-  const [cycle,        setCycle]        = useState(saved?.cycle        ?? 0);
-  const [tabInput,     setTabInput]     = useState("");
-  const [wasRestored,  setWasRestored]  = useState(!!saved);
+  const [step,        setStep]        = useState(saved?.step        ?? "context");
+  const [tabs,        setTabs]        = useState(saved?.tabs        ?? []);
+  const [currentIdx,  setCurrentIdx]  = useState(saved?.currentIdx  ?? 0);
+  const [cycle,       setCycle]       = useState(saved?.cycle       ?? 0);
+  const [tabInput,    setTabInput]    = useState("");
+  const [wasRestored, setWasRestored] = useState(!!saved);
 
   useEffect(() => {
     if (step === "summary") return;
@@ -28,11 +29,6 @@ export default function TabHopSession({ onClose }) {
     setTabInput("");
   };
 
-  const startRotation = () => {
-    setCurrentIdx(0);
-    setStep("rotating");
-  };
-
   const nextTab = () => {
     setTabs((prev) => prev.map((t, i) => i === currentIdx ? { ...t, visits: t.visits + 1 } : t));
     const next = currentIdx + 1;
@@ -44,22 +40,13 @@ export default function TabHopSession({ onClose }) {
     }
   };
 
-  const newCycle = () => {
-    setCurrentIdx(0);
-    setStep("rotating");
-  };
-
-  const confirmAddTab = () => {
-    setStep("add_tab");
-  };
-
   const finishAddTab = (name) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const newTab = { name: trimmed, visits: 0 };
-    setTabs((prev) => [...prev, newTab]);
+    const insertIdx = tabs.length;
+    setTabs((prev) => [...prev, { name: trimmed, visits: 0 }]);
     setTabInput("");
-    setCurrentIdx(tabs.length); // next index = new tab position
+    setCurrentIdx(insertIdx);
     setStep("rotating");
   };
 
@@ -74,7 +61,7 @@ export default function TabHopSession({ onClose }) {
         <div className={styles.headerMeta}>
           <span className={styles.headerTitle}>Tab Hop</span>
           <span className={styles.headerSub}>
-            {cycle > 0 ? `Ciclo ${cycle + 1}` : "Configurando"} • {tabs.length} aba{tabs.length !== 1 ? "s" : ""} • {totalVisits} visita{totalVisits !== 1 ? "s" : ""}
+            {cycle > 0 ? `Ciclo ${cycle + 1}` : "Configurando"} • {tabs.length} aba{tabs.length !== 1 ? "s" : ""}{totalVisits > 0 ? ` • ${totalVisits} visitas` : ""}
           </span>
         </div>
         <button className={styles.closeBtn} onClick={handleClose}>✕</button>
@@ -89,32 +76,32 @@ export default function TabHopSession({ onClose }) {
           </div>
         )}
 
-        {/* ── Confirmação de contexto ── */}
+        {/* ── Contexto ── */}
         {step === "context" && (
           <>
             <div className={styles.promptBox}>
-              <div className={styles.promptTitle}>📲 Modo criado para transporte</div>
+              <div className={styles.promptTitle}>📲 Modo para transporte e celular</div>
               <div className={styles.promptText}>
-                Este modo funciona melhor quando você está no celular em transporte — ônibus, metrô, esperas. A ideia é ter vários apps abertos e ir fazendo um pouco de cada, rotacionando entre eles.
+                Este modo funciona melhor no celular durante deslocamentos — ônibus, metrô, esperas. Você tem vários apps abertos e vai fazendo um pouco de cada, rotacionando entre eles.
               </div>
             </div>
             <div className={styles.promptBox}>
               <div className={styles.promptTitle}>Como funciona</div>
               <div className={styles.promptText}>
-                1. Abra os apps no celular que você vai trabalhar hoje.<br />
-                2. Adicione cada um aqui como uma "aba".<br />
-                3. O modo mostra qual app focar agora.<br />
-                4. Faz um pouco → toca em "Próxima aba →" → passa para o seguinte.<br />
-                5. Quando terminar todos, pode adicionar um novo app ou reiniciar o ciclo.<br />
-                6. Ao final, lembrete de git push.
+                <strong>1.</strong> Abra os apps que vai usar hoje.<br />
+                <strong>2.</strong> Adicione cada um aqui como uma "aba".<br />
+                <strong>3.</strong> O modo indica qual app focar agora.<br />
+                <strong>4.</strong> Faz um pouco → "Próxima aba →" → passa para o seguinte.<br />
+                <strong>5.</strong> Ao completar todas: novo ciclo, ou adiciona uma aba nova.<br />
+                <strong>6.</strong> No final: lembrete de git push.
               </div>
             </div>
             <button
               className={`${styles.btn} ${styles.btnPrimary}`}
-              style={{ background: COLOR, borderColor: COLOR }}
+              style={{ background: COLOR }}
               onClick={() => setStep("setup")}
             >
-              📲 Entendi — adicionar apps
+              📲 Entendi — vamos configurar
             </button>
             <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleClose}>
               Não agora
@@ -122,22 +109,22 @@ export default function TabHopSession({ onClose }) {
           </>
         )}
 
-        {/* ── Setup: adicionar abas ── */}
+        {/* ── Setup ── */}
         {step === "setup" && (
           <>
-            <div className={styles.infoPill} style={{ color: COLOR, borderColor: `${COLOR}44` }}>
-              📲 Abra os apps no celular e adicione-os aqui
+            <div className={styles.infoPill} style={{ color: COLOR, borderColor: `${COLOR}55` }}>
+              📱 Abra os apps e adicione-os aqui
             </div>
 
             {tabs.length > 0 && (
               <div className={styles.savedTaskList}>
-                <span className={styles.sectionLabel}>Apps adicionados</span>
+                <span className={styles.sectionLabel}>Apps na rotação</span>
                 {tabs.map((t, i) => (
                   <div key={i} className={styles.savedTask}>
                     <span className={styles.savedTaskTitle}>📱 {i + 1}. {t.name}</span>
                     <button
-                      className={styles.removeTabBtn}
                       onClick={() => setTabs((prev) => prev.filter((_, idx) => idx !== i))}
+                      style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "12px", padding: "2px 6px", borderRadius: "4px" }}
                       title="Remover"
                     >✕</button>
                   </div>
@@ -165,13 +152,13 @@ export default function TabHopSession({ onClose }) {
 
             <button
               className={`${styles.btn} ${styles.btnPrimary}`}
-              style={{ background: COLOR, borderColor: COLOR }}
+              style={{ background: COLOR }}
               disabled={tabs.length < 2}
-              onClick={startRotation}
+              onClick={() => { setCurrentIdx(0); setStep("rotating"); }}
             >
               {tabs.length < 2
                 ? `Adicione pelo menos 2 abas (${tabs.length}/2)`
-                : `▶ Iniciar rotação com ${tabs.length} aba${tabs.length !== 1 ? "s" : ""}`}
+                : `▶ Iniciar com ${tabs.length} aba${tabs.length !== 1 ? "s" : ""}`}
             </button>
           </>
         )}
@@ -179,31 +166,41 @@ export default function TabHopSession({ onClose }) {
         {/* ── Rotacionando ── */}
         {step === "rotating" && currentTab && (
           <>
-            {/* Barra de progresso do ciclo */}
-            <div className={tabHopStyles.cycleBar}>
+            {/* Barra visual de progresso do ciclo */}
+            <div style={{ display: "flex", gap: "4px", padding: "0 2px" }}>
               {tabs.map((t, i) => (
                 <div
                   key={i}
-                  className={`${tabHopStyles.cycleSlot} ${i === currentIdx ? tabHopStyles.cycleSlotActive : ""} ${i < currentIdx ? tabHopStyles.cycleSlotDone : ""}`}
-                  style={i === currentIdx ? { background: COLOR } : {}}
                   title={t.name}
+                  style={{
+                    flex: 1,
+                    height: "5px",
+                    borderRadius: "3px",
+                    background: i < currentIdx
+                      ? `${COLOR}60`
+                      : i === currentIdx
+                      ? COLOR
+                      : "var(--border)",
+                    transition: "background 0.2s",
+                  }}
                 />
               ))}
             </div>
-            <div className={styles.infoPill} style={{ color: COLOR, borderColor: `${COLOR}44` }}>
-              Aba {currentIdx + 1} de {tabs.length} — Ciclo {cycle + 1}
+
+            <div className={styles.infoPill} style={{ color: COLOR, borderColor: `${COLOR}55` }}>
+              Aba {currentIdx + 1} / {tabs.length} — Ciclo {cycle + 1}
             </div>
 
             <div className={styles.taskDisplay}>
-              <span className={styles.taskName} style={{ fontSize: "22px" }}>
+              <span className={styles.taskName} style={{ fontSize: "20px" }}>
                 📱 {currentTab.name}
               </span>
               <span className={styles.taskMeta}>
                 Faça um pouco aqui. Quando terminar, passe para a próxima aba.
               </span>
               {currentTab.visits > 0 && (
-                <span className={styles.taskMeta} style={{ color: COLOR }}>
-                  ↩ {currentTab.visits} visita{currentTab.visits !== 1 ? "s" : ""} anteriores
+                <span className={styles.taskMeta} style={{ color: COLOR, marginTop: "2px" }}>
+                  ↩ {currentTab.visits} visita{currentTab.visits !== 1 ? "s" : ""} anteriores nesta aba
                 </span>
               )}
             </div>
@@ -211,12 +208,12 @@ export default function TabHopSession({ onClose }) {
             <div className={styles.actions}>
               <button
                 className={`${styles.btn} ${styles.btnPrimary}`}
-                style={{ background: COLOR, borderColor: COLOR }}
+                style={{ background: COLOR }}
                 onClick={nextTab}
               >
                 {currentIdx + 1 < tabs.length
-                  ? `→ Próxima aba: ${tabs[currentIdx + 1].name}`
-                  : "✓ Última aba — concluir ciclo"}
+                  ? `→ Próxima: ${tabs[currentIdx + 1].name}`
+                  : "✓ Última aba — fechar ciclo"}
               </button>
               <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setStep("git_push")}>
                 ⏹ Encerrar sessão
@@ -228,23 +225,22 @@ export default function TabHopSession({ onClose }) {
         {/* ── Ciclo concluído ── */}
         {step === "cycle_done" && (
           <>
-            <div className={styles.summaryBox} style={{ borderColor: `${COLOR}44` }}>
+            <div className={styles.summaryBox} style={{ borderColor: `${COLOR}44`, background: COLOR_BG }}>
               <span className={styles.summaryEmoji}>🔄</span>
               <div className={styles.summaryTitle}>Ciclo {cycle} completo!</div>
               <div className={styles.summaryText}>
-                Você passou por todas as {tabs.length} abas.{" "}
-                {totalVisits} visita{totalVisits !== 1 ? "s" : ""} no total.
+                Você passou por todas as {tabs.length} abas. {totalVisits} visita{totalVisits !== 1 ? "s" : ""} acumuladas.
               </div>
             </div>
 
             <div className={styles.savedTaskList}>
-              <span className={styles.sectionLabel}>Abas neste ciclo</span>
+              <span className={styles.sectionLabel}>Abas deste ciclo</span>
               {tabs.map((t, i) => (
                 <div key={i} className={styles.savedTask}>
                   <span className={styles.savedTaskTitle}>
                     📱 {t.name}
-                    <span style={{ color: COLOR, marginLeft: 8, fontSize: "11px" }}>
-                      {t.visits} visita{t.visits !== 1 ? "s" : ""}
+                    <span style={{ color: COLOR, marginLeft: 8, fontSize: "11px", fontWeight: 600 }}>
+                      {t.visits}×
                     </span>
                   </span>
                 </div>
@@ -253,12 +249,12 @@ export default function TabHopSession({ onClose }) {
 
             <button
               className={`${styles.btn} ${styles.btnPrimary}`}
-              style={{ background: COLOR, borderColor: COLOR }}
-              onClick={newCycle}
+              style={{ background: COLOR }}
+              onClick={() => { setCurrentIdx(0); setStep("rotating"); }}
             >
-              🔄 Novo ciclo — mesmas abas
+              🔄 Novo ciclo com as mesmas abas
             </button>
-            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={confirmAddTab}>
+            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("add_tab")}>
               + Adicionar nova aba ao ciclo
             </button>
             <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setStep("git_push")}>
@@ -270,14 +266,8 @@ export default function TabHopSession({ onClose }) {
         {/* ── Adicionar nova aba ── */}
         {step === "add_tab" && (
           <>
-            <div className={styles.infoPill} style={{ color: COLOR, borderColor: `${COLOR}44` }}>
-              + Nova aba para o próximo ciclo
-            </div>
-            <div className={styles.promptBox}>
-              <div className={styles.promptTitle}>Qual app você quer adicionar?</div>
-              <div className={styles.promptText}>
-                Ele entra no final da fila e será o próximo na rotação.
-              </div>
+            <div className={styles.infoPill} style={{ color: COLOR, borderColor: `${COLOR}55` }}>
+              + Nova aba — ela entra em seguida na rotação
             </div>
             <div className={styles.actions}>
               <input
@@ -290,7 +280,7 @@ export default function TabHopSession({ onClose }) {
               />
               <button
                 className={`${styles.btn} ${styles.btnPrimary}`}
-                style={{ background: COLOR, borderColor: COLOR }}
+                style={{ background: COLOR }}
                 disabled={!tabInput.trim()}
                 onClick={() => finishAddTab(tabInput)}
               >
@@ -307,13 +297,14 @@ export default function TabHopSession({ onClose }) {
         {step === "git_push" && (
           <>
             <div className={styles.promptBox}>
-              <div className={styles.promptTitle}>📤 Lembrete: git push</div>
+              <div className={styles.promptTitle}>📤 Hora do git push</div>
               <div className={styles.promptText}>
-                Você terminou a sessão. Antes de fechar os apps, faça o commit e push de tudo que trabalhou hoje.
+                Você terminou a sessão. Antes de fechar os apps, faça commit e push de tudo que trabalhou.
               </div>
             </div>
+
             <div className={styles.savedTaskList}>
-              <span className={styles.sectionLabel}>Sessão resumida</span>
+              <span className={styles.sectionLabel}>Resumo da sessão</span>
               {tabs.map((t, i) => (
                 <div key={i} className={styles.savedTask}>
                   <span className={styles.savedTaskTitle}>
@@ -324,15 +315,18 @@ export default function TabHopSession({ onClose }) {
                   </span>
                 </div>
               ))}
+              <div className={styles.savedTask}>
+                <span className={styles.savedTaskTitle} style={{ color: "var(--text-muted)" }}>
+                  🔄 {cycle} ciclo{cycle !== 1 ? "s" : ""} completo{cycle !== 1 ? "s" : ""}
+                </span>
+              </div>
             </div>
-            <button
-              className={`${styles.btn} ${styles.btnSuccess}`}
-              onClick={() => setStep("summary")}
-            >
+
+            <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={() => setStep("summary")}>
               ✓ Git push feito — encerrar
             </button>
             <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("summary")}>
-              Pular — encerrar assim mesmo
+              Pular — encerrar mesmo assim
             </button>
           </>
         )}
@@ -357,11 +351,3 @@ export default function TabHopSession({ onClose }) {
     </div>
   );
 }
-
-// Estilos inline para elementos específicos do Tab Hop
-const tabHopStyles = {
-  cycleBar: "cycleBar",
-  cycleSlot: "cycleSlot",
-  cycleSlotActive: "cycleSlotActive",
-  cycleSlotDone: "cycleSlotDone",
-};
