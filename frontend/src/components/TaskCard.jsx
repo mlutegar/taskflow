@@ -62,6 +62,7 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
         description: editData.description.trim() || null,
         priority: Number(editData.priority),
         due_date: editData.due_date || null,
+        recurrence: editData.recurrence || null,
       };
       await onUpdate(task.id, payload);
       setEditing(false);
