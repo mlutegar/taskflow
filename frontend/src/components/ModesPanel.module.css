@@ -227,6 +227,25 @@
   display: block;
 }
 
+.contextTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.contextTag {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  line-height: 1.6;
+}
+
 .chevron {
   font-size: 18px;
   color: var(--text-muted);
