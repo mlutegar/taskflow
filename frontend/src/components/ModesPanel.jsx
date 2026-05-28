@@ -114,6 +114,21 @@ const MODES = [
     ],
     tips: "Diferente do Splite: você pode guardar tarefas em andamento com notas de progresso. Ideal para projetos longos.",
   },
+  {
+    id: "caferitual",
+    emoji: "🫖",
+    name: "Café Ritual",
+    tagline: "Shot de café + a música certa = estado de pico",
+    color: "#d4960a",
+    colorBg: "rgba(212,150,10,0.08)",
+    steps: [
+      "Prepare e tome um shot de café quente (âncora física)",
+      "Abra o Spotify e passe por ~100 músicas",
+      "Quando UMA fizer você sentir que pode tudo, volte aqui",
+      "Escolha qualquer tarefa e execute com o estado de pico",
+    ],
+    tips: "O café cria a âncora física. A música cria a âncora mental. Juntos, ativam um estado de confiança e foco onde qualquer tarefa parece possível.",
+  },
 ];
 
 const EMOJI_PRESETS = ["🚀", "🔥", "💎", "🧠", "🎯", "⭐", "🌊", "🏆", "💪", "🎲", "🌙", "⚙️", "🦁", "🐉", "🧩"];
