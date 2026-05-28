@@ -11,6 +11,7 @@ const MODES = [
     tagline: "Encontre a música certa, faça a tarefa certa",
     color: "#7c6ef5",
     colorBg: "rgba(124,110,245,0.08)",
+    context: ["🖥️ Desktop", "🎧 Música"],
     steps: [
       "Abra o Spotify e passe por ~100 músicas",
       "Quando encontrar UMA que ressoa, volte aqui",
@@ -26,6 +27,7 @@ const MODES = [
     tagline: "Ciclos progressivos: videos → tarefas",
     color: "#e05252",
     colorBg: "rgba(224,82,82,0.08)",
+    context: ["📱 Mobile", "🔄 Ciclos"],
     steps: [
       "Ciclo 1: Assista 5 vídeos → Faça 1 tarefa",
       "Ciclo 2: Assista 10 vídeos → Faça 2 tarefas",
@@ -41,6 +43,7 @@ const MODES = [
     tagline: "Ciclos progressivos com atividade personalizada",
     color: "#f0a540",
     colorBg: "rgba(240,165,64,0.08)",
+    context: ["🖥️ Desktop", "🔄 Ciclos"],
     steps: [
       "Escolha uma atividade da sua lista personalizada",
       "Ciclo 1: Atividade 1× → 1 tarefa",
@@ -56,6 +59,7 @@ const MODES = [
     tagline: "Quebre a inércia com sessões de 5 minutos",
     color: "#4ecca3",
     colorBg: "rgba(78,204,163,0.08)",
+    context: ["🖥️ Desktop", "⏱️ Timer"],
     steps: [
       "Confirme que o celular está longe",
       "Selecione uma tarefa para trabalhar",
@@ -71,6 +75,7 @@ const MODES = [
     tagline: "Sprints de 25 minutos com rastreamento de café",
     color: "#c8874a",
     colorBg: "rgba(200,135,74,0.08)",
+    context: ["🖥️ Desktop", "☕ Café", "⏱️ Timer"],
     steps: [
       "Confirme que tomou café (sessão registrada)",
       "Selecione uma tarefa para o sprint",
@@ -86,6 +91,7 @@ const MODES = [
     tagline: "Produtividade gamificada com classes de personagem",
     color: "#b06ef5",
     colorBg: "rgba(176,110,245,0.08)",
+    context: ["🖥️ Desktop", "🎮 Gamificação"],
     classes: [
       { emoji: "⚔️", name: "Warrior", desc: "30 min, bônus de stamina", color: "#e05252" },
       { emoji: "🧙‍♂️", name: "Mage", desc: "25 min, +25% XP em estudo", color: "#7c6ef5" },
@@ -97,7 +103,7 @@ const MODES = [
       "Classifique a dificuldade (Easy → Very Hard)",
       "Complete o timer da sua classe e ganhe XP",
     ],
-    tips: "Personagem salvo no navegador. Suba de nível completando quests e desbloqueie novas conquistas.",
+    tips: "Personagem salvo no navegador. Soba de nível completando quests e desbloqueie novas conquistas.",
   },
   {
     id: "lazyfal",
@@ -106,6 +112,7 @@ const MODES = [
     tagline: "Ciclos progressivos com tarefas salvas para depois",
     color: "#4ea8cc",
     colorBg: "rgba(78,168,204,0.08)",
+    context: ["🖥️ Desktop", "🔄 Ciclos"],
     steps: [
       "Escolha uma atividade da lista",
       "Faça ciclos progressivos (n atividades → n tarefas)",
@@ -121,6 +128,7 @@ const MODES = [
     tagline: "Shot de café + a música certa = estado de pico",
     color: "#d4960a",
     colorBg: "rgba(212,150,10,0.08)",
+    context: ["🖥️ Desktop", "☕ Café", "🎧 Música"],
     steps: [
       "Prepare e tome um shot de café quente (âncora física)",
       "Abra o Spotify e passe por ~100 músicas",
@@ -128,6 +136,23 @@ const MODES = [
       "Escolha qualquer tarefa e execute com o estado de pico",
     ],
     tips: "O café cria a âncora física. A música cria a âncora mental. Juntos, ativam um estado de confiança e foco onde qualquer tarefa parece possível.",
+  },
+  {
+    id: "tabhop",
+    emoji: "📲",
+    name: "Tab Hop",
+    tagline: "Rotação entre apps abertos — feito para transporte",
+    color: "#2d9bf0",
+    colorBg: "rgba(45,155,240,0.08)",
+    context: ["📱 Mobile", "🚇 Transporte"],
+    steps: [
+      "Abra os apps que vai usar hoje no celular",
+      "Adicione cada um como uma 'aba' aqui",
+      "O modo mostra qual app focar agora",
+      "Faz um pouco → 'Próxima aba →' → passa para o seguinte",
+      "Ao fechar: commit + git push",
+    ],
+    tips: "Criado para deslocamentos onde você não consegue manter foco longo. Cada aba exige apenas um pequeno avanço — a rotação cria progresso distribuído.",
   },
 ];
 
