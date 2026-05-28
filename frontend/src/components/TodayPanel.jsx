@@ -62,31 +62,42 @@ export default function TodayPanel({ tasks, onComplete, onReopen }) {
   const [todayIds, setTodayIds] = useState(loadTodayIds);
   const [showPicker, setShowPicker] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem(todayKey(), JSON.stringify(todayIds));
-  }, [todayIds]);
-
   const todayTasks = useMemo(() => {
     const map = new Map(tasks.map((t) => [t.id, t]));
     return todayIds.map((id) => map.get(id)).filter(Boolean);
   }, [tasks, todayIds]);
+
+  // Remove IDs de tarefas que foram deletadas
+  useEffect(() => {
+    const validIds = new Set(tasks.map((t) => t.id));
+    const cleaned = todayIds.filter((id) => validIds.has(id));
+    if (cleaned.length !== todayIds.length) {
+      setTodayIds(cleaned);
+    }
+  }, [tasks]); // eslint-disable-line
+
+  useEffect(() => {
+    localStorage.setItem(todayKey(), JSON.stringify(todayIds));
+  }, [todayIds]);
 
   const pickerTasks = useMemo(
     () => tasks.filter((t) => !t._isRoutine && !todayIds.includes(t.id)),
     [tasks, todayIds]
   );
 
+  const count = todayTasks.length;
+
   const handleSelect = (item) => {
-    if (todayIds.includes(item.id) || todayIds.length >= DAILY_LIMIT) return;
+    if (todayIds.includes(item.id) || count >= DAILY_LIMIT) return;
     setTodayIds((prev) => [...prev, item.id]);
-    if (todayIds.length + 1 >= DAILY_LIMIT) setShowPicker(false);
+    if (count + 1 >= DAILY_LIMIT) setShowPicker(false);
   };
 
   const handleRemove = (id) => setTodayIds((prev) => prev.filter((i) => i !== id));
 
   const completedCount = todayTasks.filter((t) => t.completed).length;
-  const canAdd = todayIds.length < DAILY_LIMIT;
-  const pct = todayIds.length > 0 ? Math.round((completedCount / todayIds.length) * 100) : 0;
+  const canAdd = count < DAILY_LIMIT;
+  const pct = count > 0 ? Math.round((completedCount / count) * 100) : 0;
 
   return (
     <div className={styles.panel}>
