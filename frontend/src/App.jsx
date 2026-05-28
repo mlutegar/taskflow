@@ -36,7 +36,7 @@ export default function App() {
   // Tasks state
   const [tasks, setTasks] = useState([]);
   const [taskFilter, setTaskFilter] = useState("");
-  const [taskSort, setTaskSort] = useState("priority");
+  const [taskSort, setTaskSort] = useState("due_date_asc");
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState(null);
