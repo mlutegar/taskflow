@@ -90,7 +90,8 @@ export default function App() {
   };
 
   const handleCompleteTask = async (id) => {
-    const task = await tasksApi.complete(id);
+    const currentTask = tasks.find((t) => t.id === id);
+    const task = await tasksApi.complete(id, currentTask);
     setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
   };
 
