@@ -179,6 +179,12 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
         </div>
       </div>
 
+      {rescheduleFlash && (
+        <div className={styles.rescheduleFlash}>
+          🔄 Reagendado para {formatDate(rescheduleFlash)}
+        </div>
+      )}
+
       {expanded && (
         <div className={styles.detail}>
           {task.description && <p className={styles.description}>{task.description}</p>}
