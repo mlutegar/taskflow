@@ -24,7 +24,7 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
 
   // ── Persistir no localStorage toda vez que o estado relevante mudar ─────
   useEffect(() => {
-    if (step === "summary") return; // sessão encerrada — não vale a pena salvar
+    if (step === "summary") return;
     persist({
       step,
       cycle,
@@ -39,6 +39,14 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
   const numVideos = cycle * 5;
   const numTasks  = cycle;
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
+
+  // Reset defensivo: se step é "working" mas a tarefa foi deletada, volta a select
+  useEffect(() => {
+    if (step === "working" && !selectedTask) {
+      setSelectedTask(null);
+      setStep(available.length > 0 ? "select_task" : "summary");
+    }
+  }, [step, selectedTask, available.length]); // eslint-disable-line
 
   const resetSubtask = () => { setShowSubtask(false); setSubtaskText(""); };
 
