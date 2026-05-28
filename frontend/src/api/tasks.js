@@ -21,7 +21,12 @@ export const tasksApi = {
     if (params.status === "active") query = query.eq("completed", false);
     else if (params.status === "completed") query = query.eq("completed", true);
 
-    if (params.sort === "due_date") {
+    if (params.sort === "due_date_asc" || params.sort === "due_date") {
+      query = query.order("due_date", { ascending: true, nullsFirst: false }).order("priority");
+    } else if (params.sort === "due_date_desc") {
+      query = query.order("due_date", { ascending: false, nullsFirst: false }).order("priority");
+    } else if (params.sort === "overdue") {
+      // busca tudo e ordena no client: vencidas primeiro, depois por proximidade
       query = query.order("due_date", { nullsFirst: false }).order("priority");
     } else if (params.sort === "created") {
       query = query.order("created_at", { ascending: false });
