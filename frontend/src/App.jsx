@@ -41,6 +41,10 @@ export default function App() {
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState(null);
 
+  // Undo delete
+  const [undoTask, setUndoTask] = useState(null); // { task, expiresAt }
+  const undoTimerRef = useRef(null);
+
   // Routines state
   const [routines, setRoutines] = useState([]);
   const [routineFilter, setRoutineFilter] = useState("");
