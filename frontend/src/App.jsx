@@ -18,8 +18,10 @@ const TASK_FILTERS = [
 
 const TASK_SORTS = [
   { label: "Prioridade", value: "priority" },
+  { label: "Vencimento (mais próximo)", value: "due_date_asc" },
+  { label: "Vencimento (mais distante)", value: "due_date_desc" },
+  { label: "Vencidas primeiro", value: "overdue" },
   { label: "Data criação", value: "created" },
-  { label: "Vencimento", value: "due_date" },
 ];
 
 const ROUTINE_FILTERS = [
