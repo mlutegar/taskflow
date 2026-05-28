@@ -29,9 +29,27 @@ function isOverdue(dueDate, completed) {
 export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onDeleteChecklist }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [editData, setEditData] = useState({ title: task.title, description: task.description || "", priority: task.priority, due_date: task.due_date || "" });
+  const [editData, setEditData] = useState({
+    title: task.title,
+    description: task.description || "",
+    priority: task.priority,
+    due_date: task.due_date || "",
+    recurrence: task.recurrence || "",
+  });
   const [checklistInput, setChecklistInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [rescheduleFlash, setRescheduleFlash] = useState(null);
+  const prevDueDateRef = useRef(task.due_date);
+
+  useEffect(() => {
+    if (task.recurrence && task.due_date !== prevDueDateRef.current) {
+      setRescheduleFlash(task.due_date);
+      prevDueDateRef.current = task.due_date;
+      const t = setTimeout(() => setRescheduleFlash(null), 3500);
+      return () => clearTimeout(t);
+    }
+    prevDueDateRef.current = task.due_date;
+  }, [task.due_date, task.recurrence]);
 
   const priority = PRIORITY_MAP[task.priority] || PRIORITY_MAP[4];
   const overdue = isOverdue(task.due_date, task.completed);
