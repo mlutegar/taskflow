@@ -117,7 +117,7 @@ export default function TodayPanel({ tasks, onComplete, onReopen }) {
       </div>
 
       {/* Barra de progresso */}
-      {todayIds.length > 0 && (
+      {count > 0 && (
         <div className={styles.progressWrap}>
           <div className={styles.progressBar}>
             <div className={styles.progressFill} style={{ width: `${pct}%` }} />
