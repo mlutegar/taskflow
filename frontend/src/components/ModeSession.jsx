@@ -8,6 +8,7 @@ import EspressoSession from "./sessions/EspressoSession";
 import RPGSession from "./sessions/RPGSession";
 import LazyFalconSession from "./sessions/LazyFalconSession";
 import CafeRitualSession from "./sessions/CafeRitualSession";
+import TabHopSession from "./sessions/TabHopSession";
 import CustomModeSession from "./sessions/CustomModeSession";
 
 const SESSION_MAP = {
