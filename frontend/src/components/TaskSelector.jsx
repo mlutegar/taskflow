@@ -176,13 +176,21 @@ export default function TaskSelector({ tasks, onSelect, onCancel }) {
   const [priorities,  setPriorities]  = useState(new Set());   // vazio = todos
   const [checklist,   setChecklist]   = useState("all");
   const [date,        setDate]        = useState("all");
+  const [search,      setSearch]      = useState("");
 
   const active = tasks.filter((t) => !t.completed);
 
   const filtered = useMemo(() => {
     const f = applyFilters(active, { priorities, checklist, date });
-    return applySort(f, sortBy);
-  }, [active, priorities, checklist, date, sortBy]);
+    const q = search.trim().toLowerCase();
+    const searched = q
+      ? f.filter((t) =>
+          t.title?.toLowerCase().includes(q) ||
+          t.description?.toLowerCase().includes(q)
+        )
+      : f;
+    return applySort(searched, sortBy);
+  }, [active, priorities, checklist, date, sortBy, search]);
 
   const regularTasks = filtered.filter((t) => !t._isRoutine);
   const routines     = filtered.filter((t) => t._isRoutine);
