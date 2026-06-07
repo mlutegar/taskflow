@@ -229,6 +229,28 @@ export default function TaskSelector({ tasks, onSelect, onCancel }) {
         </div>
       </div>
 
+      {/* ── Busca ── */}
+      <div className={styles.searchRow}>
+        <span className={styles.searchIcon}>🔍</span>
+        <input
+          className={styles.searchInput}
+          type="text"
+          placeholder="Pesquisar tarefa..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          autoFocus
+        />
+        {search && (
+          <button
+            className={styles.searchClear}
+            onClick={() => setSearch("")}
+            title="Limpar busca"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       {/* ── Painel de filtros ── */}
       {showFilters && (
         <div className={styles.filterPanel}>
