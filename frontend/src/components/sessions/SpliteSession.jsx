@@ -57,6 +57,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
       selectedTaskId: selectedTask?.id ?? null,
       isDiaryMode,
       nextDiaryStep,
+      diaryDate,
     });
   }, [step, activity, cycle, taskInCycle, completed, doneIds, selectedTask, isDiaryMode, nextDiaryStep]); // eslint-disable-line
 
