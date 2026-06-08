@@ -157,6 +157,18 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
               <div className={styles.promptText}>
                 Faça "{activity}" {cycle} vez{cycle !== 1 ? "es" : ""}. Depois conclua {numTasks} tarefa{numTasks !== 1 ? "s" : ""}.
               </div>
+              {activity === READ_DIARY_ACTIVITY && diaryDate && (
+                <div className={styles.promptText}>
+                  📅 Data sugerida para ler: <strong>{diaryDate}</strong>
+                  <button
+                    className={`${styles.btn} ${styles.btnSecondary}`}
+                    style={{ marginLeft: 8 }}
+                    onClick={() => setDiaryDate(randomDiaryDate())}
+                  >
+                    🎲 Sortear outra
+                  </button>
+                </div>
+              )}
             </div>
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { setTaskInCycle(0); setStep("select_task"); }}>
               ✅ Fiz!
