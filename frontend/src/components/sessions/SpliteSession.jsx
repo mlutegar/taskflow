@@ -12,6 +12,16 @@ const ACTIVITIES = [
 ];
 
 const DIARY_MODE_ACTIVITY = "Escrever no diário";
+const READ_DIARY_ACTIVITY = "Ler diário";
+
+// Gera uma data aleatória entre 01/01/2024 e hoje, no formato dd/mm/aaaa
+function randomDiaryDate() {
+  const start = new Date(2024, 0, 1);       // 1 de janeiro de 2024
+  const end = new Date();                    // hoje
+  const ms = start.getTime() + Math.random() * (end.getTime() - start.getTime());
+  const d = new Date(ms);
+  return d.toLocaleDateString("pt-BR");      // dd/mm/aaaa
+}
 
 export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
   const { saved, persist, clearSaved } = useSessionPersist("splite");
