@@ -38,6 +38,7 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
   const [doneIds,       setDoneIds]       = useState(() => new Set(saved?.doneIds ?? []));
   const [isDiaryMode,   setIsDiaryMode]   = useState(saved?.isDiaryMode   ?? false);
   const [nextDiaryStep, setNextDiaryStep] = useState(saved?.nextDiaryStep ?? "reading_analysis");
+  const [diaryDate,     setDiaryDate]     = useState(saved?.diaryDate     ?? null);
   const [wasRestored,   setWasRestored]   = useState(!!saved);
 
   const numTasks = cycle;
