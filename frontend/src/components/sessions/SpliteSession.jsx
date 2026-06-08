@@ -67,10 +67,13 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
     setActivity(a);
     if (a === DIARY_MODE_ACTIVITY) {
       setIsDiaryMode(true);
+      setDiaryDate(null);
       setNextDiaryStep("reading_analysis"); // após a 1ª tarefa vai para "ler análise"
       setStep("writing_diary");
     } else {
       setIsDiaryMode(false);
+      // "Ler diário": sugere uma data aleatória entre 01/01/2024 e hoje
+      setDiaryDate(a === READ_DIARY_ACTIVITY ? randomDiaryDate() : null);
       setStep("doing_activity");
     }
   };
