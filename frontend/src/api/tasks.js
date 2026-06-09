@@ -111,6 +111,17 @@ export const tasksApi = {
     return data;
   },
 
+  updateChecklistItem: async (_taskId, itemId, description) => {
+    const { data, error } = await supabase
+      .from("checklist_items")
+      .update({ description })
+      .eq("id", itemId)
+      .select()
+      .single();
+    throwIfError(error);
+    return data;
+  },
+
   toggleChecklistItem: async (_taskId, itemId) => {
     const { data: current, error: fetchError } = await supabase
       .from("checklist_items")
