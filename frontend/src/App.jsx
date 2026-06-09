@@ -159,6 +159,15 @@ export default function App() {
     }));
   };
 
+  const handleUpdateTaskChecklist = async (taskId, itemId, description) => {
+    const item = await tasksApi.updateChecklistItem(taskId, itemId, description);
+    setTasks((prev) => prev.map((t) => {
+      if (t.id !== taskId) return t;
+      const newChecklist = t.checklist.map((c) => (c.id === itemId ? item : c));
+      return { ...t, checklist: newChecklist };
+    }));
+  };
+
   const handleDeleteTaskChecklist = async (taskId, itemId) => {
     await tasksApi.deleteChecklistItem(taskId, itemId);
     setTasks((prev) => prev.map((t) => {
