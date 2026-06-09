@@ -273,21 +273,18 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
 
           {(task.checklist.length > 0 || !task.completed) && (
             <div className={styles.checklist}>
-              {task.checklist.map((item) => (
-                <div key={item.id} className={styles.checklistItem}>
-                  <button
-                    className={`${styles.checklistCheck} ${item.completed ? styles.checklistDone : ""}`}
-                    onClick={() => onToggleChecklist(task.id, item.id)}
-                  >
-                    {item.completed && "✓"}
-                  </button>
-                  <span className={item.completed ? styles.checklistTextDone : ""}>{item.description}</span>
-                  <button
-                    className={styles.checklistDelete}
-                    onClick={() => onDeleteChecklist(task.id, item.id)}
-                    title="Remover item"
-                  >✕</button>
-                </div>
+              {rootItems.map((item) => (
+                <ChecklistNode
+                  key={item.id}
+                  item={item}
+                  childrenMap={childrenMap}
+                  taskId={task.id}
+                  taskCompleted={task.completed}
+                  depth={0}
+                  onToggle={onToggleChecklist}
+                  onDelete={onDeleteChecklist}
+                  onAdd={onAddChecklist}
+                />
               ))}
 
               {!task.completed && (
