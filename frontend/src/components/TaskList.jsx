@@ -23,6 +23,7 @@ export default function TaskList({ tasks, onComplete, onReopen, onDelete, onUpda
           onUpdate={onUpdate}
           onAddChecklist={onAddChecklist}
           onToggleChecklist={onToggleChecklist}
+          onUpdateChecklist={onUpdateChecklist}
           onDeleteChecklist={onDeleteChecklist}
         />
       ))}
