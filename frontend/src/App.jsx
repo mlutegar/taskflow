@@ -391,6 +391,7 @@ export default function App() {
                 onUpdate={handleUpdateTask}
                 onAddChecklist={handleAddTaskChecklist}
                 onToggleChecklist={handleToggleTaskChecklist}
+                onUpdateChecklist={handleUpdateTaskChecklist}
                 onDeleteChecklist={handleDeleteTaskChecklist}
               />
             )}
