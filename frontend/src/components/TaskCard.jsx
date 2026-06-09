@@ -138,7 +138,7 @@ function isOverdue(dueDate, completed) {
   return new Date(dueDate) < new Date(new Date().toDateString());
 }
 
-export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onDeleteChecklist }) {
+export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({
