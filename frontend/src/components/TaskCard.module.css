@@ -101,6 +101,56 @@
   white-space: nowrap;
 }
 
+/* Contador regressivo */
+.countdownBadge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  padding: 1px 7px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.countdownToday {
+  color: var(--high);
+  background: rgba(240, 165, 64, 0.12);
+  border-color: rgba(240, 165, 64, 0.25);
+}
+
+.countdownLate {
+  color: var(--danger);
+  background: rgba(224, 82, 82, 0.12);
+  border-color: rgba(224, 82, 82, 0.25);
+}
+
+/* Banner de ritmo das subtarefas */
+.paceBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  background: rgba(124, 110, 245, 0.08);
+  border: 1px solid rgba(124, 110, 245, 0.20);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.paceBanner strong { color: var(--accent); }
+
+.paceUrgent {
+  background: rgba(224, 82, 82, 0.08);
+  border-color: rgba(224, 82, 82, 0.22);
+}
+
+.paceUrgent strong { color: var(--danger); }
+
+.paceIcon { font-size: 14px; flex-shrink: 0; }
+
+.paceSub { color: var(--text-muted); font-size: 12px; }
+
 .rescheduleFlash {
   padding: 7px 16px;
   font-size: 12px;
