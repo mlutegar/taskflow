@@ -205,6 +205,12 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
   const priority = PRIORITY_MAP[task.priority] || PRIORITY_MAP[4];
   const overdue = isOverdue(task.due_date, task.completed);
 
+  // Contador de dias + ritmo das subtarefas pendentes.
+  const daysLeft = task.completed ? null : daysUntil(task.due_date);
+  const pendingChecklist = (task.checklist_count || 0) - (task.checklist_completed_count || 0);
+  const countdown = task.completed ? null : countdownLabel(daysLeft);
+  const pace = task.completed ? null : pacePlan(daysLeft, pendingChecklist);
+
   // Monta a árvore do checklist: agrupa filhos por parent_id e ordena cada nível.
   const { rootItems, childrenMap } = useMemo(() => {
     const map = new Map();
