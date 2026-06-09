@@ -326,6 +326,7 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
                   taskCompleted={task.completed}
                   depth={0}
                   onToggle={onToggleChecklist}
+                  onUpdate={onUpdateChecklist}
                   onDelete={onDeleteChecklist}
                   onAdd={onAddChecklist}
                 />
