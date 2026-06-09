@@ -104,6 +104,7 @@ function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onTogg
           taskCompleted={taskCompleted}
           depth={depth + 1}
           onToggle={onToggle}
+          onUpdate={onUpdate}
           onDelete={onDelete}
           onAdd={onAdd}
         />
