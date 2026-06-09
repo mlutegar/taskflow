@@ -163,8 +163,25 @@ export default function App() {
     await tasksApi.deleteChecklistItem(taskId, itemId);
     setTasks((prev) => prev.map((t) => {
       if (t.id !== taskId) return t;
-      const newChecklist = t.checklist.filter((c) => c.id !== itemId);
-      return { ...t, checklist: newChecklist, checklist_count: newChecklist.length };
+      // remove o item e todos os seus descendentes (o banco já faz cascade)
+      const toRemove = new Set([itemId]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const c of t.checklist) {
+          if (c.parent_id != null && toRemove.has(c.parent_id) && !toRemove.has(c.id)) {
+            toRemove.add(c.id);
+            changed = true;
+          }
+        }
+      }
+      const newChecklist = t.checklist.filter((c) => !toRemove.has(c.id));
+      return {
+        ...t,
+        checklist: newChecklist,
+        checklist_count: newChecklist.length,
+        checklist_completed_count: newChecklist.filter((c) => c.completed).length,
+      };
     }));
   };
 
