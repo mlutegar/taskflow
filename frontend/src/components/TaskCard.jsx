@@ -365,6 +365,19 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
         <div className={styles.detail}>
           {task.description && <p className={styles.description}>{task.description}</p>}
 
+          {pace && (
+            <div className={`${styles.paceBanner} ${pace.urgent ? styles.paceUrgent : ""}`}>
+              <span className={styles.paceIcon}>🎯</span>
+              <span>
+                Ritmo: <strong>{pace.text}</strong>
+                <span className={styles.paceSub}>
+                  {" "}— {pendingChecklist} pendente{pendingChecklist === 1 ? "" : "s"}
+                  {daysLeft != null && daysLeft > 0 && ` em ${plural(daysLeft, "dia", "dias")}`}
+                </span>
+              </span>
+            </div>
+          )}
+
           {(task.checklist.length > 0 || !task.completed) && (
             <div className={styles.checklist}>
               {rootItems.map((item) => (
