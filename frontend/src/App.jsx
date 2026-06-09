@@ -143,8 +143,8 @@ export default function App() {
     setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
   };
 
-  const handleAddTaskChecklist = async (taskId, description) => {
-    const item = await tasksApi.addChecklistItem(taskId, description);
+  const handleAddTaskChecklist = async (taskId, description, parentId = null) => {
+    const item = await tasksApi.addChecklistItem(taskId, description, parentId);
     setTasks((prev) => prev.map((t) =>
       t.id === taskId ? { ...t, checklist: [...t.checklist, item], checklist_count: t.checklist_count + 1 } : t
     ));
