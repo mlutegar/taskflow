@@ -90,16 +90,21 @@ export const tasksApi = {
 
   reopen: (id) => tasksApi.update(id, { completed: false }),
 
-  addChecklistItem: async (taskId, description) => {
-    const { data: existing } = await supabase
+  addChecklistItem: async (taskId, description, parentId = null) => {
+    // ordem é calculada entre os irmãos (mesmo task_id e mesmo parent_id)
+    let countQuery = supabase
       .from("checklist_items")
       .select("id")
       .eq("task_id", taskId);
+    countQuery = parentId == null
+      ? countQuery.is("parent_id", null)
+      : countQuery.eq("parent_id", parentId);
+    const { data: existing } = await countQuery;
     const order = existing?.length ?? 0;
 
     const { data, error } = await supabase
       .from("checklist_items")
-      .insert({ task_id: taskId, description, order })
+      .insert({ task_id: taskId, parent_id: parentId, description, order })
       .select()
       .single();
     throwIfError(error);
