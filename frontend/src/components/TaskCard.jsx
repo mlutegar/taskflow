@@ -330,6 +330,11 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
                 📅 {formatDate(task.due_date)}{overdue && " · Atrasada"}
               </span>
             )}
+            {countdown && (
+              <span className={`${styles.countdownBadge} ${daysLeft < 0 ? styles.countdownLate : daysLeft === 0 ? styles.countdownToday : ""}`}>
+                {countdown}
+              </span>
+            )}
             {task.recurrence && (
               <span className={styles.recurrenceBadge}>
                 🔄 {RECURRENCE_LABELS[task.recurrence]}
