@@ -1,5 +1,73 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import styles from "./TaskCard.module.css";
+
+// Item de checklist recursivo: permite subtarefas dentro de subtarefas.
+function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onToggle, onDelete, onAdd }) {
+  const [adding, setAdding] = useState(false);
+  const [text, setText] = useState("");
+  const children = childrenMap.get(item.id) || [];
+
+  const handleAddChild = async (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    await onAdd(taskId, text.trim(), item.id);
+    setText("");
+    setAdding(false);
+  };
+
+  return (
+    <div className={styles.checklistNode} style={depth > 0 ? { marginLeft: 18 } : undefined}>
+      <div className={styles.checklistItem}>
+        <button
+          className={`${styles.checklistCheck} ${item.completed ? styles.checklistDone : ""}`}
+          onClick={() => onToggle(taskId, item.id)}
+        >
+          {item.completed && "✓"}
+        </button>
+        <span className={item.completed ? styles.checklistTextDone : ""}>{item.description}</span>
+        {!taskCompleted && (
+          <button
+            className={styles.checklistDelete}
+            onClick={() => setAdding((v) => !v)}
+            title="Adicionar subtarefa"
+          >＋</button>
+        )}
+        <button
+          className={styles.checklistDelete}
+          onClick={() => onDelete(taskId, item.id)}
+          title="Remover item"
+        >✕</button>
+      </div>
+
+      {adding && !taskCompleted && (
+        <form className={styles.checklistForm} style={{ marginLeft: 18 }} onSubmit={handleAddChild}>
+          <input
+            className={styles.checklistInput}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Adicionar subtarefa..."
+            autoFocus
+          />
+          <button type="submit" className={styles.checklistAdd} disabled={!text.trim()}>+</button>
+        </form>
+      )}
+
+      {children.map((child) => (
+        <ChecklistNode
+          key={child.id}
+          item={child}
+          childrenMap={childrenMap}
+          taskId={taskId}
+          taskCompleted={taskCompleted}
+          depth={depth + 1}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          onAdd={onAdd}
+        />
+      ))}
+    </div>
+  );
+}
 
 const RECURRENCE_LABELS = {
   daily: "Todo dia",
