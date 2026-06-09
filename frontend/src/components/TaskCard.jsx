@@ -138,6 +138,45 @@ function isOverdue(dueDate, completed) {
   return new Date(dueDate) < new Date(new Date().toDateString());
 }
 
+// Quantos dias faltam até a data de entrega (0 = hoje, negativo = atrasada).
+function daysUntil(dueDate) {
+  if (!dueDate) return null;
+  const [y, m, d] = dueDate.split("-").map(Number);
+  const due = new Date(y, m - 1, d);
+  const today = new Date(new Date().toDateString());
+  return Math.round((due - today) / 86400000);
+}
+
+const plural = (n, sing, plur) => `${n} ${Math.abs(n) === 1 ? sing : plur}`;
+
+// Texto do contador regressivo.
+function countdownLabel(days) {
+  if (days == null) return null;
+  if (days < 0) return `⏳ Atrasada ${plural(Math.abs(days), "dia", "dias")}`;
+  if (days === 0) return "⏳ É hoje!";
+  return `⏳ Faltam ${plural(days, "dia", "dias")}`;
+}
+
+// Calcula o ritmo necessário das subtarefas para cumprir o prazo.
+// Ex.: 10 subtarefas em 20 dias → "1 subtarefa a cada 2 dias".
+//      20 subtarefas em 5 dias  → "4 subtarefas por dia".
+function pacePlan(days, pending) {
+  if (pending <= 0 || days == null) return null;
+  // Atrasada ou vence hoje: tudo precisa sair hoje.
+  if (days <= 0) {
+    return { text: `Faça ${plural(pending, "subtarefa", "subtarefas")} hoje`, urgent: true };
+  }
+  if (days >= pending) {
+    const everyN = Math.floor(days / pending);
+    return {
+      text: everyN <= 1 ? "1 subtarefa por dia" : `1 subtarefa a cada ${everyN} dias`,
+      urgent: false,
+    };
+  }
+  const perDay = Math.ceil(pending / days);
+  return { text: `${plural(perDay, "subtarefa", "subtarefas")} por dia`, urgent: perDay >= 3 };
+}
+
 export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
