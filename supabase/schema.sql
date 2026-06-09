@@ -12,14 +12,19 @@ create table tasks (
   due_date date
 );
 
--- Itens de checklist das tarefas
+-- Itens de checklist das tarefas (suporta aninhamento: subtarefa de subtarefa)
 create table checklist_items (
   id bigserial primary key,
   task_id uuid not null references tasks(id) on delete cascade,
+  parent_id bigint references checklist_items(id) on delete cascade,
   description text not null,
   completed boolean not null default false,
   "order" integer not null default 0
 );
+
+-- Se a tabela já existir, rode esta migração no SQL Editor do Supabase:
+-- alter table checklist_items
+--   add column if not exists parent_id bigint references checklist_items(id) on delete cascade;
 
 -- Tabela de rotinas
 create table routines (
