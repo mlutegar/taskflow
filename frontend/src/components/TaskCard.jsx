@@ -2,9 +2,11 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import styles from "./TaskCard.module.css";
 
 // Item de checklist recursivo: permite subtarefas dentro de subtarefas.
-function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onToggle, onDelete, onAdd }) {
+function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onToggle, onUpdate, onDelete, onAdd }) {
   const [adding, setAdding] = useState(false);
   const [text, setText] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(item.description);
   const children = childrenMap.get(item.id) || [];
 
   const handleAddChild = async (e) => {
@@ -15,29 +17,70 @@ function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onTogg
     setAdding(false);
   };
 
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    const trimmed = editText.trim();
+    if (!trimmed || trimmed === item.description) {
+      setEditing(false);
+      return;
+    }
+    await onUpdate(taskId, item.id, trimmed);
+    setEditing(false);
+  };
+
   return (
     <div className={styles.checklistNode} style={depth > 0 ? { marginLeft: 18 } : undefined}>
-      <div className={styles.checklistItem}>
-        <button
-          className={`${styles.checklistCheck} ${item.completed ? styles.checklistDone : ""}`}
-          onClick={() => onToggle(taskId, item.id)}
-        >
-          {item.completed && "✓"}
-        </button>
-        <span className={item.completed ? styles.checklistTextDone : ""}>{item.description}</span>
-        {!taskCompleted && (
+      {editing ? (
+        <form className={styles.checklistForm} onSubmit={handleSaveEdit}>
+          <input
+            className={styles.checklistInput}
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Escape") { setEditText(item.description); setEditing(false); } }}
+            autoFocus
+          />
+          <button type="submit" className={styles.checklistAdd} disabled={!editText.trim()} title="Salvar">✓</button>
+          <button
+            type="button"
+            className={styles.checklistDelete}
+            onClick={() => { setEditText(item.description); setEditing(false); }}
+            title="Cancelar"
+          >✕</button>
+        </form>
+      ) : (
+        <div className={styles.checklistItem}>
+          <button
+            className={`${styles.checklistCheck} ${item.completed ? styles.checklistDone : ""}`}
+            onClick={() => onToggle(taskId, item.id)}
+          >
+            {item.completed && "✓"}
+          </button>
+          <span
+            className={item.completed ? styles.checklistTextDone : ""}
+            onDoubleClick={() => !taskCompleted && setEditing(true)}
+            title={!taskCompleted ? "Clique duplo para editar" : undefined}
+          >{item.description}</span>
+          {!taskCompleted && (
+            <button
+              className={styles.checklistDelete}
+              onClick={() => setEditing(true)}
+              title="Editar"
+            >✎</button>
+          )}
+          {!taskCompleted && (
+            <button
+              className={styles.checklistDelete}
+              onClick={() => setAdding((v) => !v)}
+              title="Adicionar subtarefa"
+            >＋</button>
+          )}
           <button
             className={styles.checklistDelete}
-            onClick={() => setAdding((v) => !v)}
-            title="Adicionar subtarefa"
-          >＋</button>
-        )}
-        <button
-          className={styles.checklistDelete}
-          onClick={() => onDelete(taskId, item.id)}
-          title="Remover item"
-        >✕</button>
-      </div>
+            onClick={() => onDelete(taskId, item.id)}
+            title="Remover item"
+          >✕</button>
+        </div>
+      )}
 
       {adding && !taskCompleted && (
         <form className={styles.checklistForm} style={{ marginLeft: 18 }} onSubmit={handleAddChild}>
