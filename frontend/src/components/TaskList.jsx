@@ -1,7 +1,7 @@
 import TaskCard from "./TaskCard";
 import styles from "./TaskList.module.css";
 
-export default function TaskList({ tasks, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onDeleteChecklist }) {
+export default function TaskList({ tasks, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist }) {
   if (tasks.length === 0) {
     return (
       <div className={styles.empty}>
