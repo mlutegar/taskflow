@@ -122,6 +122,20 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
   const priority = PRIORITY_MAP[task.priority] || PRIORITY_MAP[4];
   const overdue = isOverdue(task.due_date, task.completed);
 
+  // Monta a árvore do checklist: agrupa filhos por parent_id e ordena cada nível.
+  const { rootItems, childrenMap } = useMemo(() => {
+    const map = new Map();
+    for (const item of task.checklist) {
+      const key = item.parent_id ?? null;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(item);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.order - b.order || a.id - b.id);
+    }
+    return { rootItems: map.get(null) || [], childrenMap: map };
+  }, [task.checklist]);
+
   const handleSaveEdit = async () => {
     setSaving(true);
     try {
