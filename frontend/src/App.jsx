@@ -46,6 +46,17 @@ export default function App() {
   const [undoTask, setUndoTask] = useState(null); // { task, expiresAt }
   const undoTimerRef = useRef(null);
 
+  // Tarefas concluídas hoje (total, não só as selecionadas em "Tarefas de Hoje")
+  const [completedToday, setCompletedToday] = useState(0);
+  const refreshCompletedToday = useCallback(async () => {
+    try {
+      setCompletedToday(await tasksApi.countCompletedToday());
+    } catch {
+      /* silencioso: não é crítico para o fluxo principal */
+    }
+  }, []);
+  useEffect(() => { refreshCompletedToday(); }, [refreshCompletedToday]);
+
   // Routines state
   const [routines, setRoutines] = useState([]);
   const [routineFilter, setRoutineFilter] = useState("");
