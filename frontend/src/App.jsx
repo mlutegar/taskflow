@@ -37,6 +37,7 @@ export default function App() {
   const [tasks, setTasks] = useState([]);
   const [taskFilter, setTaskFilter] = useState("");
   const [taskSort, setTaskSort] = useState("due_date_asc");
+  const [taskSearch, setTaskSearch] = useState("");
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState(null);
