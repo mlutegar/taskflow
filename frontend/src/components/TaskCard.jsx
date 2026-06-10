@@ -50,21 +50,32 @@ function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onTogg
   return (
     <div className={styles.checklistNode} style={depth > 0 ? { marginLeft: 18 } : undefined}>
       {editing ? (
-        <form className={styles.checklistForm} onSubmit={handleSaveEdit}>
-          <input
-            className={styles.checklistInput}
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Escape") { setEditText(item.description); setEditing(false); } }}
-            autoFocus
+        <form className={styles.checklistEditForm} onSubmit={handleSaveEdit}>
+          <div className={styles.checklistForm}>
+            <input
+              className={styles.checklistInput}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") cancelEditing(); }}
+              placeholder="Título da subtarefa"
+              autoFocus
+            />
+            <button type="submit" className={styles.checklistAdd} disabled={!editText.trim()} title="Salvar">✓</button>
+            <button
+              type="button"
+              className={styles.checklistDelete}
+              onClick={cancelEditing}
+              title="Cancelar"
+            >✕</button>
+          </div>
+          <textarea
+            className={styles.checklistNoteInput}
+            value={editNote}
+            onChange={(e) => setEditNote(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Escape") cancelEditing(); }}
+            placeholder="Descrição / nota (opcional)"
+            rows={2}
           />
-          <button type="submit" className={styles.checklistAdd} disabled={!editText.trim()} title="Salvar">✓</button>
-          <button
-            type="button"
-            className={styles.checklistDelete}
-            onClick={() => { setEditText(item.description); setEditing(false); }}
-            title="Cancelar"
-          >✕</button>
         </form>
       ) : (
         <div className={styles.checklistItem}>
@@ -75,14 +86,17 @@ function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onTogg
             {item.completed && "✓"}
           </button>
           <span
-            className={item.completed ? styles.checklistTextDone : ""}
-            onDoubleClick={() => !taskCompleted && setEditing(true)}
+            className={`${styles.checklistTextWrap} ${item.completed ? styles.checklistTextDone : ""}`}
+            onDoubleClick={() => !taskCompleted && startEditing()}
             title={!taskCompleted ? "Clique duplo para editar" : undefined}
-          >{item.description}</span>
+          >
+            {item.description}
+            {item.note && <span className={styles.checklistNote}>{item.note}</span>}
+          </span>
           {!taskCompleted && (
             <button
               className={styles.checklistDelete}
-              onClick={() => setEditing(true)}
+              onClick={startEditing}
               title="Editar"
             >✎</button>
           )}
