@@ -111,10 +111,12 @@ export const tasksApi = {
     return data;
   },
 
-  updateChecklistItem: async (_taskId, itemId, description) => {
+  updateChecklistItem: async (_taskId, itemId, fields) => {
+    // Aceita string (legado = só descrição) ou objeto { description?, note? }
+    const updates = typeof fields === "string" ? { description: fields } : fields;
     const { data, error } = await supabase
       .from("checklist_items")
-      .update({ description })
+      .update(updates)
       .eq("id", itemId)
       .select()
       .single();
