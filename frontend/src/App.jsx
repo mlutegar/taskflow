@@ -417,7 +417,7 @@ export default function App() {
             {tasksError && <div className={styles.error}>Erro: {tasksError}</div>}
             {!tasksLoading && !tasksError && (
               <TaskList
-                tasks={tasks}
+                tasks={visibleTasks}
                 onComplete={handleCompleteTask}
                 onReopen={handleReopenTask}
                 onDelete={handleDeleteTask}
