@@ -108,6 +108,12 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
           <span className={`${styles.slot} ${count >= DAILY_LIMIT ? styles.slotFull : ""}`}>
             {count}/{DAILY_LIMIT}
           </span>
+          <span
+            className={styles.doneToday}
+            title="Total de tarefas concluídas hoje"
+          >
+            ✓ {completedToday} feita{completedToday !== 1 ? "s" : ""} hoje
+          </span>
         </div>
         {canAdd && (
           <button className={styles.addBtn} onClick={() => setShowPicker((v) => !v)}>
