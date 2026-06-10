@@ -308,6 +308,49 @@
 .checklistAdd:hover:not(:disabled) { background: var(--accent-hover); }
 .checklistAdd:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Subtarefa: título + nota/descrição */
+.checklistTextWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: text;
+}
+
+.checklistNote {
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.checklistTextDone .checklistNote { text-decoration: line-through; }
+
+/* Form de edição da subtarefa (título + nota) */
+.checklistEditForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.checklistEditForm .checklistForm { margin-top: 0; }
+
+.checklistNoteInput {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.checklistNoteInput:focus { border-color: var(--accent); }
+.checklistNoteInput::placeholder { color: var(--text-muted); }
+
 /* Edit form */
 .editForm {
   padding: 16px;
