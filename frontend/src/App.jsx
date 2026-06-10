@@ -109,11 +109,13 @@ export default function App() {
     const currentTask = tasks.find((t) => t.id === id);
     const task = await tasksApi.complete(id, currentTask);
     setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
+    refreshCompletedToday();
   };
 
   const handleReopenTask = async (id) => {
     const task = await tasksApi.reopen(id);
     setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
+    refreshCompletedToday();
   };
 
   const handleDeleteTask = (id) => {
