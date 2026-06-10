@@ -371,6 +371,7 @@ export default function App() {
           <>
             <TodayPanel
               tasks={tasks}
+              completedToday={completedToday}
               onComplete={handleCompleteTask}
               onReopen={handleReopenTask}
             />
