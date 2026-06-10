@@ -58,7 +58,7 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove }) {
 }
 
 /* ─── TodayPanel ─────────────────────────────────────────────────────────── */
-export default function TodayPanel({ tasks, onComplete, onReopen }) {
+export default function TodayPanel({ tasks, completedToday = 0, onComplete, onReopen }) {
   const [todayIds, setTodayIds] = useState(loadTodayIds);
   const [showPicker, setShowPicker] = useState(false);
 
