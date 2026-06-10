@@ -18,13 +18,16 @@ create table checklist_items (
   task_id uuid not null references tasks(id) on delete cascade,
   parent_id bigint references checklist_items(id) on delete cascade,
   description text not null,
+  note text,
   completed boolean not null default false,
   "order" integer not null default 0
 );
 
--- Se a tabela já existir, rode esta migração no SQL Editor do Supabase:
+-- Se a tabela já existir, rode estas migrações no SQL Editor do Supabase:
 -- alter table checklist_items
 --   add column if not exists parent_id bigint references checklist_items(id) on delete cascade;
+-- alter table checklist_items
+--   add column if not exists note text;
 
 -- Tabela de rotinas
 create table routines (
