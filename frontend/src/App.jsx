@@ -160,8 +160,8 @@ export default function App() {
     }));
   };
 
-  const handleUpdateTaskChecklist = async (taskId, itemId, description) => {
-    const item = await tasksApi.updateChecklistItem(taskId, itemId, description);
+  const handleUpdateTaskChecklist = async (taskId, itemId, fields) => {
+    const item = await tasksApi.updateChecklistItem(taskId, itemId, fields);
     setTasks((prev) => prev.map((t) => {
       if (t.id !== taskId) return t;
       const newChecklist = t.checklist.map((c) => (c.id === itemId ? item : c));
