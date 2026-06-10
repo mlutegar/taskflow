@@ -384,6 +384,9 @@
   .controls { gap: 8px; margin-bottom: 14px; }
   .filterBtn { padding: 4px 9px; font-size: 11px; }
 
+  .searchWrapper { flex: 1 1 100%; order: -1; }
+  .searchInput { font-size: 12px; padding: 6px 28px; }
+
   .sortWrapper { gap: 5px; }
   .sortSelect { font-size: 11px; padding: 4px 8px; }
   .sortLabel { font-size: 11px; }
