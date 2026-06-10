@@ -81,14 +81,28 @@ export const tasksApi = {
   },
 
   complete: (id, currentTask) => {
+    const completedAt = new Date().toISOString();
     if (currentTask?.recurrence) {
       const nextDate = computeNextDueDate(currentTask.due_date, currentTask.recurrence);
-      return tasksApi.update(id, { due_date: nextDate, completed: false });
+      return tasksApi.update(id, { due_date: nextDate, completed: false, completed_at: completedAt });
     }
-    return tasksApi.update(id, { completed: true });
+    return tasksApi.update(id, { completed: true, completed_at: completedAt });
   },
 
-  reopen: (id) => tasksApi.update(id, { completed: false }),
+  reopen: (id) => tasksApi.update(id, { completed: false, completed_at: null }),
+
+  // Quantas tarefas foram concluídas hoje (independente de já terem sido reabertas
+  // ou reagendadas como recorrentes — conta pelo carimbo de conclusão).
+  countCompletedToday: async () => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const { count, error } = await supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .gte("completed_at", start.toISOString());
+    throwIfError(error);
+    return count ?? 0;
+  },
 
   addChecklistItem: async (taskId, description, parentId = null) => {
     // ordem é calculada entre os irmãos (mesmo task_id e mesmo parent_id)
