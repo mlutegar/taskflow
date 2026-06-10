@@ -369,6 +369,25 @@ export default function App() {
             )}
 
             <div className={styles.controls}>
+              <div className={styles.searchWrapper}>
+                <span className={styles.searchIcon}>🔍</span>
+                <input
+                  type="text"
+                  className={styles.searchInput}
+                  placeholder="Pesquisar tarefas..."
+                  value={taskSearch}
+                  onChange={(e) => setTaskSearch(e.target.value)}
+                />
+                {taskSearch && (
+                  <button
+                    className={styles.searchClear}
+                    onClick={() => setTaskSearch("")}
+                    aria-label="Limpar busca"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
               <div className={styles.filters}>
                 {TASK_FILTERS.map((f) => (
                   <button
