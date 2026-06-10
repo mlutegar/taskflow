@@ -181,6 +181,56 @@
 
 .filters { display: flex; gap: 6px; }
 
+/* ── Busca ─────────────────────────────────────────── */
+.searchWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  font-size: 12px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  padding: 7px 30px 7px 30px;
+  border-radius: 20px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.searchInput::placeholder { color: var(--text-muted); }
+.searchInput:focus { border-color: var(--accent); }
+
+.searchClear {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+
+.searchClear:hover { color: var(--text); border-color: #4a4a60; }
+
 .filterBtn {
   padding: 5px 13px;
   border-radius: 20px;
