@@ -274,6 +274,19 @@ export default function App() {
     }));
   };
 
+  // Busca de tarefas (título, descrição e itens do checklist)
+  const search = taskSearch.trim().toLowerCase();
+  const visibleTasks = search
+    ? tasks.filter((t) => {
+        const inTitle = t.title?.toLowerCase().includes(search);
+        const inDesc = t.description?.toLowerCase().includes(search);
+        const inChecklist = t.checklist?.some((c) =>
+          c.description?.toLowerCase().includes(search)
+        );
+        return inTitle || inDesc || inChecklist;
+      })
+    : tasks;
+
   // Stats
   const activeTaskCnt = tasks.filter((t) => !t.completed).length;
   const doneTodayCnt = routines.filter((r) => r.is_completed_today).length;
