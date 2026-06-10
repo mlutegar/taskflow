@@ -7,7 +7,20 @@ function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onTogg
   const [text, setText] = useState("");
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(item.description);
+  const [editNote, setEditNote] = useState(item.note || "");
   const children = childrenMap.get(item.id) || [];
+
+  const startEditing = () => {
+    setEditText(item.description);
+    setEditNote(item.note || "");
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditText(item.description);
+    setEditNote(item.note || "");
+    setEditing(false);
+  };
 
   const handleAddChild = async (e) => {
     e.preventDefault();
@@ -20,11 +33,17 @@ function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onTogg
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     const trimmed = editText.trim();
-    if (!trimmed || trimmed === item.description) {
-      setEditing(false);
+    if (!trimmed) {
+      cancelEditing();
       return;
     }
-    await onUpdate(taskId, item.id, trimmed);
+    const newNote = editNote.trim() || null;
+    const updates = {};
+    if (trimmed !== item.description) updates.description = trimmed;
+    if (newNote !== (item.note || null)) updates.note = newNote;
+    if (Object.keys(updates).length > 0) {
+      await onUpdate(taskId, item.id, updates);
+    }
     setEditing(false);
   };
 
