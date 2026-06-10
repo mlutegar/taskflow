@@ -8,9 +8,15 @@ create table tasks (
   description text,
   completed boolean not null default false,
   created_at timestamptz not null default now(),
+  completed_at timestamptz,
   priority integer not null default 4,
   due_date date
 );
+
+-- Se a tabela "tasks" já existir, rode esta migração no SQL Editor do Supabase
+-- para habilitar a contagem de "tarefas concluídas hoje":
+-- alter table tasks add column if not exists completed_at timestamptz;
+-- create index if not exists tasks_completed_at_idx on tasks (completed_at);
 
 -- Itens de checklist das tarefas (suporta aninhamento: subtarefa de subtarefa)
 create table checklist_items (
