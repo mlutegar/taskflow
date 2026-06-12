@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import TaskSelector from "./TaskSelector";
+import { dailyTasksApi } from "../api/dailyTasks";
 import styles from "./TodayPanel.module.css";
 
 const DAILY_LIMIT = 5;
@@ -8,12 +9,20 @@ function todayKey() {
   return `todayTasks_${new Date().toISOString().split("T")[0]}`;
 }
 
-function loadTodayIds() {
+function loadCachedIds() {
   try {
     const raw = localStorage.getItem(todayKey());
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
+  }
+}
+
+function saveCachedIds(ids) {
+  try {
+    localStorage.setItem(todayKey(), JSON.stringify(ids));
+  } catch {
+    // ignora erros de storage
   }
 }
 
