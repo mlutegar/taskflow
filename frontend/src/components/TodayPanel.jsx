@@ -95,10 +95,12 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
   const dotColor = PRIORITY_COLORS[task.priority] || "var(--text-muted)";
   const done = task.completed;
 
+  const allItems = task.checklist || [];
+
   // Só subtarefas raiz (sem parent)
   const rootSubtasks = useMemo(
-    () => (task.checklist || []).filter((c) => !c.parent_id),
-    [task.checklist]
+    () => allItems.filter((c) => !c.parent_id),
+    [allItems]
   );
 
   const hasSubtasks = rootSubtasks.length > 0;
