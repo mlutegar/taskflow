@@ -375,6 +375,7 @@ export default function App() {
               onComplete={handleCompleteTask}
               onReopen={handleReopenTask}
               onToggleChecklist={handleToggleTaskChecklist}
+              onUpdate={handleUpdateTask}
             />
 
             {showTaskForm && (
