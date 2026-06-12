@@ -457,4 +457,6 @@
   .taskItem { padding: 10px 12px; }
   .empty { padding: 12px; }
   .removeBtn { opacity: 1; }
+  .editBtn { opacity: 1; }
+  .editRow { flex-direction: column; }
 }
