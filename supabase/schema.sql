@@ -83,6 +83,21 @@ create table mode_stats (
 alter table mode_stats enable row level security;
 create policy "Acesso público" on mode_stats for all using (true) with check (true);
 
+-- ─────────────────────────────────────────────────────────
+-- Tarefas selecionadas para o dia (persistência de "Tarefas de Hoje")
+-- ─────────────────────────────────────────────────────────
+create table if not exists daily_tasks (
+  id bigserial primary key,
+  date date not null,
+  task_id uuid not null references tasks(id) on delete cascade,
+  position integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique(date, task_id)
+);
+
+alter table daily_tasks enable row level security;
+create policy "Acesso público" on daily_tasks for all using (true) with check (true);
+
 -- Função de incremento atômico (evita race condition)
 create or replace function increment_mode_stat(p_mode_id text)
 returns integer as $func$
