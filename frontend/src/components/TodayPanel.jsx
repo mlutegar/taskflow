@@ -184,15 +184,35 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
 
 /* ─── TodayPanel ─────────────────────────────────────────────────────────── */
 export default function TodayPanel({ tasks, completedToday = 0, onComplete, onReopen, onToggleChecklist }) {
-  const [todayIds, setTodayIds] = useState(loadTodayIds);
+  // Inicia com o cache local para evitar flash, depois sincroniza com o BD
+  const [todayIds, setTodayIds] = useState(loadCachedIds);
   const [showPicker, setShowPicker] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  // ── Carrega do BD ao montar ──────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    dailyTasksApi.load().then((ids) => {
+      if (cancelled) return;
+      setTodayIds(ids);
+      saveCachedIds(ids);
+    }).catch(() => {
+      // BD indisponível: permanece com o cache local
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Atualiza cache local sempre que ids mudar ────────────────────────────
+  useEffect(() => {
+    saveCachedIds(todayIds);
+  }, [todayIds]);
 
   const todayTasks = useMemo(() => {
     const map = new Map(tasks.map((t) => [t.id, t]));
     return todayIds.map((id) => map.get(id)).filter(Boolean);
   }, [tasks, todayIds]);
 
-  // Remove IDs de tarefas que foram deletadas
+  // Remove do estado tarefas que foram deletadas do BD
   useEffect(() => {
     const validIds = new Set(tasks.map((t) => t.id));
     const cleaned = todayIds.filter((id) => validIds.has(id));
@@ -201,10 +221,6 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
     }
   }, [tasks]); // eslint-disable-line
 
-  useEffect(() => {
-    localStorage.setItem(todayKey(), JSON.stringify(todayIds));
-  }, [todayIds]);
-
   const pickerTasks = useMemo(
     () => tasks.filter((t) => !t._isRoutine && !todayIds.includes(t.id)),
     [tasks, todayIds]
@@ -212,13 +228,31 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
 
   const count = todayTasks.length;
 
-  const handleSelect = (item) => {
+  const handleSelect = async (item) => {
     if (todayIds.includes(item.id) || count >= DAILY_LIMIT) return;
+    // Otimista: atualiza UI imediatamente
     setTodayIds((prev) => [...prev, item.id]);
     if (count + 1 >= DAILY_LIMIT) setShowPicker(false);
+    // Persiste no BD
+    try {
+      await dailyTasksApi.add(item.id);
+    } catch {
+      // Reverte se falhar
+      setTodayIds((prev) => prev.filter((i) => i !== item.id));
+    }
   };
 
-  const handleRemove = (id) => setTodayIds((prev) => prev.filter((i) => i !== id));
+  const handleRemove = async (id) => {
+    // Otimista: atualiza UI imediatamente
+    setTodayIds((prev) => prev.filter((i) => i !== id));
+    // Persiste no BD
+    try {
+      await dailyTasksApi.remove(id);
+    } catch {
+      // Reverte se falhar
+      setTodayIds((prev) => [...prev, id]);
+    }
+  };
 
   const completedCount = todayTasks.filter((t) => t.completed).length;
   const canAdd = count < DAILY_LIMIT;
