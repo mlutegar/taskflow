@@ -17,48 +17,114 @@ function loadTodayIds() {
   }
 }
 
-/* ─── Item ───────────────────────────────────────────────────────────────── */
+/* ─── Cores de prioridade ─────────────────────────────────────────────────── */
 const PRIORITY_COLORS = { 1: "var(--critical)", 2: "var(--high)", 3: "var(--medium)", 4: "var(--low)" };
 
-function TodayTaskItem({ task, onComplete, onReopen, onRemove }) {
-  const dotColor = PRIORITY_COLORS[task.priority] || "var(--text-muted)";
-  const done = task.completed;
-
+/* ─── Subtarefa inline ───────────────────────────────────────────────────── */
+function SubtaskItem({ item, taskId, onToggle }) {
   return (
-    <div className={`${styles.taskItem} ${done ? styles.taskDone : ""}`}>
+    <div className={styles.subtaskItem}>
       <button
-        className={styles.checkBtn}
+        className={styles.subtaskCheck}
         style={{
-          borderColor: dotColor,
-          color: done ? "#fff" : "transparent",
-          background: done ? dotColor : "transparent",
+          borderColor: item.completed ? "var(--success)" : "var(--border)",
+          background: item.completed ? "var(--success)" : "transparent",
+          color: item.completed ? "#fff" : "transparent",
         }}
-        onClick={() => (done ? onReopen(task.id) : onComplete(task.id))}
-        title={done ? "Reabrir" : "Concluir"}
+        onClick={() => onToggle(taskId, item.id)}
+        title={item.completed ? "Desmarcar" : "Marcar como feita"}
       >
         ✓
       </button>
-      <div className={styles.taskInfo}>
-        <span className={styles.taskTitle}>{task.title}</span>
-        {task.checklist_count > 0 && (
-          <span className={styles.taskSub}>
-            {task.checklist_completed_count}/{task.checklist_count} subtarefas
-          </span>
+      <span className={`${styles.subtaskLabel} ${item.completed ? styles.subtaskDone : ""}`}>
+        {item.description}
+      </span>
+    </div>
+  );
+}
+
+/* ─── Item de tarefa ─────────────────────────────────────────────────────── */
+function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist }) {
+  const [expanded, setExpanded] = useState(false);
+  const dotColor = PRIORITY_COLORS[task.priority] || "var(--text-muted)";
+  const done = task.completed;
+
+  // Só subtarefas raiz (sem parent)
+  const rootSubtasks = useMemo(
+    () => (task.checklist || []).filter((c) => !c.parent_id),
+    [task.checklist]
+  );
+
+  const hasSubtasks = rootSubtasks.length > 0;
+  const subDone = rootSubtasks.filter((c) => c.completed).length;
+
+  return (
+    <div className={styles.taskBlock}>
+      <div className={`${styles.taskItem} ${done ? styles.taskDone : ""}`}>
+        {/* Botão de conclusão */}
+        <button
+          className={styles.checkBtn}
+          style={{
+            borderColor: dotColor,
+            color: done ? "#fff" : "transparent",
+            background: done ? dotColor : "transparent",
+          }}
+          onClick={() => (done ? onReopen(task.id) : onComplete(task.id))}
+          title={done ? "Reabrir" : "Concluir"}
+        >
+          ✓
+        </button>
+
+        {/* Info da tarefa */}
+        <div className={styles.taskInfo}>
+          <span className={styles.taskTitle}>{task.title}</span>
+          {hasSubtasks && (
+            <span className={styles.taskSub}>
+              {subDone}/{rootSubtasks.length} subtarefas
+            </span>
+          )}
+        </div>
+
+        {/* Botão de expandir subtarefas */}
+        {hasSubtasks && (
+          <button
+            className={`${styles.expandBtn} ${expanded ? styles.expandBtnOpen : ""}`}
+            onClick={() => setExpanded((v) => !v)}
+            title={expanded ? "Fechar subtarefas" : "Ver subtarefas"}
+          >
+            ›
+          </button>
         )}
+
+        {/* Remover do dia */}
+        <button
+          className={styles.removeBtn}
+          onClick={() => onRemove(task.id)}
+          title="Remover do dia"
+        >
+          ✕
+        </button>
       </div>
-      <button
-        className={styles.removeBtn}
-        onClick={() => onRemove(task.id)}
-        title="Remover do dia"
-      >
-        ✕
-      </button>
+
+      {/* Lista de subtarefas expandida */}
+      {expanded && hasSubtasks && (
+        <div className={styles.subtaskList}>
+          {rootSubtasks.map((item) => (
+            <SubtaskItem
+              key={item.id}
+              item={item}
+              taskId={task.id}
+              onToggle={onToggleChecklist}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 /* ─── TodayPanel ─────────────────────────────────────────────────────────── */
-export default function TodayPanel({ tasks, completedToday = 0, onComplete, onReopen }) {
+export default function TodayPanel({ tasks, completedToday = 0, onComplete, onReopen, onToggleChecklist }) {
   const [todayIds, setTodayIds] = useState(loadTodayIds);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -165,6 +231,7 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
               onComplete={onComplete}
               onReopen={onReopen}
               onRemove={handleRemove}
+              onToggleChecklist={onToggleChecklist}
             />
           ))}
           {count >= DAILY_LIMIT && (
