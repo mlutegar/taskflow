@@ -218,6 +218,91 @@
   border-top: 1px solid var(--border);
 }
 
+/* ── Bloco de tarefa (item + subtarefas) ── */
+.taskBlock {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+.taskBlock:last-child {
+  border-bottom: none;
+}
+
+/* Remove a borda inferior do item quando o bloco já controla isso */
+.taskBlock .taskItem {
+  border-bottom: none;
+}
+
+/* ── Botão expandir ── */
+.expandBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: inherit;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease, color 0.15s, background 0.15s;
+  opacity: 0;
+}
+.taskItem:hover .expandBtn { opacity: 1; }
+.expandBtn:hover { color: var(--accent); background: rgba(124, 110, 245, 0.1); }
+.expandBtnOpen {
+  transform: rotate(90deg);
+  opacity: 1 !important;
+  color: var(--accent);
+}
+
+/* ── Lista de subtarefas expandida ── */
+.subtaskList {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 16px 8px 46px;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.06);
+  border-top: 1px solid var(--border);
+}
+
+/* ── Item de subtarefa ── */
+.subtaskItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+
+.subtaskCheck {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+.subtaskCheck:hover { opacity: 0.75; }
+
+.subtaskLabel {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.subtaskDone {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
 /* ── Mobile ── */
 @media (max-width: 520px) {
   .header { padding: 10px 12px; }
