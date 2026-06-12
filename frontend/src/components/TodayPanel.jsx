@@ -162,7 +162,9 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
               key={item.id}
               item={item}
               taskId={task.id}
+              allItems={allItems}
               onToggle={onToggleChecklist}
+              depth={0}
             />
           ))}
         </div>
