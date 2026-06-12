@@ -288,7 +288,7 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
 }
 
 /* ─── TodayPanel ─────────────────────────────────────────────────────────── */
-export default function TodayPanel({ tasks, completedToday = 0, onComplete, onReopen, onToggleChecklist }) {
+export default function TodayPanel({ tasks, completedToday = 0, onComplete, onReopen, onToggleChecklist, onUpdate }) {
   // Inicia com o cache local para evitar flash, depois sincroniza com o BD
   const [todayIds, setTodayIds] = useState(loadCachedIds);
   const [showPicker, setShowPicker] = useState(false);
