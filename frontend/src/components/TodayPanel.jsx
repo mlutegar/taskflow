@@ -430,6 +430,7 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
               onReopen={onReopen}
               onRemove={handleRemove}
               onToggleChecklist={onToggleChecklist}
+              onUpdate={onUpdate}
             />
           ))}
           {count >= DAILY_LIMIT && (
