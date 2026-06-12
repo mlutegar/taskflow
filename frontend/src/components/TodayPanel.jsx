@@ -98,9 +98,95 @@ function SubtaskItem({ item, taskId, allItems, onToggle, depth = 0 }) {
   );
 }
 
+/* ─── Formulário de edição inline ───────────────────────────────────────── */
+function EditForm({ task, onSave, onCancel }) {
+  const [data, setData] = useState({
+    title: task.title,
+    description: task.description || "",
+    priority: task.priority,
+    due_date: task.due_date || "",
+    recurrence: task.recurrence || "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!data.title.trim()) return;
+    setSaving(true);
+    try {
+      await onSave(task.id, {
+        title: data.title.trim(),
+        description: data.description.trim() || null,
+        priority: Number(data.priority),
+        due_date: data.due_date || null,
+        recurrence: data.recurrence || null,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form className={styles.editForm} onSubmit={handleSubmit}>
+      <input
+        className={styles.editInput}
+        value={data.title}
+        onChange={(e) => setData((d) => ({ ...d, title: e.target.value }))}
+        placeholder="Título"
+        autoFocus
+      />
+      <textarea
+        className={styles.editTextarea}
+        value={data.description}
+        onChange={(e) => setData((d) => ({ ...d, description: e.target.value }))}
+        placeholder="Descrição (opcional)"
+        rows={2}
+      />
+      <div className={styles.editRow}>
+        <select
+          className={styles.editSelect}
+          value={data.priority}
+          onChange={(e) => setData((d) => ({ ...d, priority: e.target.value }))}
+        >
+          <option value={1}>🔴 Crítica</option>
+          <option value={2}>🟠 Alta</option>
+          <option value={3}>🟡 Média</option>
+          <option value={4}>🟢 Baixa</option>
+        </select>
+        <input
+          type="date"
+          className={styles.editInput}
+          value={data.due_date}
+          onChange={(e) => setData((d) => ({ ...d, due_date: e.target.value }))}
+        />
+      </div>
+      <select
+        className={styles.editSelect}
+        value={data.recurrence}
+        onChange={(e) => setData((d) => ({ ...d, recurrence: e.target.value }))}
+      >
+        <option value="">Sem repetição</option>
+        <option value="daily">🔄 Todo dia</option>
+        <option value="weekly">🔄 Toda semana</option>
+        <option value="biweekly">🔄 A cada 2 semanas</option>
+        <option value="monthly">🔄 Todo mês</option>
+      </select>
+      <div className={styles.editActions}>
+        <button type="submit" className={styles.btnSave} disabled={saving || !data.title.trim()}>
+          {saving ? "Salvando…" : "Salvar"}
+        </button>
+        <button type="button" className={styles.btnCancel} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /* ─── Item de tarefa ─────────────────────────────────────────────────────── */
-function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist }) {
+function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist, onUpdate }) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
   const dotColor = PRIORITY_COLORS[task.priority] || "var(--text-muted)";
   const done = task.completed;
 
@@ -115,56 +201,75 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
   const hasSubtasks = rootSubtasks.length > 0;
   const subDone = rootSubtasks.filter((c) => c.completed).length;
 
+  const handleSave = async (id, payload) => {
+    await onUpdate(id, payload);
+    setEditing(false);
+  };
+
   return (
     <div className={styles.taskBlock}>
-      <div className={`${styles.taskItem} ${done ? styles.taskDone : ""}`}>
-        {/* Botão de conclusão */}
-        <button
-          className={styles.checkBtn}
-          style={{
-            borderColor: dotColor,
-            color: done ? "#fff" : "transparent",
-            background: done ? dotColor : "transparent",
-          }}
-          onClick={() => (done ? onReopen(task.id) : onComplete(task.id))}
-          title={done ? "Reabrir" : "Concluir"}
-        >
-          ✓
-        </button>
-
-        {/* Info da tarefa */}
-        <div className={styles.taskInfo}>
-          <span className={styles.taskTitle}>{task.title}</span>
-          {hasSubtasks && (
-            <span className={styles.taskSub}>
-              {subDone}/{rootSubtasks.length} subtarefas
-            </span>
-          )}
-        </div>
-
-        {/* Botão de expandir subtarefas */}
-        {hasSubtasks && (
+      {/* ── Formulário de edição ── */}
+      {editing ? (
+        <EditForm task={task} onSave={handleSave} onCancel={() => setEditing(false)} />
+      ) : (
+        <div className={`${styles.taskItem} ${done ? styles.taskDone : ""}`}>
+          {/* Botão de conclusão */}
           <button
-            className={`${styles.expandBtn} ${expanded ? styles.expandBtnOpen : ""}`}
-            onClick={() => setExpanded((v) => !v)}
-            title={expanded ? "Fechar subtarefas" : "Ver subtarefas"}
+            className={styles.checkBtn}
+            style={{
+              borderColor: dotColor,
+              color: done ? "#fff" : "transparent",
+              background: done ? dotColor : "transparent",
+            }}
+            onClick={() => (done ? onReopen(task.id) : onComplete(task.id))}
+            title={done ? "Reabrir" : "Concluir"}
           >
-            ›
+            ✓
           </button>
-        )}
 
-        {/* Remover do dia */}
-        <button
-          className={styles.removeBtn}
-          onClick={() => onRemove(task.id)}
-          title="Remover do dia"
-        >
-          ✕
-        </button>
-      </div>
+          {/* Info da tarefa */}
+          <div className={styles.taskInfo}>
+            <span className={styles.taskTitle}>{task.title}</span>
+            {hasSubtasks && (
+              <span className={styles.taskSub}>
+                {subDone}/{rootSubtasks.length} subtarefas
+              </span>
+            )}
+          </div>
+
+          {/* Botão de expandir subtarefas */}
+          {hasSubtasks && (
+            <button
+              className={`${styles.expandBtn} ${expanded ? styles.expandBtnOpen : ""}`}
+              onClick={() => setExpanded((v) => !v)}
+              title={expanded ? "Fechar subtarefas" : "Ver subtarefas"}
+            >
+              ›
+            </button>
+          )}
+
+          {/* Editar */}
+          <button
+            className={styles.editBtn}
+            onClick={() => setEditing(true)}
+            title="Editar tarefa"
+          >
+            ✎
+          </button>
+
+          {/* Remover do dia */}
+          <button
+            className={styles.removeBtn}
+            onClick={() => onRemove(task.id)}
+            title="Remover do dia"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Lista de subtarefas expandida */}
-      {expanded && hasSubtasks && (
+      {!editing && expanded && hasSubtasks && (
         <div className={styles.subtaskList}>
           {rootSubtasks.map((item) => (
             <SubtaskItem
