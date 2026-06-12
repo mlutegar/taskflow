@@ -191,6 +191,22 @@
   color: var(--text-muted);
 }
 
+.editBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: color 0.15s, background 0.15s;
+  opacity: 0;
+}
+.taskItem:hover .editBtn { opacity: 1; }
+.editBtn:hover { color: var(--accent); background: rgba(124, 110, 245, 0.1); }
+
 .removeBtn {
   flex-shrink: 0;
   background: none;
@@ -206,6 +222,75 @@
 }
 .taskItem:hover .removeBtn { opacity: 1; }
 .removeBtn:hover { color: var(--critical); background: rgba(224, 82, 82, 0.1); }
+
+/* ── Formulário de edição inline ── */
+.editForm {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.editInput,
+.editTextarea,
+.editSelect {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.editInput:focus,
+.editTextarea:focus,
+.editSelect:focus { border-color: var(--accent); }
+.editTextarea { resize: vertical; }
+
+.editRow {
+  display: flex;
+  gap: 8px;
+}
+.editRow .editInput,
+.editRow .editSelect { flex: 1; }
+
+.editActions {
+  display: flex;
+  gap: 8px;
+}
+
+.btnSave {
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btnSave:hover:not(:disabled) { background: var(--accent-hover); }
+.btnSave:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btnCancel {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btnCancel:hover { color: var(--text); border-color: var(--text-muted); }
 
 /* ── Limite ── */
 .limitMsg {
