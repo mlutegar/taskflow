@@ -303,6 +303,62 @@
   color: var(--text-muted);
 }
 
+/* ── Bloco de subtarefa (item + filhos) ── */
+.subtaskBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Filhos aninhados ── */
+.subtaskChildren {
+  display: flex;
+  flex-direction: column;
+  margin-left: 24px;
+  border-left: 1.5px solid var(--border);
+  padding-left: 8px;
+}
+
+/* ── Indentação visual (linha conectora) ── */
+.subtaskIndent {
+  display: none; /* Controlado pelo subtaskChildren */
+}
+
+/* ── Contagem de filhos ── */
+.subtaskChildCount {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: rgba(124, 110, 245, 0.1);
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 99px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Botão expandir subtarefa filha ── */
+.subtaskExpandBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 1px 3px;
+  border-radius: 4px;
+  font-family: inherit;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease, color 0.15s;
+  opacity: 0;
+}
+.subtaskItem:hover .subtaskExpandBtn { opacity: 1; }
+.subtaskExpandBtn:hover { color: var(--accent); }
+.subtaskExpandBtnOpen {
+  transform: rotate(90deg);
+  opacity: 1 !important;
+  color: var(--accent);
+}
+
 /* ── Mobile ── */
 @media (max-width: 520px) {
   .header { padding: 10px 12px; }
