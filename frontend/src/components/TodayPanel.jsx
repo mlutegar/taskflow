@@ -20,25 +20,71 @@ function loadTodayIds() {
 /* ─── Cores de prioridade ─────────────────────────────────────────────────── */
 const PRIORITY_COLORS = { 1: "var(--critical)", 2: "var(--high)", 3: "var(--medium)", 4: "var(--low)" };
 
-/* ─── Subtarefa inline ───────────────────────────────────────────────────── */
-function SubtaskItem({ item, taskId, onToggle }) {
+/* ─── Subtarefa recursiva ────────────────────────────────────────────────── */
+function SubtaskItem({ item, taskId, allItems, onToggle, depth = 0 }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const children = allItems.filter((c) => c.parent_id === item.id);
+  const hasChildren = children.length > 0;
+  const childDone = children.filter((c) => c.completed).length;
+
   return (
-    <div className={styles.subtaskItem}>
-      <button
-        className={styles.subtaskCheck}
-        style={{
-          borderColor: item.completed ? "var(--success)" : "var(--border)",
-          background: item.completed ? "var(--success)" : "transparent",
-          color: item.completed ? "#fff" : "transparent",
-        }}
-        onClick={() => onToggle(taskId, item.id)}
-        title={item.completed ? "Desmarcar" : "Marcar como feita"}
-      >
-        ✓
-      </button>
-      <span className={`${styles.subtaskLabel} ${item.completed ? styles.subtaskDone : ""}`}>
-        {item.description}
-      </span>
+    <div className={styles.subtaskBlock} style={{ "--depth": depth }}>
+      <div className={styles.subtaskItem}>
+        {/* Indentação visual por linha conectora */}
+        {depth > 0 && <span className={styles.subtaskIndent} />}
+
+        {/* Checkbox */}
+        <button
+          className={styles.subtaskCheck}
+          style={{
+            borderColor: item.completed ? "var(--success)" : "var(--border)",
+            background: item.completed ? "var(--success)" : "transparent",
+            color: item.completed ? "#fff" : "transparent",
+          }}
+          onClick={() => onToggle(taskId, item.id)}
+          title={item.completed ? "Desmarcar" : "Marcar como feita"}
+        >
+          ✓
+        </button>
+
+        {/* Label + contagem de filhos */}
+        <span className={`${styles.subtaskLabel} ${item.completed ? styles.subtaskDone : ""}`}>
+          {item.description}
+        </span>
+        {hasChildren && (
+          <span className={styles.subtaskChildCount}>
+            {childDone}/{children.length}
+          </span>
+        )}
+
+        {/* Expandir filhos */}
+        {hasChildren && (
+          <button
+            className={`${styles.subtaskExpandBtn} ${expanded ? styles.subtaskExpandBtnOpen : ""}`}
+            onClick={() => setExpanded((v) => !v)}
+            title={expanded ? "Fechar" : "Ver subtarefas"}
+          >
+            ›
+          </button>
+        )}
+      </div>
+
+      {/* Filhos recursivos */}
+      {expanded && hasChildren && (
+        <div className={styles.subtaskChildren}>
+          {children.map((child) => (
+            <SubtaskItem
+              key={child.id}
+              item={child}
+              taskId={taskId}
+              allItems={allItems}
+              onToggle={onToggle}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
