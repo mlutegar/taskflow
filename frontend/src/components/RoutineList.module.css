@@ -12,3 +12,40 @@
 
 .emptyIcon { font-size: 36px; opacity: 0.3; }
 .empty p { font-size: 15px; }
+
+/* ── Paginação ── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px 0 4px;
+}
+
+.pageBtn {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: all 0.15s;
+}
+
+.pageBtn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(124, 110, 245, 0.08);
+}
+
+.pageBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pageInfo {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

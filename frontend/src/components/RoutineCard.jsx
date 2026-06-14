@@ -121,6 +121,7 @@ export default function RoutineCard({
           className={`${styles.checkBtn} ${routine.is_completed_today ? styles.checkDone : ""}`}
           onClick={() => !routine.is_completed_today && onComplete(routine.id)}
           title={routine.is_completed_today ? "Concluída hoje" : "Marcar como concluída"}
+          aria-label={routine.is_completed_today ? "Rotina concluída hoje" : "Marcar rotina como concluída"}
           disabled={routine.is_completed_today}
         >
           {routine.is_completed_today && "✓"}
@@ -154,17 +155,18 @@ export default function RoutineCard({
 
         <div className={styles.actions}>
           {routine.is_completed_today && (
-            <button className={`${styles.actionBtn} ${styles.uncompleteBtn}`} onClick={() => onUncomplete(routine.id)} title="Desfazer conclusão">↩</button>
+            <button className={`${styles.actionBtn} ${styles.uncompleteBtn}`} onClick={() => onUncomplete(routine.id)} title="Desfazer conclusão" aria-label="Desfazer conclusão de rotina">↩</button>
           )}
           <button
             className={`${styles.actionBtn} ${showDatePicker ? styles.datePickerBtnActive : ""}`}
             onClick={() => setShowDatePicker((v) => !v)}
             title="Marcar como feito em outro dia"
+            aria-label="Marcar como feito em outra data"
           >
             📅
           </button>
-          <button className={styles.actionBtn} onClick={() => setEditing(true)} title="Editar">✏️</button>
-          <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={() => onDelete(routine.id)} title="Deletar">🗑</button>
+          <button className={styles.actionBtn} onClick={() => setEditing(true)} title="Editar" aria-label="Editar rotina">✏️</button>
+          <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={() => onDelete(routine.id)} title="Deletar" aria-label="Deletar rotina">🗑</button>
         </div>
       </div>
 
@@ -227,6 +229,7 @@ export default function RoutineCard({
                   <button
                     className={styles.checklistDelete}
                     onClick={() => onDeleteChecklist(routine.id, item.id)}
+                    aria-label="Remover item do checklist"
                   >✕</button>
                 </div>
               ))}

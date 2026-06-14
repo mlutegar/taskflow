@@ -73,6 +73,7 @@ function SubtaskItem({ item, taskId, allItems, onToggle, depth = 0 }) {
             className={`${styles.subtaskExpandBtn} ${expanded ? styles.subtaskExpandBtnOpen : ""}`}
             onClick={() => setExpanded((v) => !v)}
             title={expanded ? "Fechar" : "Ver subtarefas"}
+            aria-label={expanded ? "Fechar subtarefas" : "Ver subtarefas"}
           >
             ›
           </button>
@@ -223,6 +224,7 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
             }}
             onClick={() => (done ? onReopen(task.id) : onComplete(task.id))}
             title={done ? "Reabrir" : "Concluir"}
+            aria-label={done ? "Reabrir tarefa" : "Concluir tarefa"}
           >
             ✓
           </button>
@@ -253,6 +255,7 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
             className={styles.editBtn}
             onClick={() => setEditing(true)}
             title="Editar tarefa"
+            aria-label="Editar tarefa"
           >
             ✎
           </button>
@@ -262,6 +265,7 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
             className={styles.removeBtn}
             onClick={() => onRemove(task.id)}
             title="Remover do dia"
+            aria-label="Remover tarefa do dia"
           >
             ✕
           </button>

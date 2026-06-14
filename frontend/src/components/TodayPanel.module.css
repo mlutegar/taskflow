@@ -459,4 +459,15 @@
   .removeBtn { opacity: 1; }
   .editBtn { opacity: 1; }
   .editRow { flex-direction: column; }
+  .checkBtn { width: 44px; height: 44px; }
+  .editBtn { min-width: 44px; min-height: 44px; padding: 10px; opacity: 1; }
+  .removeBtn { min-width: 44px; min-height: 44px; padding: 10px; opacity: 1; }
+  .expandBtn { min-width: 44px; min-height: 44px; opacity: 1; }
+  .subtaskCheck { width: 28px; height: 28px; }
+  .addBtn { min-height: 44px; padding: 10px 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill, .checkBtn, .expandBtn, .subtaskExpandBtn,
+  .editBtn, .removeBtn { transition: none !important; animation: none !important; }
 }

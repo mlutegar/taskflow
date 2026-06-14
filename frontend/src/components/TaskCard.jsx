@@ -60,12 +60,13 @@ function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onTogg
               placeholder="Título da subtarefa"
               autoFocus
             />
-            <button type="submit" className={styles.checklistAdd} disabled={!editText.trim()} title="Salvar">✓</button>
+            <button type="submit" className={styles.checklistAdd} disabled={!editText.trim()} title="Salvar" aria-label="Salvar edição">✓</button>
             <button
               type="button"
               className={styles.checklistDelete}
               onClick={cancelEditing}
               title="Cancelar"
+              aria-label="Cancelar edição"
             >✕</button>
           </div>
           <textarea
@@ -98,6 +99,7 @@ function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onTogg
               className={styles.checklistDelete}
               onClick={startEditing}
               title="Editar"
+              aria-label="Editar item"
             >✎</button>
           )}
           {!taskCompleted && (
@@ -105,12 +107,14 @@ function ChecklistNode({ item, childrenMap, taskId, taskCompleted, depth, onTogg
               className={styles.checklistDelete}
               onClick={() => setAdding((v) => !v)}
               title="Adicionar subtarefa"
+              aria-label="Adicionar subtarefa"
             >＋</button>
           )}
           <button
             className={styles.checklistDelete}
             onClick={() => onDelete(taskId, item.id)}
             title="Remover item"
+            aria-label="Remover item"
           >✕</button>
         </div>
       )}
@@ -347,6 +351,7 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
           className={`${styles.checkbox} ${task.completed ? styles.checkboxDone : ""}`}
           onClick={() => task.completed ? onReopen(task.id) : onComplete(task.id)}
           title={task.completed ? "Reabrir" : "Concluir"}
+          aria-label={task.completed ? "Reabrir tarefa" : "Concluir tarefa"}
         >
           {task.completed && "✓"}
         </button>
@@ -383,8 +388,8 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
         </div>
 
         <div className={styles.actions}>
-          <button className={styles.actionBtn} onClick={() => setEditing(true)} title="Editar">✏️</button>
-          <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={() => onDelete(task.id)} title="Deletar">🗑</button>
+          <button className={styles.actionBtn} onClick={() => setEditing(true)} title="Editar" aria-label="Editar tarefa">✏️</button>
+          <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={() => onDelete(task.id)} title="Deletar" aria-label="Deletar tarefa">🗑</button>
         </div>
       </div>
 

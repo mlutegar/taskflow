@@ -361,6 +361,9 @@
 @media (hover: none) {
   .actions { opacity: 1; }
   .checklistDelete { opacity: 1; }
+  .checkBtn { width: 44px; height: 44px; }
+  .actionBtn { width: 44px; height: 44px; }
+  .checklistDelete { width: 44px; height: 44px; }
 }
 
 @media (max-width: 520px) {
@@ -370,26 +373,26 @@
   .main { padding: 12px; gap: 10px; }
 
   .checkBtn {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
     border-radius: 7px;
     flex-shrink: 0;
   }
 
-  .actionBtn { width: 34px; height: 34px; font-size: 15px; }
+  .actionBtn { width: 44px; height: 44px; font-size: 15px; }
 
   .checklistCheck {
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
     border-radius: 5px;
     font-size: 12px;
     flex-shrink: 0;
   }
 
   .checklistDelete {
-    width: 24px;
-    height: 24px;
-    font-size: 12px;
+    width: 44px;
+    height: 44px;
+    font-size: 13px;
   }
 
   .editRow { flex-direction: column; }
@@ -397,4 +400,9 @@
   .detail { padding: 12px; }
 
   .datePickerRow { padding: 10px 12px; gap: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .checkBtn, .actions, .checklistDelete,
+  .checklistCheck, .progressFill { transition: none !important; animation: none !important; }
 }
