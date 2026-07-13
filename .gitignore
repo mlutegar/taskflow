@@ -1,6 +1,7 @@
 # Node
 node_modules/
 frontend/dist/
+frontend/dev-dist/
 frontend/vite.log
 
 # Env files

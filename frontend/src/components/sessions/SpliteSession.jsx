@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
-import SubtaskInline from "./SubtaskInline";
-import SubtaskFlow from "./SubtaskFlow";
+import SessionHeader from "./SessionHeader";
+import ResumeBanner from "./ResumeBanner";
+import WorkingTask from "./WorkingTask";
 import styles from "./session.module.css";
-import { useSessionPersist } from "../../lib/useSessionPersist";
+import { useModeSession } from "../../hooks/useModeSession";
 import { getActivities, addActivity, removeActivity } from "../../lib/activities";
+import { getPinned, togglePin } from "../../lib/splitePinned";
 
 const DIARY_MODE_ACTIVITY = "Escrever no diário";
 const READ_DIARY_ACTIVITY = "Ler diário";
@@ -19,7 +21,14 @@ function randomDiaryDate() {
 }
 
 export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  const { saved, persist, clearSaved } = useSessionPersist(preset?.activity ? `splite:${preset.activity}` : "splite");
+  const {
+    persist, clearSaved, saved,
+    completed, setCompleted,
+    doneIds, addDone,
+    selectedTask, setSelectedTask,
+    wasRestored, setWasRestored,
+    available,
+  } = useModeSession(preset?.activity ? `splite:${preset.activity}` : "splite", tasks);
 
   // Card com atividade pré-definida: pula a etapa de seleção e já entra no ciclo.
   const presetInit = (() => {
@@ -33,18 +42,27 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
   const [activity,      setActivity]      = useState(saved?.activity      ?? presetInit?.activity   ?? null);
   const [cycle,         setCycle]         = useState(saved?.cycle         ?? 1);
   const [taskInCycle,   setTaskInCycle]   = useState(saved?.taskInCycle   ?? 0);
-  const [selectedTask,  setSelectedTask]  = useState(() => {
-    if (!saved?.selectedTaskId) return null;
-    return tasks.find((t) => t.id === saved.selectedTaskId) || null;
-  });
-  const [completed,     setCompleted]     = useState(saved?.completed     ?? 0);
-  const [doneIds,       setDoneIds]       = useState(() => new Set(saved?.doneIds ?? []));
   const [isDiaryMode,   setIsDiaryMode]   = useState(saved?.isDiaryMode   ?? presetInit?.isDiaryMode ?? false);
   const [nextDiaryStep, setNextDiaryStep] = useState(saved?.nextDiaryStep ?? "reading_analysis");
   const [diaryDate,     setDiaryDate]     = useState(saved?.diaryDate     ?? presetInit?.diaryDate  ?? null);
-  const [wasRestored,   setWasRestored]   = useState(!!saved);
   const [activities,    setActivities]    = useState(() => getActivities());
   const [newActivity,   setNewActivity]   = useState("");
+  const [pinned,        setPinned]        = useState(() => getPinned());
+
+  const numTasks = cycle;
+
+  // ── Persistir no localStorage toda vez que o estado relevante mudar ─────
+  useEffect(() => {
+    if (step === "summary") return;
+    persist({
+      step, activity, cycle, taskInCycle, completed,
+      doneIds: [...doneIds],
+      selectedTaskId: selectedTask?.id ?? null,
+      isDiaryMode, nextDiaryStep, diaryDate,
+    });
+  }, [step, activity, cycle, taskInCycle, completed, doneIds, selectedTask, isDiaryMode, nextDiaryStep, diaryDate]); // eslint-disable-line
+
+  const handleClose = () => { clearSaved(); onClose(); };
 
   const handleAddActivity = () => {
     const updated = addActivity(newActivity);
@@ -52,39 +70,17 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
     setNewActivity("");
   };
   const handleRemoveActivity = (a) => setActivities(removeActivity(a));
-
-  const numTasks = cycle;
-  const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
-
-  // ── Persistir no localStorage toda vez que o estado relevante mudar ─────
-  useEffect(() => {
-    if (step === "summary") return;
-    persist({
-      step,
-      activity,
-      cycle,
-      taskInCycle,
-      completed,
-      doneIds:        [...doneIds],
-      selectedTaskId: selectedTask?.id ?? null,
-      isDiaryMode,
-      nextDiaryStep,
-      diaryDate,
-    });
-  }, [step, activity, cycle, taskInCycle, completed, doneIds, selectedTask, isDiaryMode, nextDiaryStep]); // eslint-disable-line
-
-  const handleClose = () => { clearSaved(); onClose(); };
+  const handleTogglePin = (a) => setPinned(togglePin(a));
 
   const selectActivity = (a) => {
     setActivity(a);
     if (a === DIARY_MODE_ACTIVITY) {
       setIsDiaryMode(true);
       setDiaryDate(null);
-      setNextDiaryStep("reading_analysis"); // após a 1ª tarefa vai para "ler análise"
+      setNextDiaryStep("reading_analysis");
       setStep("writing_diary");
     } else {
       setIsDiaryMode(false);
-      // "Ler diário": sugere uma data aleatória entre 01/01/2024 e hoje
       setDiaryDate(a === READ_DIARY_ACTIVITY ? randomDiaryDate() : null);
       setStep("doing_activity");
     }
@@ -92,7 +88,7 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
 
   const completeTask = async () => {
     await onCompleteTask(selectedTask.id);
-    setDoneIds((p) => new Set([...p, selectedTask.id]));
+    addDone(selectedTask.id);
     setCompleted((c) => c + 1);
     setSelectedTask(null);
 
@@ -101,7 +97,6 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
       if (available.length - 1 === 0) {
         setStep("summary");
       } else {
-        // vai para o próximo passo do diário e já prepara o alternado para depois
         setStep(nextDiaryStep);
         setNextDiaryStep(nextDiaryStep === "reading_analysis" ? "writing_diary" : "reading_analysis");
       }
@@ -121,34 +116,24 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
 
   return (
     <div className={styles.root}>
-      <div className={styles.header}>
-        <span className={styles.headerEmoji}>🔪</span>
-        <div className={styles.headerMeta}>
-          <span className={styles.headerTitle}>Splite Mode</span>
-          <span className={styles.headerSub}>
-            {activity ? `${activity} • ` : ""}
-            {isDiaryMode ? `${completed} tarefa(s) concluída(s)` : `Ciclo ${cycle} • ${completed} concluída(s)`}
-          </span>
-        </div>
-        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
-      </div>
+      <SessionHeader
+        emoji="🔪"
+        title="Splite Mode"
+        sub={`${activity ? `${activity} • ` : ""}${isDiaryMode ? `${completed} tarefa(s) concluída(s)` : `Ciclo ${cycle} • ${completed} concluída(s)`}`}
+        onClose={handleClose}
+      />
 
       <div className={styles.body}>
-
-        {/* Banner de sessão restaurada */}
-        {wasRestored && step !== "select_activity" && step !== "summary" && (
-          <div className={styles.resumeBanner}>
-            ↩ Sessão restaurada — {activity ? `${activity} • ` : ""}Ciclo {cycle}, {completed} tarefa(s) concluída(s)
-            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
-          </div>
-        )}
+        <ResumeBanner show={wasRestored && step !== "select_activity" && step !== "summary"} onDismiss={() => setWasRestored(false)}>
+          ↩ Sessão restaurada — {activity ? `${activity} • ` : ""}Ciclo {cycle}, {completed} tarefa(s) concluída(s)
+        </ResumeBanner>
 
         {/* ── Seleção de atividade ── */}
         {step === "select_activity" && (
           <>
             <div className={styles.promptBox}>
               <div className={styles.promptTitle}>🎯 Escolha sua atividade de recompensa</div>
-              <div className={styles.promptText}>Esta será a atividade entre as tarefas.</div>
+              <div className={styles.promptText}>Esta será a atividade entre as tarefas. Use 📌 para fixar como card na página de Modos.</div>
             </div>
             <div className={styles.activityList}>
               {activities.map((a) => (
@@ -158,8 +143,18 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
                   </button>
                   <button
                     className={`${styles.btn} ${styles.btnSecondary}`}
+                    style={{ flex: "0 0 auto", padding: "0 12px", opacity: pinned.includes(a) ? 1 : 0.5 }}
+                    title={pinned.includes(a) ? "Desafixar card" : "Fixar como card"}
+                    aria-label={pinned.includes(a) ? `Desafixar ${a}` : `Fixar ${a} como card`}
+                    onClick={() => handleTogglePin(a)}
+                  >
+                    📌
+                  </button>
+                  <button
+                    className={`${styles.btn} ${styles.btnSecondary}`}
                     style={{ flex: "0 0 auto", padding: "0 12px" }}
                     title="Remover atividade"
+                    aria-label={`Remover ${a}`}
                     onClick={() => handleRemoveActivity(a)}
                   >
                     ✕
@@ -224,10 +219,7 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
                 Abra seu diário e escreva livremente. Quando terminar, clique em "Fiz!" para partir para a primeira tarefa.
               </div>
             </div>
-            <button
-              className={`${styles.btn} ${styles.btnPrimary}`}
-              onClick={() => setStep("select_task")}
-            >
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("select_task")}>
               ✅ Escrevi! Partir para a tarefa
             </button>
             <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setStep("summary")}>Encerrar</button>
@@ -243,10 +235,7 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
                 Abra a análise gerada do seu diário e leia com atenção. Quando terminar, parta para a próxima tarefa.
               </div>
             </div>
-            <button
-              className={`${styles.btn} ${styles.btnPrimary}`}
-              onClick={() => setStep("select_task")}
-            >
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setStep("select_task")}>
               ✅ Li! Partir para a tarefa
             </button>
             <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setStep("summary")}>Encerrar</button>
@@ -258,7 +247,6 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
           <>
             {isDiaryMode ? (
               <div className={styles.cycleBadge}>
-                {/* nextDiaryStep já aponta para o PRÓXIMO, então o atual foi o oposto */}
                 {nextDiaryStep === "writing_diary" ? "🔍 Após análise — Tarefa" : "📓 Após escrever — Tarefa"}
                 {` ${completed + 1}`}
               </div>
@@ -270,7 +258,6 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
               onSelect={(t) => { setSelectedTask(t); setStep("working"); }}
               onCancel={() => {
                 if (isDiaryMode) {
-                  // volta para o passo que estava antes (oposto do nextDiaryStep)
                   setStep(nextDiaryStep === "writing_diary" ? "reading_analysis" : "writing_diary");
                 } else {
                   setStep("doing_activity");
@@ -283,49 +270,22 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
         {/* ── Trabalhando na tarefa ── */}
         {step === "working" && selectedTask && (() => {
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
-          const hasChecklist = live.checklist?.length > 0;
-
+          const badge = isDiaryMode ? (
+            <div className={styles.cycleBadge}>
+              {nextDiaryStep === "writing_diary" ? "🔍 Tarefa após análise" : "📓 Tarefa após diário"}
+            </div>
+          ) : (
+            <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
+          );
           return (
-            <>
-              {isDiaryMode ? (
-                <div className={styles.cycleBadge}>
-                  {nextDiaryStep === "writing_diary" ? "🔍 Tarefa após análise" : "📓 Tarefa após diário"}
-                </div>
-              ) : (
-                <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
-              )}
-
-              <div className={styles.taskDisplay}>
-                <span className={styles.taskName}>{live.title}</span>
-                {live.description && <span className={styles.taskMeta}>{live.description}</span>}
-
-                {/* Subtarefas com auto-avanço */}
-                {hasChecklist && (
-                  <SubtaskFlow
-                    checklist={live.checklist}
-                    onToggle={(itemId) => onToggleChecklist?.(live.id, itemId)}
-                    onAllDone={completeTask}
-                    onSkip={completeTask}
-                  />
-                )}
-              </div>
-
-              <div className={styles.actions}>
-                {/* Só mostra "Concluída" direto se não houver checklist */}
-                {!hasChecklist && (
-                  <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={completeTask}>
-                    ✅ Concluída!
-                  </button>
-                )}
-                <button
-                  className={`${styles.btn} ${styles.btnSecondary}`}
-                  onClick={() => { setSelectedTask(null); setStep("select_task"); }}
-                >
-                  Trocar tarefa
-                </button>
-                <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
-              </div>
-            </>
+            <WorkingTask
+              task={live}
+              badge={badge}
+              onComplete={completeTask}
+              onToggleChecklist={onToggleChecklist}
+              onAddChecklist={onAddChecklist}
+              onSwap={() => { setSelectedTask(null); setStep("select_task"); }}
+            />
           );
         })()}
 
@@ -352,10 +312,9 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
                 : <div className={styles.summaryText}>{completed} tarefa(s) em {cycle} ciclo(s) com "{activity}".</div>
               }
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { clearSaved(); onClose(); }}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
           </>
         )}
-
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import styles from "./ModeSession.module.css";
+import { useDialog } from "../lib/useDialog";
 import MusicSession from "./sessions/MusicSession";
 import TikTokSession from "./sessions/TikTokSession";
 import SpliteSession from "./sessions/SpliteSession";
@@ -32,6 +33,8 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
   const [qaParent, setQaParent] = useState("");
   const [qaSaving, setQaSaving] = useState(false);
   const [qaSuccess, setQaSuccess] = useState(null); // "task" | "subtask" | null
+
+  const dialogRef = useDialog(onClose);
 
   // Mescla tarefas + rotinas pendentes num array unificado
   const items = [
@@ -113,7 +116,7 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
 
   return (
     <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={styles.modal}>
+      <div className={styles.modal} ref={dialogRef} role="dialog" aria-modal="true" aria-label={mode?.name ? `Sessão: ${mode.name}` : "Sessão de modo"} tabIndex={-1}>
         {isCustom ? (
           <CustomModeSession
             mode={mode}

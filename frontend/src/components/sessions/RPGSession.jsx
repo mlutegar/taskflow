@@ -214,7 +214,7 @@ export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, o
                   <SubtaskFlow
                     checklist={live.checklist}
                     onToggle={(itemId) => onToggleChecklist?.(live.id, itemId)}
-                    onAllDone={completeTask}
+                    onAllDone={completeQuest}
                     onSkip={() => setStep("timing")}
                   />
                 )}

@@ -1,40 +1,37 @@
 import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
-import SubtaskFlow from "./SubtaskFlow";
-import SubtaskInline from "./SubtaskInline";
+import SessionHeader from "./SessionHeader";
+import ResumeBanner from "./ResumeBanner";
+import WorkingTask from "./WorkingTask";
 import styles from "./session.module.css";
-import { useSessionPersist } from "../../lib/useSessionPersist";
+import { useModeSession } from "../../hooks/useModeSession";
 
 /**
  * Sessão genérica para modos personalizados criados pelo usuário.
  * Exibe os passos do modo, permite selecionar e concluir tarefas.
  */
 export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  // Cada modo custom tem sua própria chave baseada no id
-  const { saved, persist, clearSaved } = useSessionPersist(`custom_${mode?.id}`);
+  const {
+    persist, clearSaved, saved,
+    completed, setCompleted,
+    doneIds, addDone,
+    selectedTask, setSelectedTask,
+    wasRestored, setWasRestored,
+    available,
+  } = useModeSession(`custom_${mode?.id}`, tasks);
 
-  const [step,        setStep]        = useState(saved?.step      ?? "intro");
-  const [completed,   setCompleted]   = useState(saved?.completed ?? 0);
-  const [doneIds,     setDoneIds]     = useState(() => new Set(saved?.doneIds ?? []));
-  const [selectedTask, setSelectedTask] = useState(() => {
-    if (!saved?.selectedTaskId) return null;
-    return tasks.find((t) => t.id === saved.selectedTaskId) || null;
-  });
-  const [wasRestored, setWasRestored] = useState(!!saved);
-
-  const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
+  const [step, setStep] = useState(saved?.step ?? "intro");
 
   useEffect(() => {
     if (step === "summary") return;
     persist({ step, completed, doneIds: [...doneIds], selectedTaskId: selectedTask?.id ?? null });
   }, [step, completed, doneIds, selectedTask]); // eslint-disable-line
 
-  const handleClose        = () => { clearSaved(); onClose(); };
-  const handleSummaryClose  = () => { clearSaved(); onClose(); };
+  const handleClose = () => { clearSaved(); onClose(); };
 
   const completeTask = async () => {
     await onCompleteTask(selectedTask.id);
-    setDoneIds((p) => new Set([...p, selectedTask.id]));
+    addDone(selectedTask.id);
     setCompleted((c) => c + 1);
     setSelectedTask(null);
     setStep(available.length - 1 === 0 ? "summary" : "post_task");
@@ -43,26 +40,25 @@ export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggl
   const modeColor = mode?.color || "var(--accent)";
   const modeBg    = mode?.colorBg || "rgba(124,110,245,0.08)";
 
+  const badge = (
+    <div className={styles.cycleBadge} style={{ background: `${modeColor}1a`, borderColor: `${modeColor}40`, color: modeColor }}>
+      {mode?.emoji} Tarefa {completed + 1}
+    </div>
+  );
+
   return (
     <div className={styles.root}>
-      {/* ── Header ── */}
-      <div className={styles.header}>
-        <span className={styles.headerEmoji}>{mode?.emoji || "🚀"}</span>
-        <div className={styles.headerMeta}>
-          <span className={styles.headerTitle}>{mode?.name || "Modo Personalizado"}</span>
-          <span className={styles.headerSub}>{completed} tarefa(s) concluída(s)</span>
-        </div>
-        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
-      </div>
+      <SessionHeader
+        emoji={mode?.emoji || "🚀"}
+        title={mode?.name || "Modo Personalizado"}
+        sub={`${completed} tarefa(s) concluída(s)`}
+        onClose={handleClose}
+      />
 
       <div className={styles.body}>
-
-        {wasRestored && step !== "intro" && step !== "summary" && (
-          <div className={styles.resumeBanner}>
-            ↩ Sessão restaurada — {completed} tarefa(s) concluída(s)
-            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
-          </div>
-        )}
+        <ResumeBanner show={wasRestored && step !== "intro" && step !== "summary"} onDismiss={() => setWasRestored(false)}>
+          ↩ Sessão restaurada — {completed} tarefa(s) concluída(s)
+        </ResumeBanner>
 
         {/* ── Introdução ── */}
         {step === "intro" && (
@@ -103,9 +99,7 @@ export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggl
         {/* ── Selecionar tarefa ── */}
         {step === "select_task" && (
           <>
-            <div className={styles.cycleBadge} style={{ background: `${modeColor}1a`, borderColor: `${modeColor}40`, color: modeColor }}>
-              {mode?.emoji} Tarefa {completed + 1}
-            </div>
+            {badge}
             <TaskSelector
               tasks={available}
               onSelect={(t) => { setSelectedTask(t); setStep("working"); }}
@@ -117,48 +111,15 @@ export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggl
         {/* ── Trabalhando na tarefa ── */}
         {step === "working" && selectedTask && (() => {
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
-          const hasChecklist = live.checklist?.length > 0;
           return (
-            <>
-              <div
-                className={styles.cycleBadge}
-                style={{ background: `${modeColor}1a`, borderColor: `${modeColor}40`, color: modeColor }}
-              >
-                {mode?.emoji} Tarefa {completed + 1}
-              </div>
-
-              <div className={styles.taskDisplay} style={{ borderLeftColor: modeColor }}>
-                <span className={styles.taskName}>{live.title}</span>
-                {live.description && <span className={styles.taskMeta}>{live.description}</span>}
-
-                {hasChecklist && (
-                  <SubtaskFlow
-                    checklist={live.checklist}
-                    onToggle={(itemId) => onToggleChecklist?.(live.id, itemId)}
-                    onAllDone={completeTask}
-                    onSkip={completeTask}
-                  />
-                )}
-              </div>
-
-              <div className={styles.actions}>
-                {!hasChecklist && (
-                  <button
-                    className={`${styles.btn} ${styles.btnSuccess}`}
-                    onClick={completeTask}
-                  >
-                    ✅ Concluída!
-                  </button>
-                )}
-                <button
-                  className={`${styles.btn} ${styles.btnSecondary}`}
-                  onClick={() => { setSelectedTask(null); setStep("select_task"); }}
-                >
-                  Trocar tarefa
-                </button>
-                <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
-              </div>
-            </>
+            <WorkingTask
+              task={live}
+              badge={badge}
+              onComplete={completeTask}
+              onToggleChecklist={onToggleChecklist}
+              onAddChecklist={onAddChecklist}
+              onSwap={() => { setSelectedTask(null); setStep("select_task"); }}
+            />
           );
         })()}
 
@@ -178,10 +139,7 @@ export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggl
             >
               Próxima tarefa
             </button>
-            <button
-              className={`${styles.btn} ${styles.btnSecondary}`}
-              onClick={() => setStep("summary")}
-            >
+            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("summary")}>
               Encerrar sessão
             </button>
           </>
@@ -199,10 +157,9 @@ export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggl
                   : "Sessão encerrada sem tarefas concluídas."}
               </div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
           </>
         )}
-
       </div>
     </div>
   );

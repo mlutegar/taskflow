@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import ModeSession from "./ModeSession";
 import styles from "./ModesPanel.module.css";
 import { modeStatsApi } from "../api/modeStats";
+import { getPinned, metaFor } from "../lib/splitePinned";
+import { logCompletion, usageStats } from "../lib/modeLog";
+import { useDialog } from "../lib/useDialog";
 
 const MODES = [
   {
@@ -197,32 +200,33 @@ const MODES = [
 ];
 
 // ── Cards do Splite separados por atividade (reutilizam a SpliteSession com preset) ──
-const SPLITE_ACTIVITY_MODES = [
-  { id: "splite_agua",       emoji: "💧", name: "Beber Água",        activity: "Beber água",              color: "#4ea8cc", tagline: "Ciclos progressivos hidratando entre tarefas" },
-  { id: "splite_meditar",    emoji: "🧘", name: "Meditar",           activity: "Meditar",                 color: "#7c6ef5", tagline: "Ciclos progressivos meditando entre tarefas" },
-  { id: "splite_diario",     emoji: "📖", name: "Ler Diário",        activity: "Ler diário",              color: "#c8874a", tagline: "Ciclos progressivos relendo o diário entre tarefas" },
-  { id: "splite_esticar",    emoji: "🤸", name: "Esticar 5 min",     activity: "Esticar 5 minutos",       color: "#4ecca3", tagline: "Ciclos progressivos alongando entre tarefas" },
-  { id: "splite_livro",      emoji: "📚", name: "Ler um Capítulo",   activity: "Ler um capítulo de livro", color: "#f0a540", tagline: "Ciclos progressivos lendo entre tarefas" },
-  { id: "splite_exercicio",  emoji: "🏃", name: "Exercícios Rápidos", activity: "Fazer exercícios rápidos", color: "#e05252", tagline: "Ciclos progressivos exercitando entre tarefas" },
-].map((m) => ({
-  id: m.id,
-  emoji: m.emoji,
-  name: m.name,
-  tagline: m.tagline,
-  color: m.color,
-  colorBg: hexToRgba(m.color, 0.08),
-  category: "Ciclos",
-  session: "splite",
-  preset: { activity: m.activity },
-  context: ["🖥️ Desktop", "🔄 Ciclos"],
-  steps: [
-    `Ciclo 1: "${m.activity}" 1× → 1 tarefa`,
-    `Ciclo 2: "${m.activity}" 2× → 2 tarefas`,
-    "Continue aumentando progressivamente",
-    "A atividade de recompensa já vem escolhida",
-  ],
-  tips: `Variante do Splite Mode com "${m.activity}" fixa como recompensa entre as tarefas.`,
-}));
+// Gerados dinamicamente a partir das atividades "fixadas" (lib/splitePinned.js).
+const slug = (s) => s.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+function buildSpliteModes(pinnedActivities) {
+  return pinnedActivities.map((activity, i) => {
+    const { emoji, color } = metaFor(activity, i);
+    return {
+      id: `splite_${slug(activity)}`,
+      emoji,
+      name: activity,
+      tagline: `Ciclos progressivos com "${activity}" entre tarefas`,
+      color,
+      colorBg: hexToRgba(color, 0.08),
+      category: "Ciclos",
+      session: "splite",
+      preset: { activity },
+      context: ["🖥️ Desktop", "🔄 Ciclos"],
+      steps: [
+        `Ciclo 1: "${activity}" 1× → 1 tarefa`,
+        `Ciclo 2: "${activity}" 2× → 2 tarefas`,
+        "Continue aumentando progressivamente",
+        "A atividade de recompensa já vem escolhida",
+      ],
+      tips: `Variante do Splite Mode com "${activity}" fixa como recompensa entre as tarefas.`,
+    };
+  });
+}
 
 // Categoria de cada modo embutido (fallback quando o objeto não traz `category`)
 const CATEGORY_BY_ID = {
@@ -289,12 +293,14 @@ function CreateModeModal({ onSave, onClose }) {
   const addStep = () => setSteps((prev) => [...prev, ""]);
   const removeStep = (i) => setSteps((prev) => prev.filter((_, idx) => idx !== i));
 
+  const dialogRef = useDialog(onClose);
+
   return (
     <div className={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={styles.modal}>
+      <div className={styles.modal} ref={dialogRef} role="dialog" aria-modal="true" aria-label="Criar modo personalizado" tabIndex={-1}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>✨ Criar Modo Personalizado</h2>
-          <button className={styles.modalClose} onClick={onClose}>×</button>
+          <button className={styles.modalClose} onClick={onClose} aria-label="Fechar">×</button>
         </div>
 
         <div className={styles.modalBody}>
@@ -382,7 +388,7 @@ function CreateModeModal({ onSave, onClose }) {
                     onChange={(e) => { updateStep(i, e.target.value); setErrors((p) => ({ ...p, steps: "" })); }}
                   />
                   {steps.length > 1 && (
-                    <button className={styles.removeStepBtn} onClick={() => removeStep(i)} title="Remover passo">×</button>
+                    <button className={styles.removeStepBtn} onClick={() => removeStep(i)} title="Remover passo" aria-label={`Remover passo ${i + 1}`}>×</button>
                   )}
                 </div>
               ))}
@@ -420,6 +426,8 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const [showCreate, setShowCreate] = useState(false);
   const [sortBy, setSortBy] = useState("default"); // "default" | "tasks"
   const [category, setCategory] = useState(""); // "" = todas
+  const [pinnedSplite, setPinnedSplite] = useState(() => getPinned());
+  const [weekly, setWeekly] = useState(() => usageStats(7));
 
   const [customModes, setCustomModes] = useState(() => {
     try { return JSON.parse(localStorage.getItem("customModes") || "[]"); }
@@ -446,6 +454,9 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   }, []);
 
   const handleModeTaskComplete = async (modeId) => {
+    // Log local para o painel "mais usados na semana"
+    logCompletion(modeId);
+    setWeekly(usageStats(7));
     // Update otimista imediato na UI e no cache local
     setModeStats((prev) => {
       const updated = { ...prev, [modeId]: (prev[modeId] || 0) + 1 };
@@ -482,7 +493,15 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     localStorage.setItem("customModes", JSON.stringify(updated));
   };
 
-  const allModes = [...MODES, ...SPLITE_ACTIVITY_MODES, ...customModes];
+  const allModes = [...MODES, ...buildSpliteModes(pinnedSplite), ...customModes];
+  const modeById = Object.fromEntries(allModes.map((m) => [m.id, m]));
+
+  // Top modos da semana (com metadados conhecidos)
+  const topWeekly = weekly
+    .map((w) => ({ ...w, mode: modeById[w.modeId] }))
+    .filter((w) => w.mode)
+    .slice(0, 5);
+  const weeklyMax = topWeekly.reduce((mx, w) => Math.max(mx, w.count), 0);
 
   // Categorias presentes (na ordem canônica, só as que têm modos)
   const presentCategories = CATEGORY_ORDER.filter((c) => allModes.some((m) => categoryOf(m) === c));
@@ -612,6 +631,31 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         </button>
       </div>
 
+      {/* Mais usados na semana */}
+      {topWeekly.length > 0 && (
+        <div className={styles.weeklyPanel}>
+          <div className={styles.weeklyHeader}>
+            <span className={styles.weeklyTitle}>⚡ Mais usados na semana</span>
+            <span className={styles.weeklyNote}>últimos 7 dias · por dispositivo</span>
+          </div>
+          <div className={styles.weeklyList}>
+            {topWeekly.map((w) => (
+              <div key={w.modeId} className={styles.weeklyRow}>
+                <span className={styles.weeklyEmoji}>{w.mode.emoji}</span>
+                <span className={styles.weeklyName}>{w.mode.name}</span>
+                <div className={styles.weeklyBarTrack}>
+                  <div
+                    className={styles.weeklyBarFill}
+                    style={{ width: `${weeklyMax ? (w.count / weeklyMax) * 100 : 0}%`, background: w.mode.color }}
+                  />
+                </div>
+                <span className={styles.weeklyCount}>{w.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Filtro por categoria */}
       <div className={styles.sortBar}>
         <span className={styles.sortLabel}>Categoria:</span>
@@ -679,7 +723,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
           onAddRoutineChecklist={onAddRoutineChecklist}
           onToggleRoutineChecklist={onToggleRoutineChecklist}
           onTaskComplete={handleModeTaskComplete}
-          onClose={() => setActiveSession(null)}
+          onClose={() => { setActiveSession(null); setPinnedSplite(getPinned()); }}
         />
       )}
     </div>

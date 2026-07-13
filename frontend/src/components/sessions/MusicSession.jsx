@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
-import SubtaskInline from "./SubtaskInline";
-import SubtaskFlow from "./SubtaskFlow";
+import SessionHeader from "./SessionHeader";
+import ResumeBanner from "./ResumeBanner";
+import WorkingTask from "./WorkingTask";
 import styles from "./session.module.css";
-import { useSessionPersist } from "../../lib/useSessionPersist";
+import { useModeSession } from "../../hooks/useModeSession";
 
 const MUSIC_MODES = [
   { id: "hundred",  emoji: "🎧", title: "100 Músicas",         desc: "Passe por ~100 músicas no Spotify, encontre UMA que ressoa e faça uma tarefa enquanto ouve." },
@@ -14,31 +15,28 @@ const MUSIC_MODES = [
 const PLAYLIST_SIZE = 10;
 
 export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  const { saved, persist, clearSaved } = useSessionPersist("music");
+  const {
+    persist, clearSaved, saved,
+    completed, setCompleted,
+    doneIds, addDone,
+    selectedTask, setSelectedTask,
+    wasRestored, setWasRestored,
+    available,
+  } = useModeSession("music", tasks);
 
-  const [mode,        setMode]        = useState(saved?.mode        ?? null);
-  const [step,        setStep]        = useState(saved?.step        ?? "choose_mode");
-  const [completed,   setCompleted]   = useState(saved?.completed   ?? 0);
-  const [doneIds,     setDoneIds]     = useState(() => new Set(saved?.doneIds ?? []));
-  const [albumInput,  setAlbumInput]  = useState("");
-  const [albumName,   setAlbumName]   = useState(saved?.albumName   ?? "");
-  const [playlist,    setPlaylist]    = useState(saved?.playlist     ?? []);
-  const [songInput,   setSongInput]   = useState("");
-  const [selectedTask, setSelectedTask] = useState(() => {
-    if (!saved?.selectedTaskId) return null;
-    return tasks.find((t) => t.id === saved.selectedTaskId) || null;
-  });
-  const [wasRestored, setWasRestored] = useState(!!saved);
-
-  const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
+  const [mode,       setMode]       = useState(saved?.mode      ?? null);
+  const [step,       setStep]       = useState(saved?.step      ?? "choose_mode");
+  const [albumInput, setAlbumInput] = useState("");
+  const [albumName,  setAlbumName]  = useState(saved?.albumName ?? "");
+  const [playlist,   setPlaylist]   = useState(saved?.playlist  ?? []);
+  const [songInput,  setSongInput]  = useState("");
 
   useEffect(() => {
     if (step === "summary" || step === "playlist_done") return;
     persist({ step, mode, completed, doneIds: [...doneIds], albumName, playlist, selectedTaskId: selectedTask?.id ?? null });
   }, [step, mode, completed, doneIds, albumName, playlist, selectedTask]); // eslint-disable-line
 
-  const handleClose        = () => { clearSaved(); onClose(); };
-  const handleSummaryClose  = () => { clearSaved(); onClose(); };
+  const handleClose = () => { clearSaved(); onClose(); };
 
   const selectMode = (modeId) => {
     setMode(modeId);
@@ -56,10 +54,20 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
 
   const finishTask = async () => {
     await onCompleteTask(selectedTask.id);
-    setDoneIds((p) => new Set([...p, selectedTask.id]));
+    addDone(selectedTask.id);
     setCompleted((c) => c + 1);
     setSelectedTask(null);
     setStep(available.length - 1 === 0 ? "summary" : getMusicStep());
+  };
+
+  const finishPlaylistTask = async () => {
+    await onCompleteTask(selectedTask.id);
+    addDone(selectedTask.id);
+    setCompleted((c) => c + 1);
+    setSelectedTask(null);
+    if (playlist.length >= PLAYLIST_SIZE) setStep("playlist_done");
+    else if (available.length - 1 === 0) setStep("summary");
+    else setStep("playlist_hunt");
   };
 
   const handleSubtaskToggle = async (taskId, itemId) => {
@@ -80,35 +88,17 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
     }
   };
 
-  const renderChecklist = (live) =>
-    live.checklist?.length > 0 && (
-      <SubtaskFlow
-        checklist={live.checklist}
-        onToggle={(itemId) => handleSubtaskToggle(live.id, itemId)}
-        onAllDone={finishTask}
-        onSkip={finishTask}
-      />
-    );
-
   return (
     <div className={styles.root}>
-      <div className={styles.header}>
-        <span className={styles.headerEmoji}>🎵</span>
-        <div className={styles.headerMeta}>
-          <span className={styles.headerTitle}>Music Mode</span>
-          <span className={styles.headerSub}>{completed} concluída(s)</span>
-        </div>
-        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
-      </div>
+      <SessionHeader emoji="🎵" title="Music Mode" sub={`${completed} concluída(s)`} onClose={handleClose} />
 
       <div className={styles.body}>
-
-        {wasRestored && step !== "choose_mode" && step !== "summary" && step !== "playlist_done" && (
-          <div className={styles.resumeBanner}>
-            ↩ Sessão restaurada — {completed} tarefa(s) concluída(s)
-            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
-          </div>
-        )}
+        <ResumeBanner
+          show={wasRestored && step !== "choose_mode" && step !== "summary" && step !== "playlist_done"}
+          onDismiss={() => setWasRestored(false)}
+        >
+          ↩ Sessão restaurada — {completed} tarefa(s) concluída(s)
+        </ResumeBanner>
 
         {/* ── Escolha do modo ── */}
         {step === "choose_mode" && (
@@ -153,19 +143,15 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
         {step === "hundred_working" && selectedTask && (() => {
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
           return (
-            <>
-              <div className={styles.infoPill}>🎵 Música tocando — foco total!</div>
-              <div className={styles.taskDisplay}>
-                <span className={styles.taskName}>{live.title}</span>
-                {live.description && <span className={styles.taskMeta}>{live.description}</span>}
-                {renderChecklist(live)}
-              </div>
-              <div className={styles.actions}>
-                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={finishTask}>✅ Tarefa concluída!</button>
-                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("hundred_select")}>Trocar tarefa</button>
-                <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
-              </div>
-            </>
+            <WorkingTask
+              task={live}
+              badge={<div className={styles.infoPill}>🎵 Música tocando — foco total!</div>}
+              completeLabel="✅ Tarefa concluída!"
+              onComplete={finishTask}
+              onToggleChecklist={handleSubtaskToggle}
+              onAddChecklist={onAddChecklist}
+              onSwap={() => setStep("hundred_select")}
+            />
           );
         })()}
 
@@ -204,19 +190,15 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
         {step === "album_working" && selectedTask && (() => {
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
           return (
-            <>
-              <div className={styles.infoPill}>💿 {albumName} — foco total!</div>
-              <div className={styles.taskDisplay}>
-                <span className={styles.taskName}>{live.title}</span>
-                {live.description && <span className={styles.taskMeta}>{live.description}</span>}
-                {renderChecklist(live)}
-              </div>
-              <div className={styles.actions}>
-                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={finishTask}>✅ Tarefa concluída!</button>
-                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("album_select")}>Trocar tarefa</button>
-                <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
-              </div>
-            </>
+            <WorkingTask
+              task={live}
+              badge={<div className={styles.infoPill}>💿 {albumName} — foco total!</div>}
+              completeLabel="✅ Tarefa concluída!"
+              onComplete={finishTask}
+              onToggleChecklist={handleSubtaskToggle}
+              onAddChecklist={onAddChecklist}
+              onSwap={() => setStep("album_select")}
+            />
           );
         })()}
 
@@ -287,29 +269,15 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
           const currentSong = playlist[playlist.length - 1];
           return (
-            <>
-              <div className={styles.infoPill}>🎵 {currentSong} — foco total!</div>
-              <div className={styles.taskDisplay}>
-                <span className={styles.taskName}>{live.title}</span>
-                {live.description && <span className={styles.taskMeta}>{live.description}</span>}
-                {renderChecklist(live)}
-              </div>
-              <div className={styles.actions}>
-                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={async () => {
-                  await onCompleteTask(selectedTask.id);
-                  setDoneIds((p) => new Set([...p, selectedTask.id]));
-                  setCompleted((c) => c + 1);
-                  setSelectedTask(null);
-                  if (playlist.length >= PLAYLIST_SIZE) setStep("playlist_done");
-                  else if (available.length - 1 === 0) setStep("summary");
-                  else setStep("playlist_hunt");
-                }}>
-                  ✅ Tarefa concluída!
-                </button>
-                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("playlist_select")}>Trocar tarefa</button>
-                <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
-              </div>
-            </>
+            <WorkingTask
+              task={live}
+              badge={<div className={styles.infoPill}>🎵 {currentSong} — foco total!</div>}
+              completeLabel="✅ Tarefa concluída!"
+              onComplete={finishPlaylistTask}
+              onToggleChecklist={handleSubtaskToggle}
+              onAddChecklist={onAddChecklist}
+              onSwap={() => setStep("playlist_select")}
+            />
           );
         })()}
 
@@ -326,7 +294,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
                 <div key={i} className={styles.savedTask}><span className={styles.savedTaskTitle}>{i + 1}. {s}</span></div>
               ))}
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>🎵 Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>🎵 Fechar</button>
           </>
         )}
 
@@ -348,10 +316,9 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
             {mode === "album" && albumName && (
               <div className={styles.infoPill} style={{ marginBottom: 8 }}>💿 Álbum da sessão: {albumName}</div>
             )}
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
           </>
         )}
-
       </div>
     </div>
   );

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
-import SubtaskInline from "./SubtaskInline";
-import SubtaskFlow from "./SubtaskFlow";
+import SessionHeader from "./SessionHeader";
+import ResumeBanner from "./ResumeBanner";
+import WorkingTask from "./WorkingTask";
 import styles from "./session.module.css";
-import { useSessionPersist } from "../../lib/useSessionPersist";
+import { useModeSession } from "../../hooks/useModeSession";
 import { getActivities, addActivity, removeActivity } from "../../lib/activities";
 
 // Tarefas "salvas para depois" (feature do LazyFalcon, separada do estado de sessão)
@@ -12,29 +13,21 @@ function loadSaved() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || 
 function persistSaved(d) { localStorage.setItem(LS_KEY, JSON.stringify(d)); }
 
 export default function LazyFalconSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  // Persistência do estado de sessão (ciclo, progresso, etc.)
-  const { saved: sessState, persist: persistSess, clearSaved: clearSess } = useSessionPersist("lazyfal");
+  const {
+    persist: persistSess, clearSaved: clearSess, saved: sessState,
+    completed, setCompleted,
+    doneIds, addDone,
+    selectedTask, setSelectedTask,
+    wasRestored, setWasRestored,
+    available,
+  } = useModeSession("lazyfal", tasks);
 
   const [step,        setStep]        = useState(sessState?.step        ?? "select_activity");
   const [activity,    setActivity]    = useState(sessState?.activity    ?? null);
   const [cycle,       setCycle]       = useState(sessState?.cycle       ?? 1);
   const [taskInCycle, setTaskInCycle] = useState(sessState?.taskInCycle ?? 0);
-  const [selectedTask, setSelectedTask] = useState(() => {
-    if (!sessState?.selectedTaskId) return null;
-    return tasks.find((t) => t.id === sessState.selectedTaskId) || null;
-  });
-  const [completed,   setCompleted]   = useState(sessState?.completed   ?? 0);
-  const [doneIds,     setDoneIds]     = useState(() => new Set(sessState?.doneIds ?? []));
-  const [wasRestored, setWasRestored] = useState(!!sessState);
   const [activities,  setActivities]  = useState(() => getActivities());
   const [newActivity, setNewActivity] = useState("");
-
-  const handleAddActivity = () => {
-    const updated = addActivity(newActivity);
-    setActivities(updated);
-    setNewActivity("");
-  };
-  const handleRemoveActivity = (a) => setActivities(removeActivity(a));
 
   // Estado das tarefas salvas para depois (feature específica do LazyFalcon)
   const [saved,     setSaved]     = useState(() => loadSaved());
@@ -42,23 +35,24 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
   const [subStep,   setSubStep]   = useState(null);
 
   const numTasks = cycle;
-  const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
 
-  // ── Persistir estado de sessão ───────────────────────────────────────────
   useEffect(() => {
     if (step === "summary") return;
     persistSess({
-      step,
-      activity,
-      cycle,
-      taskInCycle,
-      completed,
-      doneIds:        [...doneIds],
+      step, activity, cycle, taskInCycle, completed,
+      doneIds: [...doneIds],
       selectedTaskId: selectedTask?.id ?? null,
     });
   }, [step, activity, cycle, taskInCycle, completed, doneIds, selectedTask]); // eslint-disable-line
 
   const handleClose = () => { clearSess(); onClose(); };
+
+  const handleAddActivity = () => {
+    const updated = addActivity(newActivity);
+    setActivities(updated);
+    setNewActivity("");
+  };
+  const handleRemoveActivity = (a) => setActivities(removeActivity(a));
 
   const doSave = (note) => {
     const existing = saved.findIndex((s) => s.task_id === selectedTask.id);
@@ -78,7 +72,7 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
     const updated = saved.filter((s) => s.task_id !== selectedTask.id);
     persistSaved(updated);
     setSaved(updated);
-    setDoneIds((p) => new Set([...p, selectedTask.id]));
+    addDone(selectedTask.id);
     setCompleted((c) => c + 1);
     advanceCycle();
   };
@@ -99,24 +93,17 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
 
   return (
     <div className={styles.root}>
-      <div className={styles.header}>
-        <span className={styles.headerEmoji}>🦅</span>
-        <div className={styles.headerMeta}>
-          <span className={styles.headerTitle}>Lazy Falcon Mode</span>
-          <span className={styles.headerSub}>Ciclo {cycle} • ✅ {completed} • 💾 {saved.length}</span>
-        </div>
-        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
-      </div>
+      <SessionHeader
+        emoji="🦅"
+        title="Lazy Falcon Mode"
+        sub={`Ciclo ${cycle} • ✅ ${completed} • 💾 ${saved.length}`}
+        onClose={handleClose}
+      />
 
       <div className={styles.body}>
-
-        {/* Banner de sessão restaurada */}
-        {wasRestored && step !== "select_activity" && step !== "summary" && (
-          <div className={styles.resumeBanner}>
-            ↩ Sessão restaurada — {activity ? `${activity} • ` : ""}Ciclo {cycle}, {completed} tarefa(s) concluída(s)
-            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
-          </div>
-        )}
+        <ResumeBanner show={wasRestored && step !== "select_activity" && step !== "summary"} onDismiss={() => setWasRestored(false)}>
+          ↩ Sessão restaurada — {activity ? `${activity} • ` : ""}Ciclo {cycle}, {completed} tarefa(s) concluída(s)
+        </ResumeBanner>
 
         {saved.length > 0 && step !== "summary" && (
           <>
@@ -153,6 +140,7 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
                     className={`${styles.btn} ${styles.btnSecondary}`}
                     style={{ flex: "0 0 auto", padding: "0 12px" }}
                     title="Remover atividade"
+                    aria-label={`Remover ${a}`}
                     onClick={() => handleRemoveActivity(a)}
                   >
                     ✕
@@ -209,27 +197,17 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
         {step === "task_action" && selectedTask && !subStep && (() => {
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
           return (
-            <>
-              <div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>
-              <div className={styles.taskDisplay}>
-                <span className={styles.taskName}>{live.title}</span>
-                {live.description && <span className={styles.taskMeta}>{live.description}</span>}
-                {live.checklist?.length > 0 && (
-                  <SubtaskFlow
-                    checklist={live.checklist}
-                    onToggle={(itemId) => onToggleChecklist?.(live.id, itemId)}
-                    onAllDone={doFinalize}
-                    onSkip={doFinalize}
-                  />
-                )}
-              </div>
-              <div className={styles.actions}>
-                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={doFinalize}>✅ Finalizar (marcar concluída)</button>
-                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setSubStep("save_note")}>💾 Salvar para depois</button>
-                <SubtaskInline taskId={live.id} onAdd={onAddChecklist} />
-                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("select_task")}>Trocar tarefa</button>
-              </div>
-            </>
+            <WorkingTask
+              task={live}
+              badge={<div className={styles.cycleBadge}>Ciclo {cycle} — Tarefa {taskInCycle + 1} de {numTasks}</div>}
+              completeLabel="✅ Finalizar (marcar concluída)"
+              onComplete={doFinalize}
+              onToggleChecklist={onToggleChecklist}
+              onAddChecklist={onAddChecklist}
+              onSwap={() => setStep("select_task")}
+            >
+              <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setSubStep("save_note")}>💾 Salvar para depois</button>
+            </WorkingTask>
           );
         })()}
 
@@ -271,7 +249,7 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
               <div className={styles.summaryTitle}>Sessão encerrada!</div>
               <div className={styles.summaryText}>{completed} concluída(s) • {saved.length} salva(s) • {cycle} ciclo(s)</div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { clearSess(); onClose(); }}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
           </>
         )}
       </div>
