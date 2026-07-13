@@ -48,6 +48,17 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
     }
   }, [step, selectedTask, available.length]); // eslint-disable-line
 
+  // Detecta conclusão "por fora" — se a tarefa selecionada foi marcada como
+  // concluída fora da sessão (ex: na aba Tarefas), avança o ciclo automaticamente.
+  useEffect(() => {
+    if (step !== "working" || !selectedTask) return;
+    const live = tasks.find((t) => t.id === selectedTask.id);
+    if (live?.completed && !doneIds.has(live.id)) {
+      setDoneIds((p) => new Set([...p, live.id]));
+      advanceAfterTaskComplete(live.id);
+    }
+  }, [tasks, step, selectedTask, doneIds]); // eslint-disable-line
+
   const resetSubtask = () => { setShowSubtask(false); setSubtaskText(""); };
 
   // ── Handlers de conclusão ────────────────────────────────────────────────

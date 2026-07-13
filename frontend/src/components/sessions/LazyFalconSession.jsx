@@ -4,12 +4,7 @@ import SubtaskInline from "./SubtaskInline";
 import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
 import { useSessionPersist } from "../../lib/useSessionPersist";
-
-const ACTIVITIES = [
-  "Ler diário", "Escrever no diário", "Beber água", "Jogar Spelunky",
-  "Ver Twitter", "Ver um vídeo", "Colocar música", "Ler um capítulo de livro",
-  "Esticar 5 minutos", "Meditar", "Fazer exercícios rápidos", "Organizar algo", "Responder mensagens",
-];
+import { getActivities, addActivity, removeActivity } from "../../lib/activities";
 
 // Tarefas "salvas para depois" (feature do LazyFalcon, separada do estado de sessão)
 const LS_KEY = "taskflow_lazyfal_saved";
@@ -31,6 +26,15 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
   const [completed,   setCompleted]   = useState(sessState?.completed   ?? 0);
   const [doneIds,     setDoneIds]     = useState(() => new Set(sessState?.doneIds ?? []));
   const [wasRestored, setWasRestored] = useState(!!sessState);
+  const [activities,  setActivities]  = useState(() => getActivities());
+  const [newActivity, setNewActivity] = useState("");
+
+  const handleAddActivity = () => {
+    const updated = addActivity(newActivity);
+    setActivities(updated);
+    setNewActivity("");
+  };
+  const handleRemoveActivity = (a) => setActivities(removeActivity(a));
 
   // Estado das tarefas salvas para depois (feature específica do LazyFalcon)
   const [saved,     setSaved]     = useState(() => loadSaved());
@@ -140,11 +144,37 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
               <div className={styles.promptText}>Você poderá salvar tarefas para continuar depois.</div>
             </div>
             <div className={styles.activityList}>
-              {ACTIVITIES.map((a) => (
-                <button key={a} className={styles.activityItem} onClick={() => { setActivity(a); setStep("doing_activity"); }}>
-                  {a}
-                </button>
+              {activities.map((a) => (
+                <div key={a} style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
+                  <button className={styles.activityItem} style={{ flex: 1 }} onClick={() => { setActivity(a); setStep("doing_activity"); }}>
+                    {a}
+                  </button>
+                  <button
+                    className={`${styles.btn} ${styles.btnSecondary}`}
+                    style={{ flex: "0 0 auto", padding: "0 12px" }}
+                    title="Remover atividade"
+                    onClick={() => handleRemoveActivity(a)}
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
+            </div>
+            <div className={styles.actionsRow} style={{ marginTop: 10 }}>
+              <input
+                className={styles.input}
+                placeholder="Nova atividade..."
+                value={newActivity}
+                onChange={(e) => setNewActivity(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleAddActivity(); }}
+              />
+              <button
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={handleAddActivity}
+                disabled={!newActivity.trim()}
+              >
+                ＋ Adicionar
+              </button>
             </div>
           </>
         )}

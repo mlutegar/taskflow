@@ -124,6 +124,42 @@
   gap: 8px;
 }
 
+/* ── Grupo de categoria ───────────────────────────────── */
+.categoryGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.categoryHeader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.categoryTitle {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.categoryCount {
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
 /* ── Card ──────────────────────────────────────────────── */
 .card {
   background: var(--surface);

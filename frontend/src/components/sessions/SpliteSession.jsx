@@ -4,12 +4,7 @@ import SubtaskInline from "./SubtaskInline";
 import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
 import { useSessionPersist } from "../../lib/useSessionPersist";
-
-const ACTIVITIES = [
-  "Ler diário", "Escrever no diário", "Beber água", "Jogar Spelunky",
-  "Ver Twitter", "Ver um vídeo", "Colocar música", "Ler um capítulo de livro",
-  "Esticar 5 minutos", "Meditar", "Fazer exercícios rápidos", "Organizar algo", "Responder mensagens",
-];
+import { getActivities, addActivity, removeActivity } from "../../lib/activities";
 
 const DIARY_MODE_ACTIVITY = "Escrever no diário";
 const READ_DIARY_ACTIVITY = "Ler diário";
@@ -23,11 +18,19 @@ function randomDiaryDate() {
   return d.toLocaleDateString("pt-BR");      // dd/mm/aaaa
 }
 
-export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
-  const { saved, persist, clearSaved } = useSessionPersist("splite");
+export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+  const { saved, persist, clearSaved } = useSessionPersist(preset?.activity ? `splite:${preset.activity}` : "splite");
 
-  const [step,          setStep]          = useState(saved?.step          ?? "select_activity");
-  const [activity,      setActivity]      = useState(saved?.activity      ?? null);
+  // Card com atividade pré-definida: pula a etapa de seleção e já entra no ciclo.
+  const presetInit = (() => {
+    const a = preset?.activity;
+    if (!a) return null;
+    if (a === DIARY_MODE_ACTIVITY) return { activity: a, step: "writing_diary", isDiaryMode: true, diaryDate: null };
+    return { activity: a, step: "doing_activity", isDiaryMode: false, diaryDate: a === READ_DIARY_ACTIVITY ? randomDiaryDate() : null };
+  })();
+
+  const [step,          setStep]          = useState(saved?.step          ?? presetInit?.step       ?? "select_activity");
+  const [activity,      setActivity]      = useState(saved?.activity      ?? presetInit?.activity   ?? null);
   const [cycle,         setCycle]         = useState(saved?.cycle         ?? 1);
   const [taskInCycle,   setTaskInCycle]   = useState(saved?.taskInCycle   ?? 0);
   const [selectedTask,  setSelectedTask]  = useState(() => {
@@ -36,10 +39,19 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
   });
   const [completed,     setCompleted]     = useState(saved?.completed     ?? 0);
   const [doneIds,       setDoneIds]       = useState(() => new Set(saved?.doneIds ?? []));
-  const [isDiaryMode,   setIsDiaryMode]   = useState(saved?.isDiaryMode   ?? false);
+  const [isDiaryMode,   setIsDiaryMode]   = useState(saved?.isDiaryMode   ?? presetInit?.isDiaryMode ?? false);
   const [nextDiaryStep, setNextDiaryStep] = useState(saved?.nextDiaryStep ?? "reading_analysis");
-  const [diaryDate,     setDiaryDate]     = useState(saved?.diaryDate     ?? null);
+  const [diaryDate,     setDiaryDate]     = useState(saved?.diaryDate     ?? presetInit?.diaryDate  ?? null);
   const [wasRestored,   setWasRestored]   = useState(!!saved);
+  const [activities,    setActivities]    = useState(() => getActivities());
+  const [newActivity,   setNewActivity]   = useState("");
+
+  const handleAddActivity = () => {
+    const updated = addActivity(newActivity);
+    setActivities(updated);
+    setNewActivity("");
+  };
+  const handleRemoveActivity = (a) => setActivities(removeActivity(a));
 
   const numTasks = cycle;
   const available = tasks.filter((t) => !t.completed && !doneIds.has(t.id));
@@ -139,11 +151,37 @@ export default function SpliteSession({ tasks, onCompleteTask, onToggleChecklist
               <div className={styles.promptText}>Esta será a atividade entre as tarefas.</div>
             </div>
             <div className={styles.activityList}>
-              {ACTIVITIES.map((a) => (
-                <button key={a} className={styles.activityItem} onClick={() => selectActivity(a)}>
-                  {a}
-                </button>
+              {activities.map((a) => (
+                <div key={a} style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
+                  <button className={styles.activityItem} style={{ flex: 1 }} onClick={() => selectActivity(a)}>
+                    {a}
+                  </button>
+                  <button
+                    className={`${styles.btn} ${styles.btnSecondary}`}
+                    style={{ flex: "0 0 auto", padding: "0 12px" }}
+                    title="Remover atividade"
+                    onClick={() => handleRemoveActivity(a)}
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
+            </div>
+            <div className={styles.actionsRow} style={{ marginTop: 10 }}>
+              <input
+                className={styles.input}
+                placeholder="Nova atividade..."
+                value={newActivity}
+                onChange={(e) => setNewActivity(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleAddActivity(); }}
+              />
+              <button
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={handleAddActivity}
+                disabled={!newActivity.trim()}
+              >
+                ＋ Adicionar
+              </button>
             </div>
           </>
         )}

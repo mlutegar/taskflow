@@ -10,6 +10,7 @@ import LazyFalconSession from "./sessions/LazyFalconSession";
 import CafeRitualSession from "./sessions/CafeRitualSession";
 import TabHopSession from "./sessions/TabHopSession";
 import CustomModeSession from "./sessions/CustomModeSession";
+import SingSession from "./sessions/SingSession";
 
 const SESSION_MAP = {
   music: MusicSession,
@@ -21,6 +22,7 @@ const SESSION_MAP = {
   lazyfal: LazyFalconSession,
   caferitual: CafeRitualSession,
   tabhop: TabHopSession,
+  sing: SingSession,
 };
 
 export default function ModeSession({ modeId, mode, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }) {
@@ -102,7 +104,8 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
     }
   };
 
-  const Session = SESSION_MAP[modeId];
+  const Session = SESSION_MAP[mode?.session || modeId];
+  const preset = mode?.preset;
 
   // Modo personalizado: usa sessão genérica se não há entrada no mapa
   const isCustom = !Session && mode?.isCustom;
@@ -121,7 +124,7 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
             onClose={onClose}
           />
         ) : (
-          <Session tasks={items} onCompleteTask={wrappedCompleteTask} onToggleChecklist={wrappedToggleChecklist} onAddChecklist={wrappedAddChecklist} onClose={onClose} />
+          <Session preset={preset} tasks={items} onCompleteTask={wrappedCompleteTask} onToggleChecklist={wrappedToggleChecklist} onAddChecklist={wrappedAddChecklist} onClose={onClose} />
         )}
 
         {/* ── Quick-Add bar ─────────────────────────────────── */}

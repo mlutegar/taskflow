@@ -154,7 +154,88 @@ const MODES = [
     ],
     tips: "Criado para deslocamentos onde você não consegue manter foco longo. Cada aba exige apenas um pequeno avanço — a rotação cria progresso distribuído.",
   },
+
+  // ── Modos de cantar (variantes da SingSession) ──
+  {
+    id: "sing_one",
+    emoji: "🎙️",
+    name: "Cantar 1 Música",
+    tagline: "Cante uma música inteira, depois faça uma tarefa",
+    color: "#e0679b",
+    colorBg: "rgba(224,103,155,0.08)",
+    category: "Música",
+    session: "sing",
+    preset: { variant: "one" },
+    context: ["🖥️ Desktop", "🎤 Voz"],
+    steps: [
+      "Escolha uma música que você ama",
+      "Cante junto do começo ao fim",
+      "Selecione uma tarefa e conclua",
+      "Repita com a próxima música",
+    ],
+    tips: "Cantar libera tensão e ativa a respiração — um reset rápido de energia antes de cada tarefa.",
+  },
+  {
+    id: "sing_ten",
+    emoji: "🎤",
+    name: "10 Músicas Cantáveis",
+    tagline: "Monte uma fila de 10 músicas para cantar junto",
+    color: "#d14a86",
+    colorBg: "rgba(209,74,134,0.08)",
+    category: "Música",
+    session: "sing",
+    preset: { variant: "ten" },
+    context: ["🖥️ Desktop", "🎤 Voz", "🔄 Ciclos"],
+    steps: [
+      "Encontre uma música que dá vontade de cantar",
+      "Registre na fila e faça uma tarefa cantando junto",
+      "Repita até completar 10 músicas cantáveis",
+      "Feche com sua fila curada de karaokê",
+    ],
+    tips: "A curadoria da fila mantém a sessão leve e divertida enquanto o trabalho acontece em segundo plano.",
+  },
 ];
+
+// ── Cards do Splite separados por atividade (reutilizam a SpliteSession com preset) ──
+const SPLITE_ACTIVITY_MODES = [
+  { id: "splite_agua",       emoji: "💧", name: "Beber Água",        activity: "Beber água",              color: "#4ea8cc", tagline: "Ciclos progressivos hidratando entre tarefas" },
+  { id: "splite_meditar",    emoji: "🧘", name: "Meditar",           activity: "Meditar",                 color: "#7c6ef5", tagline: "Ciclos progressivos meditando entre tarefas" },
+  { id: "splite_diario",     emoji: "📖", name: "Ler Diário",        activity: "Ler diário",              color: "#c8874a", tagline: "Ciclos progressivos relendo o diário entre tarefas" },
+  { id: "splite_esticar",    emoji: "🤸", name: "Esticar 5 min",     activity: "Esticar 5 minutos",       color: "#4ecca3", tagline: "Ciclos progressivos alongando entre tarefas" },
+  { id: "splite_livro",      emoji: "📚", name: "Ler um Capítulo",   activity: "Ler um capítulo de livro", color: "#f0a540", tagline: "Ciclos progressivos lendo entre tarefas" },
+  { id: "splite_exercicio",  emoji: "🏃", name: "Exercícios Rápidos", activity: "Fazer exercícios rápidos", color: "#e05252", tagline: "Ciclos progressivos exercitando entre tarefas" },
+].map((m) => ({
+  id: m.id,
+  emoji: m.emoji,
+  name: m.name,
+  tagline: m.tagline,
+  color: m.color,
+  colorBg: hexToRgba(m.color, 0.08),
+  category: "Ciclos",
+  session: "splite",
+  preset: { activity: m.activity },
+  context: ["🖥️ Desktop", "🔄 Ciclos"],
+  steps: [
+    `Ciclo 1: "${m.activity}" 1× → 1 tarefa`,
+    `Ciclo 2: "${m.activity}" 2× → 2 tarefas`,
+    "Continue aumentando progressivamente",
+    "A atividade de recompensa já vem escolhida",
+  ],
+  tips: `Variante do Splite Mode com "${m.activity}" fixa como recompensa entre as tarefas.`,
+}));
+
+// Categoria de cada modo embutido (fallback quando o objeto não traz `category`)
+const CATEGORY_BY_ID = {
+  music: "Música", sing_one: "Música", sing_ten: "Música",
+  tiktok: "Ciclos", splite: "Ciclos", lazyfal: "Ciclos",
+  momentum: "Foco", espresso: "Foco", rpg: "Foco",
+  caferitual: "Ritual", tabhop: "Mobile",
+};
+
+const CATEGORY_ORDER = ["Música", "Ciclos", "Foco", "Ritual", "Mobile", "Personalizados"];
+
+const categoryOf = (m) =>
+  m.isCustom ? "Personalizados" : (m.category || CATEGORY_BY_ID[m.id] || "Outros");
 
 const EMOJI_PRESETS = ["🚀", "🔥", "💎", "🧠", "🎯", "⭐", "🌊", "🏆", "💪", "🎲", "🌙", "⚙️", "🦁", "🐉", "🧩"];
 const COLOR_PRESETS = [
@@ -338,6 +419,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const [activeSession, setActiveSession] = useState(null); // objeto completo do modo
   const [showCreate, setShowCreate] = useState(false);
   const [sortBy, setSortBy] = useState("default"); // "default" | "tasks"
+  const [category, setCategory] = useState(""); // "" = todas
 
   const [customModes, setCustomModes] = useState(() => {
     try { return JSON.parse(localStorage.getItem("customModes") || "[]"); }
@@ -400,11 +482,124 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     localStorage.setItem("customModes", JSON.stringify(updated));
   };
 
-  const allModes = [...MODES, ...customModes];
+  const allModes = [...MODES, ...SPLITE_ACTIVITY_MODES, ...customModes];
 
-  const sortedModes = sortBy === "tasks"
-    ? [...allModes].sort((a, b) => (modeStats[b.id] || 0) - (modeStats[a.id] || 0))
-    : allModes;
+  // Categorias presentes (na ordem canônica, só as que têm modos)
+  const presentCategories = CATEGORY_ORDER.filter((c) => allModes.some((m) => categoryOf(m) === c));
+
+  const applySort = (list) =>
+    sortBy === "tasks"
+      ? [...list].sort((a, b) => (modeStats[b.id] || 0) - (modeStats[a.id] || 0))
+      : list;
+
+  // Sem filtro → agrupa por categoria; com filtro → um único grupo
+  const groups = category
+    ? [{ name: category, modes: applySort(allModes.filter((m) => categoryOf(m) === category)) }]
+    : presentCategories.map((c) => ({ name: c, modes: applySort(allModes.filter((m) => categoryOf(m) === c)) }));
+
+  const renderCard = (mode) => {
+    const open = expanded === mode.id;
+    const taskCount = modeStats[mode.id] || 0;
+    return (
+      <div
+        key={mode.id}
+        className={`${styles.card} ${open ? styles.cardOpen : ""} ${mode.isCustom ? styles.cardCustom : ""}`}
+        style={{ "--mode-color": mode.color, "--mode-bg": mode.colorBg }}
+      >
+        <div className={styles.cardHeader}>
+          <button className={styles.cardToggle} onClick={() => toggle(mode.id)}>
+            <span className={styles.cardEmoji}>{mode.emoji}</span>
+            <div className={styles.cardMeta}>
+              <div className={styles.cardNameRow}>
+                <span className={styles.cardName}>{mode.name}</span>
+                {mode.isCustom && <span className={styles.customBadge}>Personalizado</span>}
+                {taskCount > 0 && (
+                  <span className={styles.statBadge}>✓ {taskCount}</span>
+                )}
+              </div>
+              <span className={styles.cardTagline}>{mode.tagline}</span>
+              {mode.context?.length > 0 && (
+                <div className={styles.contextTags}>
+                  {mode.context.map((tag) => (
+                    <span key={tag} className={styles.contextTag}>{tag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`}>›</span>
+          </button>
+
+          <div className={styles.cardActions}>
+            <button
+              className={styles.startBtn}
+              onClick={() => setActiveSession(mode)}
+              title={`Iniciar ${mode.name}`}
+            >
+              ▶ Iniciar
+            </button>
+            {mode.isCustom && (
+              <button
+                className={styles.deleteBtn}
+                onClick={() => handleDeleteMode(mode.id)}
+                title="Excluir modo"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+
+        {open && (
+          <div className={styles.cardBody}>
+            {taskCount > 0 && (
+              <div className={styles.statRow}>
+                <span className={styles.statIcon}>🎯</span>
+                <span className={styles.statText}>
+                  {taskCount} tarefa{taskCount !== 1 ? "s" : ""} concluída{taskCount !== 1 ? "s" : ""} neste modo
+                </span>
+              </div>
+            )}
+
+            <div className={styles.section}>
+              <span className={styles.sectionLabel}>Como funciona</span>
+              <ol className={styles.stepList}>
+                {mode.steps.map((step, i) => (
+                  <li key={i} className={styles.stepItem}>
+                    <span className={styles.stepNum} style={{ background: mode.color }}>{i + 1}</span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            {mode.classes && (
+              <div className={styles.section}>
+                <span className={styles.sectionLabel}>Classes disponíveis</span>
+                <div className={styles.classesList}>
+                  {mode.classes.map((cls) => (
+                    <div key={cls.name} className={styles.classItem} style={{ "--cls-color": cls.color }}>
+                      <span className={styles.classEmoji}>{cls.emoji}</span>
+                      <div>
+                        <span className={styles.className}>{cls.name}</span>
+                        <span className={styles.classDesc}>{cls.desc}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {mode.tips && (
+              <div className={styles.tip}>
+                <span className={styles.tipIcon}>💡</span>
+                <span>{mode.tips}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className={styles.root}>
@@ -417,7 +612,27 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         </button>
       </div>
 
-      {/* Sort bar */}
+      {/* Filtro por categoria */}
+      <div className={styles.sortBar}>
+        <span className={styles.sortLabel}>Categoria:</span>
+        <button
+          className={`${styles.sortBtn} ${category === "" ? styles.sortBtnActive : ""}`}
+          onClick={() => setCategory("")}
+        >
+          Todas
+        </button>
+        {presentCategories.map((c) => (
+          <button
+            key={c}
+            className={`${styles.sortBtn} ${category === c ? styles.sortBtnActive : ""}`}
+            onClick={() => setCategory(c)}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
+      {/* Ordenação */}
       <div className={styles.sortBar}>
         <span className={styles.sortLabel}>Ordenar:</span>
         <button
@@ -434,113 +649,17 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         </button>
       </div>
 
-      <div className={styles.grid}>
-        {sortedModes.map((mode) => {
-          const open = expanded === mode.id;
-          const taskCount = modeStats[mode.id] || 0;
-          return (
-            <div
-              key={mode.id}
-              className={`${styles.card} ${open ? styles.cardOpen : ""} ${mode.isCustom ? styles.cardCustom : ""}`}
-              style={{ "--mode-color": mode.color, "--mode-bg": mode.colorBg }}
-            >
-              <div className={styles.cardHeader}>
-                <button className={styles.cardToggle} onClick={() => toggle(mode.id)}>
-                  <span className={styles.cardEmoji}>{mode.emoji}</span>
-                  <div className={styles.cardMeta}>
-                    <div className={styles.cardNameRow}>
-                      <span className={styles.cardName}>{mode.name}</span>
-                      {mode.isCustom && <span className={styles.customBadge}>Personalizado</span>}
-                      {taskCount > 0 && (
-                        <span className={styles.statBadge}>
-                          ✓ {taskCount}
-                        </span>
-                      )}
-                    </div>
-                    <span className={styles.cardTagline}>{mode.tagline}</span>
-                    {mode.context?.length > 0 && (
-                      <div className={styles.contextTags}>
-                        {mode.context.map((tag) => (
-                          <span key={tag} className={styles.contextTag}>{tag}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <span className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`}>›</span>
-                </button>
-
-                <div className={styles.cardActions}>
-                  <button
-                    className={styles.startBtn}
-                    onClick={() => setActiveSession(mode)}
-                    title={`Iniciar ${mode.name}`}
-                  >
-                    ▶ Iniciar
-                  </button>
-                  {mode.isCustom && (
-                    <button
-                      className={styles.deleteBtn}
-                      onClick={() => handleDeleteMode(mode.id)}
-                      title="Excluir modo"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {open && (
-                <div className={styles.cardBody}>
-                  {taskCount > 0 && (
-                    <div className={styles.statRow}>
-                      <span className={styles.statIcon}>🎯</span>
-                      <span className={styles.statText}>
-                        {taskCount} tarefa{taskCount !== 1 ? "s" : ""} concluída{taskCount !== 1 ? "s" : ""} neste modo
-                      </span>
-                    </div>
-                  )}
-
-                  <div className={styles.section}>
-                    <span className={styles.sectionLabel}>Como funciona</span>
-                    <ol className={styles.stepList}>
-                      {mode.steps.map((step, i) => (
-                        <li key={i} className={styles.stepItem}>
-                          <span className={styles.stepNum} style={{ background: mode.color }}>{i + 1}</span>
-                          <span>{step}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-
-                  {mode.classes && (
-                    <div className={styles.section}>
-                      <span className={styles.sectionLabel}>Classes disponíveis</span>
-                      <div className={styles.classesList}>
-                        {mode.classes.map((cls) => (
-                          <div key={cls.name} className={styles.classItem} style={{ "--cls-color": cls.color }}>
-                            <span className={styles.classEmoji}>{cls.emoji}</span>
-                            <div>
-                              <span className={styles.className}>{cls.name}</span>
-                              <span className={styles.classDesc}>{cls.desc}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {mode.tips && (
-                    <div className={styles.tip}>
-                      <span className={styles.tipIcon}>💡</span>
-                      <span>{mode.tips}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {groups.map((group) => (
+        <div key={group.name} className={styles.categoryGroup}>
+          <div className={styles.categoryHeader}>
+            <span className={styles.categoryTitle}>{group.name}</span>
+            <span className={styles.categoryCount}>{group.modes.length}</span>
+          </div>
+          <div className={styles.grid}>
+            {group.modes.map(renderCard)}
+          </div>
+        </div>
+      ))}
 
       {showCreate && (
         <CreateModeModal onSave={handleSaveMode} onClose={() => setShowCreate(false)} />
