@@ -4,6 +4,7 @@ import { useSessionPersist } from "../../lib/useSessionPersist";
 import { getHelper } from "./helpers/index";
 import { addSession, getHistory, getMaxLevel, updateMaxLevel } from "../../lib/dailyFocusHistory";
 import { tryUnlock, getAllWithStatus } from "../../lib/dailyFocusAchievements";
+import { getDayLevel, setDayLevel, getUsedModes, addUsedModes } from "../../lib/dailyFocusDay";
 import styles from "./DailyFocus.module.css";
 
 // ── utils ────────────────────────────────────────────────
@@ -84,7 +85,7 @@ function sendNotif(title, body) {
 
 // ── Sub-components ───────────────────────────────────────
 
-function HelperPickerModal({ current, onSelect, onClose, onRemove }) {
+function HelperPickerModal({ current, usedModes = [], onSelect, onClose, onRemove }) {
   const groups = getGroupsWithCustom();
   return (
     <div className={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -108,20 +109,28 @@ function HelperPickerModal({ current, onSelect, onClose, onRemove }) {
           {groups.map((g) => (
             <div key={g.label} className={styles.pickerGroup}>
               <div className={styles.pickerGroupLabel}>{g.label}</div>
-              {g.modes.map((m) => (
-                <div
-                  key={m.id}
-                  className={`${styles.pickerItem} ${current === m.id ? styles.pickerItemActive : ""}`}
-                  onClick={() => { onSelect(m.id); onClose(); }}
-                >
-                  <span className={styles.pickerEmoji}>{m.emoji}</span>
-                  <div className={styles.pickerInfo}>
-                    <div className={styles.pickerName}>{m.name}</div>
-                    <div className={styles.pickerTagline}>{m.tagline}</div>
+              {g.modes.map((m) => {
+                const isUsed = usedModes.includes(m.id);
+                return (
+                  <div
+                    key={m.id}
+                    className={`${styles.pickerItem} ${current === m.id ? styles.pickerItemActive : ""} ${isUsed ? styles.pickerItemUsed : ""}`}
+                    onClick={isUsed ? undefined : () => { onSelect(m.id); onClose(); }}
+                  >
+                    <span className={styles.pickerEmoji}>{m.emoji}</span>
+                    <div className={styles.pickerInfo}>
+                      <div className={styles.pickerName}>{m.name}</div>
+                      <div className={styles.pickerTagline}>
+                        {isUsed ? "✓ já testado hoje" : m.tagline}
+                      </div>
+                    </div>
+                    {isUsed
+                      ? <span className={styles.pickerLock}>🔒</span>
+                      : current === m.id && <span className={styles.pickerCheck}>✓</span>
+                    }
                   </div>
-                  {current === m.id && <span className={styles.pickerCheck}>✓</span>}
-                </div>
-              ))}
+                );
+              })}
             </div>
           ))}
         </div>
@@ -299,7 +308,7 @@ function DailyTimer({ totalSeconds, initialRemaining, running, onTick, onComplet
   );
 }
 
-function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes }) {
+function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes, usedModes = [] }) {
   const [query, setQuery] = useState(slot.title);
   const [results, setResults] = useState([]);
   const debounce = useRef(null);
@@ -387,6 +396,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
       {showHelperPicker && (
         <HelperPickerModal
           current={slot.helperModeId}
+          usedModes={usedModes}
           onSelect={(id) => onChange({ ...slot, helperModeId: id })}
           onRemove={() => onChange({ ...slot, helperModeId: null })}
           onClose={() => setShowHelperPicker(false)}
@@ -401,7 +411,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
 export default function DailyFocusPage() {
   const { saved, persist, clearSaved } = useSessionPersist("daily_focus");
 
-  const [level, setLevel]                   = useState(saved?.level ?? 1);
+  const [level, setLevel]                   = useState(saved?.level ?? getDayLevel());
   const [tasks, setTasks]                   = useState(saved?.tasks ?? makeTasks(1));
   const [currentIdx, setCurrentIdx]         = useState(saved?.currentIdx ?? 0);
   const [helperStates, setHelperStates]     = useState(saved?.helperStates ?? {}); // { modeId: state }
@@ -412,6 +422,9 @@ export default function DailyFocusPage() {
   const [rushMode, setRushMode]             = useState(saved?.rushMode ?? false);
   const [taskTimings, setTaskTimings]       = useState(saved?.taskTimings ?? []); // [{used, total}]
   const [taskStartRemaining, setTaskStartRemaining] = useState(null);
+
+  // Modos usados hoje (bloqueados no picker)
+  const [usedModes, setUsedModes] = useState(() => getUsedModes());
 
   // UI state (not persisted)
   const [showHelperPicker, setShowHelperPicker]   = useState(false);
@@ -610,6 +623,14 @@ export default function DailyFocusPage() {
     const newAch = tryUnlock(toUnlock);
     if (newAch.length) setNewAchievements(newAch);
 
+    // Salva nível do dia e modos usados
+    setDayLevel(level);
+    const modesUsedThisSession = completedTasks
+      .map((t) => t.helperModeId)
+      .filter(Boolean);
+    addUsedModes(modesUsedThisSession);
+    setUsedModes(getUsedModes());
+
     setPhase("celebrate");
   };
 
@@ -729,6 +750,7 @@ export default function DailyFocusPage() {
                   onMoveDown={() => moveTask(i, 1)}
                   canMoveUp={i > 0}
                   canMoveDown={i < tasks.length - 1}
+                  usedModes={usedModes}
                 />
               ))}
             </div>
@@ -890,6 +912,7 @@ export default function DailyFocusPage() {
       {showHelperPicker && (
         <HelperPickerModal
           current={activeHelperModeId}
+          usedModes={usedModes}
           onSelect={handleSelectHelper}
           onRemove={activeHelperModeId ? handleRemoveHelper : null}
           onClose={() => { setShowHelperPicker(false); setPickerForTask(null); }}
