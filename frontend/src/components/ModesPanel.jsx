@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import ModeSession from "./ModeSession";
 import styles from "./ModesPanel.module.css";
+import dfStyles from "./daily-focus/DailyFocus.module.css";
 import { modeStatsApi } from "../api/modeStats";
 import { getPinned, metaFor } from "../lib/splitePinned";
 import { logCompletion, usageStats } from "../lib/modeLog";
@@ -620,8 +621,25 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     );
   };
 
+  const openDailyFocus = () => {
+    window.open(window.location.href.split("#")[0] + "#/daily-focus", "_blank");
+  };
+
   return (
     <div className={styles.root}>
+      {/* Daily Focus card */}
+      <div className={dfStyles.dailyFocusCard} onClick={openDailyFocus} role="button" tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && openDailyFocus()}>
+        <span className={dfStyles.dailyFocusCardEmoji}>🎯</span>
+        <div className={dfStyles.dailyFocusCardInfo}>
+          <div className={dfStyles.dailyFocusCardName}>Daily Focus</div>
+          <div className={dfStyles.dailyFocusCardSub}>
+            Sessões progressivas por nível · Timer + Modo de Apoio · Persiste o estado
+          </div>
+        </div>
+        <span className={dfStyles.dailyFocusCardArrow}>↗</span>
+      </div>
+
       <div className={styles.panelHeader}>
         <p className={styles.subtitle}>
           Modos de atividade guiam sua sessão de trabalho com mecânicas específicas para cada estado de produtividade.
