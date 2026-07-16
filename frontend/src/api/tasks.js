@@ -91,6 +91,20 @@ export const tasksApi = {
 
   reopen: (id) => tasksApi.update(id, { completed: false, completed_at: null }),
 
+  /** Tarefas ativas com vencimento hoje — para sugestão rápida no Daily Focus. */
+  listDueToday: async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("id, title, priority, due_date")
+      .eq("completed", false)
+      .eq("due_date", today)
+      .order("priority")
+      .limit(10);
+    if (error) return [];
+    return data ?? [];
+  },
+
   // Quantas tarefas foram concluídas hoje (independente de já terem sido reabertas
   // ou reagendadas como recorrentes — conta pelo carimbo de conclusão).
   countCompletedToday: async () => {

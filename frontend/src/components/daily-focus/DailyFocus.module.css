@@ -868,6 +868,19 @@
 
 .pickerCheck { font-size: 16px; color: var(--accent); }
 
+.pickerRecommended {
+  margin-left: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--warning);
+  background: rgba(240,165,64,0.12);
+  border: 1px solid rgba(240,165,64,0.3);
+  padding: 1px 6px;
+  border-radius: 8px;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+}
+
 .pickerItemUsed {
   opacity: 0.45;
   cursor: not-allowed;
@@ -1464,3 +1477,111 @@
 }
 .activityResultItem:last-child { border-bottom: none; }
 .activityResultItem:hover { background: var(--surface); }
+
+/* ── Melhorias adicionais ──────────────────────────────── */
+
+/* Header: streak badge + meta row */
+.headerMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.streakBadge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--warning);
+  background: rgba(240,165,64,0.12);
+  border: 1px solid rgba(240,165,64,0.3);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+/* Estatísticas no histórico */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.statCard {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.statValue {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+.statLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Timer: anel de aviso (80-99% do tempo usado) */
+.ringProgressWarning {
+  stroke: var(--warning);
+  animation: ringPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes ringPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Select phase: título + botão reset nível */
+.selectTitleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.resetLevelBtn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 10px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.resetLevelBtn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Edição de duração no slot */
+.durationInput {
+  width: 58px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(124,110,245,0.12);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 1px 6px;
+  text-align: center;
+  outline: none;
+}
+
+/* Label das sugestões de hoje no slot */
+.slotResultsLabel {
+  padding: 5px 12px 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--border);
+}

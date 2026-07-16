@@ -45,3 +45,46 @@ export function updateMaxLevel(level) {
 export function getTotalSessions() {
   return getHistory().length;
 }
+
+function parsePtBR(str) {
+  const [d, m, y] = (str || "").split("/");
+  return new Date(Number(y), Number(m) - 1, Number(d));
+}
+
+/** Número de dias consecutivos com pelo menos uma sessão (contando hoje). */
+export function getStreak() {
+  const history = getHistory();
+  if (!history.length) return 0;
+
+  const todayPtBR = new Date().toLocaleDateString("pt-BR");
+  const uniqueDates = [...new Set(history.map((e) => e.date))];
+
+  if (!uniqueDates.includes(todayPtBR)) return 0;
+
+  const sorted = uniqueDates.sort((a, b) => parsePtBR(b) - parsePtBR(a));
+
+  let streak = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const curr = parsePtBR(sorted[i - 1]);
+    const prev = parsePtBR(sorted[i]);
+    const diffDays = Math.round((curr - prev) / 86400000);
+    if (diffDays === 1) streak++;
+    else break;
+  }
+  return streak;
+}
+
+/** Estatísticas gerais das sessões. */
+export function getStats() {
+  const history = getHistory();
+  if (!history.length) return null;
+
+  const totalSessions = history.length;
+  const totalTasks = history.reduce((s, e) => s + e.tasks.length, 0);
+  const avgLevel = Math.round((history.reduce((s, e) => s + e.level, 0) / totalSessions) * 10) / 10;
+  const streak = getStreak();
+  const maxLvl = getMaxLevel();
+  const rushCount = history.filter((e) => e.rushMode).length;
+
+  return { totalSessions, totalTasks, avgLevel, maxLevel: maxLvl, streak, rushCount };
+}

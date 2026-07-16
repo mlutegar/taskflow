@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { tasksApi } from "../../api/tasks";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 import { getHelper } from "./helpers/index";
-import { addSession, getHistory, getMaxLevel, updateMaxLevel } from "../../lib/dailyFocusHistory";
+import { addSession, getHistory, getMaxLevel, updateMaxLevel, getStreak, getStats } from "../../lib/dailyFocusHistory";
 import { tryUnlock, getAllWithStatus } from "../../lib/dailyFocusAchievements";
 import { getDayLevel, setDayLevel, getUsedModes, addUsedModes } from "../../lib/dailyFocusDay";
+import { usageStats } from "../../lib/modeLog";
 import styles from "./DailyFocus.module.css";
 
 // ── utils ────────────────────────────────────────────────
@@ -83,9 +84,33 @@ function sendNotif(title, body) {
   }
 }
 
+// ── Sons ─────────────────────────────────────────────────
+function playBeep(freq1 = 523, freq2 = 659, freq3 = 784) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq1, ctx.currentTime);
+    osc.frequency.setValueAtTime(freq2, ctx.currentTime + 0.12);
+    osc.frequency.setValueAtTime(freq3, ctx.currentTime + 0.24);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.55);
+  } catch {}
+}
+
+function playTimerDoneSound() {
+  // Beep descendente — "tempo esgotou"
+  playBeep(784, 659, 523);
+}
+
 // ── Sub-components ───────────────────────────────────────
 
-function HelperPickerModal({ current, usedModes = [], onSelect, onClose, onRemove }) {
+function HelperPickerModal({ current, usedModes = [], suggestedModeId = null, onSelect, onClose, onRemove }) {
   const groups = getGroupsWithCustom();
   return (
     <div className={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -111,6 +136,7 @@ function HelperPickerModal({ current, usedModes = [], onSelect, onClose, onRemov
               <div className={styles.pickerGroupLabel}>{g.label}</div>
               {g.modes.map((m) => {
                 const isUsed = usedModes.includes(m.id);
+                const isSuggested = !isUsed && m.id === suggestedModeId;
                 return (
                   <div
                     key={m.id}
@@ -119,7 +145,10 @@ function HelperPickerModal({ current, usedModes = [], onSelect, onClose, onRemov
                   >
                     <span className={styles.pickerEmoji}>{m.emoji}</span>
                     <div className={styles.pickerInfo}>
-                      <div className={styles.pickerName}>{m.name}</div>
+                      <div className={styles.pickerName}>
+                        {m.name}
+                        {isSuggested && <span className={styles.pickerRecommended}>✨ recomendado</span>}
+                      </div>
                       <div className={styles.pickerTagline}>
                         {isUsed ? "✓ já testado hoje" : m.tagline}
                       </div>
@@ -143,6 +172,7 @@ function HistoryPanel({ onClose }) {
   const history = getHistory();
   const maxLevel = getMaxLevel();
   const achievements = getAllWithStatus();
+  const stats = getStats();
 
   return (
     <div className={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -152,6 +182,39 @@ function HistoryPanel({ onClose }) {
           <button className={styles.modalClose} onClick={onClose}>×</button>
         </div>
         <div className={styles.modalBody}>
+          {/* Stats grid */}
+          {stats && (
+            <div className={styles.historySection}>
+              <div className={styles.historySectionLabel}>📊 Estatísticas</div>
+              <div className={styles.statsGrid}>
+                <div className={styles.statCard}>
+                  <div className={styles.statValue}>{stats.totalSessions}</div>
+                  <div className={styles.statLabel}>sessões</div>
+                </div>
+                <div className={styles.statCard}>
+                  <div className={styles.statValue}>{stats.totalTasks}</div>
+                  <div className={styles.statLabel}>tarefas feitas</div>
+                </div>
+                <div className={styles.statCard}>
+                  <div className={styles.statValue}>{stats.avgLevel}</div>
+                  <div className={styles.statLabel}>nível médio</div>
+                </div>
+                <div className={styles.statCard}>
+                  <div className={styles.statValue}>{stats.streak > 0 ? `🔥 ${stats.streak}` : "—"}</div>
+                  <div className={styles.statLabel}>dias seguidos</div>
+                </div>
+                <div className={styles.statCard}>
+                  <div className={styles.statValue}>{stats.maxLevel || "—"}</div>
+                  <div className={styles.statLabel}>nível máx.</div>
+                </div>
+                <div className={styles.statCard}>
+                  <div className={styles.statValue}>{stats.rushCount}</div>
+                  <div className={styles.statLabel}>sessões rush</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Max level */}
           <div className={styles.historySection}>
             <div className={styles.historySectionLabel}>🏆 Nível Máximo</div>
@@ -285,6 +348,7 @@ function DailyTimer({ totalSeconds, initialRemaining, running, onTick, onComplet
   const circ = 2 * Math.PI * r;
   const progress = Math.max(0, Math.min(1, (totalSeconds - remaining) / totalSeconds));
   const isLow = remaining <= 60 && remaining > 0;
+  const isWarning = progress >= 0.8 && !isLow;
 
   return (
     <div className={styles.ringWrap}>
@@ -292,7 +356,7 @@ function DailyTimer({ totalSeconds, initialRemaining, running, onTick, onComplet
         <circle cx="80" cy="80" r={r} className={styles.ringBg} />
         <circle
           cx="80" cy="80" r={r}
-          className={`${styles.ringProgress} ${isLow ? styles.ringProgressDanger : ""}`}
+          className={`${styles.ringProgress} ${isLow ? styles.ringProgressDanger : isWarning ? styles.ringProgressWarning : ""}`}
           strokeDasharray={circ}
           strokeDashoffset={circ * (1 - progress)}
         />
@@ -308,13 +372,22 @@ function DailyTimer({ totalSeconds, initialRemaining, running, onTick, onComplet
   );
 }
 
-function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes, usedModes = [] }) {
+function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes, usedModes = [], suggestedModeId = null }) {
   const [query, setQuery] = useState(slot.title);
   const [results, setResults] = useState([]);
+  const [todayTasks, setTodayTasks] = useState([]);
   const debounce = useRef(null);
   const [showHelperPicker, setShowHelperPicker] = useState(false);
+  const [editingDuration, setEditingDuration] = useState(false);
+  const [durationInput, setDurationInput] = useState(String(slot.durationMin));
 
   useEffect(() => { setQuery(slot.title); }, [slot.title]);
+  useEffect(() => { setDurationInput(String(slot.durationMin)); }, [slot.durationMin]);
+
+  // Carrega tarefas com vencimento hoje ao montar
+  useEffect(() => {
+    tasksApi.listDueToday().then(setTodayTasks).catch(() => {});
+  }, []);
 
   const search = (val) => {
     setQuery(val);
@@ -331,6 +404,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
   const select = (task) => {
     onChange({ ...slot, title: task.title, supabaseId: task.id });
     setResults([]);
+    setTodayTasks([]);
     setQuery(task.title);
   };
 
@@ -340,14 +414,39 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
     setResults([]);
   };
 
+  const saveDuration = () => {
+    const val = parseInt(durationInput, 10);
+    if (!isNaN(val) && val >= 1 && val <= 240) {
+      onChange({ ...slot, durationMin: val });
+    } else {
+      setDurationInput(String(slot.durationMin));
+    }
+    setEditingDuration(false);
+  };
+
   const helperMode = getModeById(slot.helperModeId);
+  const showTodaySuggestions = !query.trim() && todayTasks.length > 0;
 
   return (
     <div className={styles.taskSlot}>
       <div className={styles.slotHeader}>
         <span className={styles.slotLabel}>Tarefa {index + 1}</span>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          <span className={styles.slotTime}>{slot.durationMin} min</span>
+          {editingDuration ? (
+            <input
+              className={styles.durationInput}
+              type="number"
+              min={1}
+              max={240}
+              value={durationInput}
+              onChange={(e) => setDurationInput(e.target.value)}
+              onBlur={saveDuration}
+              onKeyDown={(e) => { if (e.key === "Enter") saveDuration(); if (e.key === "Escape") setEditingDuration(false); }}
+              autoFocus
+            />
+          ) : (
+            <span className={styles.slotTime} onClick={() => setEditingDuration(true)} title="Clique para editar duração">{slot.durationMin} min ✏️</span>
+          )}
           {level > 1 && (
             <>
               <button className={styles.slotMoveBtn} onClick={onMoveUp} disabled={!canMoveUp} title="Subir">↑</button>
@@ -362,6 +461,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
         placeholder="Digite qualquer nome ou pesquise nas suas tarefas…"
         value={query}
         onChange={(e) => search(e.target.value)}
+        onFocus={() => { if (!query.trim() && todayTasks.length) setResults([]); }}
         onBlur={() => {
           if (query.trim() && query !== slot.title) {
             onChange({ ...slot, title: query.trim(), supabaseId: null });
@@ -369,6 +469,18 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
           setTimeout(() => setResults([]), 200);
         }}
       />
+
+      {showTodaySuggestions && results.length === 0 && (
+        <div className={styles.slotResults}>
+          <div className={styles.slotResultsLabel}>📅 vence hoje</div>
+          {todayTasks.map((t) => (
+            <div key={t.id} className={styles.slotResultItem} onMouseDown={() => select(t)}>
+              <span className={styles.slotResultIcon}>⚡</span>
+              {t.title}
+            </div>
+          ))}
+        </div>
+      )}
 
       {results.length > 0 && (
         <div className={styles.slotResults}>
@@ -397,6 +509,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
         <HelperPickerModal
           current={slot.helperModeId}
           usedModes={usedModes}
+          suggestedModeId={suggestedModeId}
           onSelect={(id) => onChange({ ...slot, helperModeId: id })}
           onRemove={() => onChange({ ...slot, helperModeId: null })}
           onClose={() => setShowHelperPicker(false)}
@@ -425,6 +538,14 @@ export default function DailyFocusPage() {
 
   // Modos usados hoje (bloqueados no picker)
   const [usedModes, setUsedModes] = useState(() => getUsedModes());
+
+  // Streak e modo sugerido (calculados uma vez ao montar)
+  const streak = getStreak();
+  const suggestedModeId = useMemo(() => {
+    const stats = usageStats(30);
+    const available = stats.filter((s) => !usedModes.includes(s.modeId));
+    return available[0]?.modeId ?? null;
+  }, [usedModes]);
 
   // UI state (not persisted)
   const [showHelperPicker, setShowHelperPicker]   = useState(false);
@@ -456,6 +577,14 @@ export default function DailyFocusPage() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [phase, rushMode, timerDone]);
+
+  // Avisa ao fechar aba com sessão em andamento
+  useEffect(() => {
+    if (phase !== "work") return;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [phase]);
 
   // Long pause detection (after 5 min paused)
   useEffect(() => {
@@ -519,6 +648,7 @@ export default function DailyFocusPage() {
   const handleTimerDone = useCallback(() => {
     setTimerRunning(false);
     setTimerDone(true);
+    playTimerDoneSound();
     sendNotif("⏰ Timer encerrado!", `Tarefa: ${tasks[currentIdx]?.title || ""}`);
   }, [tasks, currentIdx]);
 
@@ -575,6 +705,8 @@ export default function DailyFocusPage() {
 
     const updated = tasks.map((t, i) => (i === currentIdx ? { ...t, done: true } : t));
     setTasks(updated);
+
+    playBeep(); // som de conclusão de tarefa
 
     const nextIdx = currentIdx + 1;
     if (nextIdx >= tasks.length) {
@@ -695,7 +827,10 @@ export default function DailyFocusPage() {
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerTitle}>🎯 Daily Focus</div>
-        <span className={styles.headerLevel}>Nível {level}</span>
+        <div className={styles.headerMeta}>
+          <span className={styles.headerLevel}>Nível {level}</span>
+          {streak >= 2 && <span className={styles.streakBadge}>🔥 {streak}</span>}
+        </div>
         <div className={styles.headerActions}>
           <button className={styles.iconBtn} onClick={() => setShowHistory(true)} title="Histórico">📋</button>
           {phase !== "select" && (
@@ -711,8 +846,15 @@ export default function DailyFocusPage() {
         {/* ── SELECT PHASE ── */}
         {phase === "select" && (
           <div>
-            <div className={styles.selectTitle}>
-              Nível {level} — {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""}
+            <div className={styles.selectTitleRow}>
+              <div className={styles.selectTitle}>
+                Nível {level} — {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""}
+              </div>
+              {level > 1 && (
+                <button className={styles.resetLevelBtn} onClick={() => { setLevel(1); setTasks(makeTasks(1)); }} title="Recomeçar do nível 1">
+                  ↩ nível 1
+                </button>
+              )}
             </div>
             <div className={styles.selectSub}>
               {tasks.length === 1
@@ -751,6 +893,7 @@ export default function DailyFocusPage() {
                   canMoveUp={i > 0}
                   canMoveDown={i < tasks.length - 1}
                   usedModes={usedModes}
+                  suggestedModeId={suggestedModeId}
                 />
               ))}
             </div>
@@ -913,6 +1056,7 @@ export default function DailyFocusPage() {
         <HelperPickerModal
           current={activeHelperModeId}
           usedModes={usedModes}
+          suggestedModeId={suggestedModeId}
           onSelect={handleSelectHelper}
           onRemove={activeHelperModeId ? handleRemoveHelper : null}
           onClose={() => { setShowHelperPicker(false); setPickerForTask(null); }}
