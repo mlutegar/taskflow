@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { tasksApi } from "./api/tasks";
+import { getStreak } from "./lib/dailyFocusHistory";
+import { getDayLevel } from "./lib/dailyFocusDay";
 import { useTasks } from "./hooks/useTasks";
 import { useRoutines } from "./hooks/useRoutines";
 import { useUndoDelete } from "./hooks/useUndoDelete";
@@ -194,6 +196,7 @@ export default function App() {
       <main className={styles.main}>
         {tab === "tasks" && (
           <>
+            <DailyWidget />
             <TodayPanel
               tasks={tasks}
               completedToday={completedToday}
@@ -357,6 +360,41 @@ export default function App() {
           onUndo={handleUndoDelete}
           onDismiss={handleDismiss}
         />
+      )}
+    </div>
+  );
+}
+
+function DailyWidget() {
+  const streak = getStreak();
+  const level  = getDayLevel();
+  if (streak < 1 && level <= 1) return null;
+  return (
+    <div style={{
+      display: "flex",
+      gap: 8,
+      padding: "8px 16px",
+      borderBottom: "1px solid var(--border)",
+      background: "var(--surface)",
+      flexWrap: "wrap",
+    }}>
+      {level > 1 && (
+        <span style={{
+          fontSize: 12, fontWeight: 600, color: "var(--accent)",
+          background: "rgba(124,110,245,0.1)", border: "1px solid rgba(124,110,245,0.25)",
+          borderRadius: 20, padding: "3px 10px",
+        }}>
+          ⚡ Nível {level} hoje
+        </span>
+      )}
+      {streak >= 1 && (
+        <span style={{
+          fontSize: 12, fontWeight: 600, color: "#f0a540",
+          background: "rgba(240,165,64,0.1)", border: "1px solid rgba(240,165,64,0.25)",
+          borderRadius: 20, padding: "3px 10px",
+        }}>
+          🔥 {streak} dia{streak !== 1 ? "s" : ""} seguido{streak !== 1 ? "s" : ""}
+        </span>
       )}
     </div>
   );

@@ -210,7 +210,7 @@ const MODES = [
     colorBg: "rgba(78,168,204,0.08)",
     category: "Ritual",
     session: "splite",
-    preset: { activity: "Beber água" },
+    preset: { activity: "Beber água", emoji: "💧", name: "Beber Água" },
     context: ["🖥️ Desktop", "💧 Saúde"],
     steps: [
       "Beba um copo de água antes de cada tarefa",
@@ -229,7 +229,7 @@ const MODES = [
     colorBg: "rgba(124,110,245,0.08)",
     category: "Ritual",
     session: "splite",
-    preset: { activity: "Meditar" },
+    preset: { activity: "Meditar", emoji: "🧘", name: "Meditar" },
     context: ["🖥️ Desktop", "🧘 Mindfulness"],
     steps: [
       "Escolha a duração: 5, 10, 15 ou 20 minutos",
@@ -248,7 +248,7 @@ const MODES = [
     colorBg: "rgba(200,135,74,0.08)",
     category: "Ritual",
     session: "splite",
-    preset: { activity: "Ler diário" },
+    preset: { activity: "Ler diário", emoji: "📖", name: "Ler Diário" },
     context: ["🖥️ Desktop", "📖 Reflexão"],
     steps: [
       "Clique em 'Sortear data' para obter uma data aleatória",
@@ -267,7 +267,7 @@ const MODES = [
     colorBg: "rgba(78,204,163,0.08)",
     category: "Ritual",
     session: "splite",
-    preset: { activity: "Esticar 5 minutos" },
+    preset: { activity: "Esticar 5 minutos", emoji: "🤸", name: "Esticar" },
     context: ["🖥️ Desktop", "🤸 Movimento"],
     steps: [
       "Levante da cadeira e estique por 5 minutos",
@@ -286,7 +286,7 @@ const MODES = [
     colorBg: "rgba(240,165,64,0.08)",
     category: "Ritual",
     session: "splite",
-    preset: { activity: "Ler um capítulo de livro" },
+    preset: { activity: "Ler um capítulo de livro", emoji: "📚", name: "Ler Livro" },
     context: ["🖥️ Desktop", "📚 Leitura"],
     steps: [
       "Registre o livro que está lendo",
@@ -305,7 +305,7 @@ const MODES = [
     colorBg: "rgba(224,82,82,0.08)",
     category: "Ritual",
     session: "splite",
-    preset: { activity: "Fazer exercícios rápidos" },
+    preset: { activity: "Fazer exercícios rápidos", emoji: "🏃", name: "Exercício Rápido" },
     context: ["🖥️ Desktop", "🏃 Movimento"],
     steps: [
       "Faça um round de exercícios rápidos (burpees, agachamentos, etc.)",
@@ -314,6 +314,26 @@ const MODES = [
       "Repita o ciclo",
     ],
     tips: "Exercício aumenta dopamina e oxigenação cerebral. Rounds curtos entre tarefas mantêm energia sem cansar demais.",
+  },
+
+  // ── Pomodoro Puro ───────────────────────────────────────
+  {
+    id: "pomodoro",
+    emoji: "🍅",
+    name: "Pomodoro",
+    tagline: "Timer personalizado — você define a duração",
+    color: "#e05252",
+    colorBg: "rgba(224,82,82,0.08)",
+    category: "Foco",
+    session: "pomodoro",
+    context: ["🖥️ Desktop", "⏱️ Timer"],
+    steps: [
+      "Escolha a duração: 15, 25, 30, 45 ou 60 minutos",
+      "Selecione uma tarefa para trabalhar",
+      "Foque até o timer acabar",
+      "Faça uma pausa e repita",
+    ],
+    tips: "Diferente do Momentum (5 min fixos) e Espresso (25 min), o Pomodoro deixa você definir o tempo ideal para cada sessão.",
   },
 ];
 

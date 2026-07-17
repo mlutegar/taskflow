@@ -1,6 +1,7 @@
 import { useState } from "react";
 import styles from "../DailyFocus.module.css";
 import CountdownTimer from "../../CountdownTimer";
+import { playTimerDone } from "../../../lib/sounds";
 
 const TIMER_SECONDS = 5 * 60; // 5 minutos
 
@@ -14,6 +15,7 @@ export default function EsticarHelper({ state, onChange }) {
   const handleTimerComplete = () => {
     setTimerRunning(false);
     onChange({ ...s, pauses: s.pauses + 1 });
+    playTimerDone();
   };
 
   const startTimer = () => {

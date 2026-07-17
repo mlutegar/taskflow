@@ -13,6 +13,7 @@ import CafeRitualSession from "./sessions/CafeRitualSession";
 import TabHopSession from "./sessions/TabHopSession";
 import CustomModeSession from "./sessions/CustomModeSession";
 import SingSession from "./sessions/SingSession";
+import PomodoroSession from "./sessions/PomodoroSession";
 
 const SESSION_MAP = {
   music: MusicSession,
@@ -25,6 +26,7 @@ const SESSION_MAP = {
   caferitual: CafeRitualSession,
   tabhop: TabHopSession,
   sing: SingSession,
+  pomodoro: PomodoroSession,
   // Modos de atividade independentes — reutilizam SpliteSession com preset
   agua: SpliteSession,
   meditar: SpliteSession,

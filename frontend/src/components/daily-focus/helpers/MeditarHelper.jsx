@@ -1,6 +1,7 @@
 import { useState } from "react";
 import styles from "../DailyFocus.module.css";
 import CountdownTimer from "../../CountdownTimer";
+import { playTimerDone } from "../../../lib/sounds";
 
 const DURATIONS = [5, 10, 15, 20];
 
@@ -16,6 +17,7 @@ export default function MeditarHelper({ state, onChange }) {
   const handleTimerComplete = () => {
     setTimerRunning(false);
     onChange({ ...s, sessions: s.sessions + 1 });
+    playTimerDone();
   };
 
   const startTimer = () => {

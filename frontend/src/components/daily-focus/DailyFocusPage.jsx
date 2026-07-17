@@ -53,12 +53,13 @@ const ALL_MODES = [
   { id: "esticar",    emoji: "🤸", name: "Esticar",              tagline: "Timer de 5 min de alongamento" },
   { id: "livro",      emoji: "📚", name: "Ler Livro",            tagline: "Contador de capítulos lidos" },
   { id: "exercicio",  emoji: "🏃", name: "Exercício Rápido",     tagline: "Contador de rounds de exercício" },
+  { id: "pomodoro",   emoji: "🍅", name: "Pomodoro",             tagline: "Timer personalizado — você define a duração" },
 ];
 
 const HELPER_GROUPS = [
   { label: "Música",       ids: ["music", "sing_one", "sing_ten"] },
   { label: "Ciclos",       ids: ["tiktok", "splite", "lazyfal"] },
-  { label: "Foco",         ids: ["momentum", "espresso", "rpg"] },
+  { label: "Foco",         ids: ["momentum", "espresso", "rpg", "pomodoro"] },
   { label: "Ritual/Mobile",ids: ["caferitual", "tabhop"] },
   { label: "Ritual",       ids: ["agua", "meditar", "ler_diario", "esticar", "livro", "exercicio"] },
 ];
@@ -71,11 +72,16 @@ function getModeById(id) {
   );
 }
 
-function getGroupsWithCustom() {
+function getGroupsWithCustom(usageMap = {}) {
   const customModes = JSON.parse(localStorage.getItem("customModes") || "[]");
+  const sortByUsage = (modes) =>
+    [...modes].sort((a, b) => (usageMap[b.id] || 0) - (usageMap[a.id] || 0));
   return [
-    ...HELPER_GROUPS.map((g) => ({ label: g.label, modes: g.ids.map((id) => ALL_MODES.find((m) => m.id === id)).filter(Boolean) })),
-    ...(customModes.length > 0 ? [{ label: "Personalizados", modes: customModes }] : []),
+    ...HELPER_GROUPS.map((g) => ({
+      label: g.label,
+      modes: sortByUsage(g.ids.map((id) => ALL_MODES.find((m) => m.id === id)).filter(Boolean)),
+    })),
+    ...(customModes.length > 0 ? [{ label: "Personalizados", modes: sortByUsage(customModes) }] : []),
   ];
 }
 
@@ -119,7 +125,8 @@ function playTimerDoneSound() {
 // ── Sub-components ───────────────────────────────────────
 
 function HelperPickerModal({ current, usedModes = [], suggestedModeId = null, onSelect, onClose, onRemove }) {
-  const groups = getGroupsWithCustom();
+  const usageMap = Object.fromEntries(usageStats(30).map(({ modeId, count }) => [modeId, count]));
+  const groups = getGroupsWithCustom(usageMap);
   return (
     <div className={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className={styles.modal}>
@@ -572,6 +579,18 @@ export default function DailyFocusPage() {
   useEffect(() => {
     persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings });
   }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings]);
+
+  // Atualiza document.title conforme a fase
+  useEffect(() => {
+    if (phase === "work") {
+      document.title = `⚡ Nível ${level} — TaskFlow`;
+    } else if (phase === "celebrate") {
+      document.title = `🎉 Nível ${level} completo! — TaskFlow`;
+    } else {
+      document.title = "TaskFlow";
+    }
+    return () => { document.title = "TaskFlow"; };
+  }, [phase, level]);
 
   // Space bar → pause/resume
   useEffect(() => {

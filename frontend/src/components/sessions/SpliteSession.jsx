@@ -117,8 +117,8 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
   return (
     <div className={styles.root}>
       <SessionHeader
-        emoji="🔪"
-        title="Splite Mode"
+        emoji={preset?.emoji ?? "🔪"}
+        title={preset?.name ?? "Splite Mode"}
         sub={`${activity ? `${activity} • ` : ""}${isDiaryMode ? `${completed} tarefa(s) concluída(s)` : `Ciclo ${cycle} • ${completed} concluída(s)`}`}
         onClose={handleClose}
       />
