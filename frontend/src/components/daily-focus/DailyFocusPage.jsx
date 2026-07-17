@@ -46,6 +46,13 @@ const ALL_MODES = [
   { id: "rpg",        emoji: "🎮", name: "RPG Class Mode",       tagline: "Produtividade gamificada com classes" },
   { id: "caferitual", emoji: "🫖", name: "Café Ritual",          tagline: "Shot de café + a música certa = estado de pico" },
   { id: "tabhop",     emoji: "📲", name: "Tab Hop",              tagline: "Rotação entre apps abertos" },
+  // Modos de atividade independentes
+  { id: "agua",       emoji: "💧", name: "Beber Água",           tagline: "Contador de copos com meta diária" },
+  { id: "meditar",    emoji: "🧘", name: "Meditar",              tagline: "Timer de meditação entre tarefas" },
+  { id: "ler_diario", emoji: "📖", name: "Ler Diário",           tagline: "Sorteia data e conta entradas lidas" },
+  { id: "esticar",    emoji: "🤸", name: "Esticar",              tagline: "Timer de 5 min de alongamento" },
+  { id: "livro",      emoji: "📚", name: "Ler Livro",            tagline: "Contador de capítulos lidos" },
+  { id: "exercicio",  emoji: "🏃", name: "Exercício Rápido",     tagline: "Contador de rounds de exercício" },
 ];
 
 const HELPER_GROUPS = [
@@ -53,6 +60,7 @@ const HELPER_GROUPS = [
   { label: "Ciclos",       ids: ["tiktok", "splite", "lazyfal"] },
   { label: "Foco",         ids: ["momentum", "espresso", "rpg"] },
   { label: "Ritual/Mobile",ids: ["caferitual", "tabhop"] },
+  { label: "Ritual",       ids: ["agua", "meditar", "ler_diario", "esticar", "livro", "exercicio"] },
 ];
 
 function getModeById(id) {
