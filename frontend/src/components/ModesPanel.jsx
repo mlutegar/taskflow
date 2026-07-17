@@ -5,6 +5,7 @@ import dfStyles from "./daily-focus/DailyFocus.module.css";
 import { modeStatsApi } from "../api/modeStats";
 import { getPinned, metaFor } from "../lib/splitePinned";
 import { logCompletion, usageStats } from "../lib/modeLog";
+import { getAllActivations } from "../lib/modeActivations";
 import { useDialog } from "../lib/useDialog";
 
 const MODES = [
@@ -198,6 +199,122 @@ const MODES = [
     ],
     tips: "A curadoria da fila mantém a sessão leve e divertida enquanto o trabalho acontece em segundo plano.",
   },
+
+  // ── Modos de atividade independentes ──────────────────────────────────
+  {
+    id: "agua",
+    emoji: "💧",
+    name: "Beber Água",
+    tagline: "Registre os copos de água ao longo do dia",
+    color: "#4ea8cc",
+    colorBg: "rgba(78,168,204,0.08)",
+    category: "Ritual",
+    session: "splite",
+    preset: { activity: "Beber água" },
+    context: ["🖥️ Desktop", "💧 Saúde"],
+    steps: [
+      "Beba um copo de água antes de cada tarefa",
+      "Marque o copo no contador",
+      "Meta: 8 copos por dia",
+      "A barra de progresso reseta automaticamente à meia-noite",
+    ],
+    tips: "Hidratação melhora concentração. Vincular a água às tarefas cria um ritual simples de autocuidado.",
+  },
+  {
+    id: "meditar",
+    emoji: "🧘",
+    name: "Meditar",
+    tagline: "Sessões de meditação entre as tarefas",
+    color: "#7c6ef5",
+    colorBg: "rgba(124,110,245,0.08)",
+    category: "Ritual",
+    session: "splite",
+    preset: { activity: "Meditar" },
+    context: ["🖥️ Desktop", "🧘 Mindfulness"],
+    steps: [
+      "Escolha a duração: 5, 10, 15 ou 20 minutos",
+      "Feche os olhos e medite antes da tarefa",
+      "Marque a sessão no contador",
+      "Repita para cada tarefa do ciclo",
+    ],
+    tips: "Meditações curtas entre tarefas reduzem a fadiga de decisão e aumentam a clareza mental.",
+  },
+  {
+    id: "ler_diario",
+    emoji: "📖",
+    name: "Ler Diário",
+    tagline: "Releia entradas aleatórias do seu diário",
+    color: "#c8874a",
+    colorBg: "rgba(200,135,74,0.08)",
+    category: "Ritual",
+    session: "splite",
+    preset: { activity: "Ler diário" },
+    context: ["🖥️ Desktop", "📖 Reflexão"],
+    steps: [
+      "Clique em 'Sortear data' para obter uma data aleatória",
+      "Abra seu diário e leia a entrada daquela data",
+      "Clique em '✅ Li!' — uma nova data é sorteada",
+      "Faça uma tarefa e repita o ciclo",
+    ],
+    tips: "Reler o diário cria perspectiva sobre seu crescimento. Datas aleatórias trazem surpresas que o modo linear não traz.",
+  },
+  {
+    id: "esticar",
+    emoji: "🤸",
+    name: "Esticar",
+    tagline: "Pausas de alongamento entre as tarefas",
+    color: "#4ecca3",
+    colorBg: "rgba(78,204,163,0.08)",
+    category: "Ritual",
+    session: "splite",
+    preset: { activity: "Esticar 5 minutos" },
+    context: ["🖥️ Desktop", "🤸 Movimento"],
+    steps: [
+      "Levante da cadeira e estique por 5 minutos",
+      "Foque em pescoço, ombros e costas",
+      "Marque a pausa no contador",
+      "Volte para a tarefa renovado",
+    ],
+    tips: "Cada pausa de alongamento reduz tensão acumulada. Sessões longas sem movimento são o maior inimigo do foco.",
+  },
+  {
+    id: "livro",
+    emoji: "📚",
+    name: "Ler Livro",
+    tagline: "Leia capítulos entre as tarefas",
+    color: "#f0a540",
+    colorBg: "rgba(240,165,64,0.08)",
+    category: "Ritual",
+    session: "splite",
+    preset: { activity: "Ler um capítulo de livro" },
+    context: ["🖥️ Desktop", "📚 Leitura"],
+    steps: [
+      "Registre o livro que está lendo",
+      "Leia um capítulo antes de cada tarefa",
+      "Marque o capítulo no contador",
+      "Ao fim da sessão, veja seu progresso total",
+    ],
+    tips: "Livros entre tarefas criam uma transição suave. O contador de capítulos vira motivação extra para continuar lendo.",
+  },
+  {
+    id: "exercicio",
+    emoji: "🏃",
+    name: "Exercício Rápido",
+    tagline: "Rounds de exercício entre as tarefas",
+    color: "#e05252",
+    colorBg: "rgba(224,82,82,0.08)",
+    category: "Ritual",
+    session: "splite",
+    preset: { activity: "Fazer exercícios rápidos" },
+    context: ["🖥️ Desktop", "🏃 Movimento"],
+    steps: [
+      "Faça um round de exercícios rápidos (burpees, agachamentos, etc.)",
+      "Marque o round no contador",
+      "Selecione uma tarefa e conclua",
+      "Repita o ciclo",
+    ],
+    tips: "Exercício aumenta dopamina e oxigenação cerebral. Rounds curtos entre tarefas mantêm energia sem cansar demais.",
+  },
 ];
 
 // ── Cards do Splite separados por atividade (reutilizam a SpliteSession com preset) ──
@@ -235,6 +352,8 @@ const CATEGORY_BY_ID = {
   tiktok: "Ciclos", splite: "Ciclos", lazyfal: "Ciclos",
   momentum: "Foco", espresso: "Foco", rpg: "Foco",
   caferitual: "Ritual", tabhop: "Mobile",
+  agua: "Ritual", meditar: "Ritual", ler_diario: "Ritual",
+  esticar: "Ritual", livro: "Ritual", exercicio: "Ritual",
 };
 
 const CATEGORY_ORDER = ["Música", "Ciclos", "Foco", "Ritual", "Mobile", "Personalizados"];
@@ -429,6 +548,10 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const [category, setCategory] = useState(""); // "" = todas
   const [pinnedSplite, setPinnedSplite] = useState(() => getPinned());
   const [weekly, setWeekly] = useState(() => usageStats(7));
+  const [activations, setActivations] = useState(() => {
+    const all = getAllActivations();
+    return Object.fromEntries(all.map(({ modeId, count }) => [modeId, count]));
+  });
 
   const [customModes, setCustomModes] = useState(() => {
     try { return JSON.parse(localStorage.getItem("customModes") || "[]"); }
@@ -520,6 +643,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const renderCard = (mode) => {
     const open = expanded === mode.id;
     const taskCount = modeStats[mode.id] || 0;
+    const activationCount = activations[mode.id] || 0;
     return (
       <div
         key={mode.id}
@@ -535,6 +659,11 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
                 {mode.isCustom && <span className={styles.customBadge}>Personalizado</span>}
                 {taskCount > 0 && (
                   <span className={styles.statBadge}>✓ {taskCount}</span>
+                )}
+                {activationCount > 0 && (
+                  <span className={styles.statBadge} style={{ opacity: 0.75 }} title="Ativações">
+                    ▶ {activationCount}
+                  </span>
                 )}
               </div>
               <span className={styles.cardTagline}>{mode.tagline}</span>
@@ -741,7 +870,13 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
           onAddRoutineChecklist={onAddRoutineChecklist}
           onToggleRoutineChecklist={onToggleRoutineChecklist}
           onTaskComplete={handleModeTaskComplete}
-          onClose={() => { setActiveSession(null); setPinnedSplite(getPinned()); }}
+          onClose={() => {
+            setActiveSession(null);
+            setPinnedSplite(getPinned());
+            // Recarrega contagem de ativações ao fechar sessão
+            const all = getAllActivations();
+            setActivations(Object.fromEntries(all.map(({ modeId, count }) => [modeId, count])));
+          }}
         />
       )}
     </div>

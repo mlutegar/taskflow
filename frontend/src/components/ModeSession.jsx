@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import styles from "./ModeSession.module.css";
 import { useDialog } from "../lib/useDialog";
+import { logActivation } from "../lib/modeActivations";
 import MusicSession from "./sessions/MusicSession";
 import TikTokSession from "./sessions/TikTokSession";
 import SpliteSession from "./sessions/SpliteSession";
@@ -24,17 +25,33 @@ const SESSION_MAP = {
   caferitual: CafeRitualSession,
   tabhop: TabHopSession,
   sing: SingSession,
+  // Modos de atividade independentes — reutilizam SpliteSession com preset
+  agua: SpliteSession,
+  meditar: SpliteSession,
+  ler_diario: SpliteSession,
+  esticar: SpliteSession,
+  livro: SpliteSession,
+  exercicio: SpliteSession,
 };
 
 export default function ModeSession({ modeId, mode, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }) {
   const [quickAdd, setQuickAdd] = useState(false);
+  const [confirmingClose, setConfirmingClose] = useState(false);
+
+  // Intercepta o fechamento para mostrar confirmação
+  const handleClose = () => setConfirmingClose(true);
+
+  // Registra ativação do modo ao abrir a sessão
+  useEffect(() => {
+    if (modeId) logActivation(modeId);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [qaMode, setQaMode] = useState("task"); // "task" | "subtask"
   const [qaTitle, setQaTitle] = useState("");
   const [qaParent, setQaParent] = useState("");
   const [qaSaving, setQaSaving] = useState(false);
   const [qaSuccess, setQaSuccess] = useState(null); // "task" | "subtask" | null
 
-  const dialogRef = useDialog(onClose);
+  const dialogRef = useDialog(handleClose);
 
   // Mescla tarefas + rotinas pendentes num array unificado
   const items = [
@@ -115,8 +132,41 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
   if (!Session && !isCustom) return null;
 
   return (
-    <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div className={styles.modal} ref={dialogRef} role="dialog" aria-modal="true" aria-label={mode?.name ? `Sessão: ${mode.name}` : "Sessão de modo"} tabIndex={-1}>
+        {/* ── Confirmação de encerramento ─── */}
+        {confirmingClose && (
+          <div style={{
+            position: "sticky", top: 0, zIndex: 10,
+            background: "var(--surface)",
+            borderBottom: "1px solid var(--border)",
+            padding: "14px 18px",
+            display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+          }}>
+            <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+              ⚠️ Encerrar a sessão? O progresso será perdido.
+            </span>
+            <button
+              onClick={onClose}
+              style={{
+                padding: "7px 14px", borderRadius: "var(--radius-sm)", border: "none",
+                background: "#e05252", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
+              }}
+            >
+              Encerrar
+            </button>
+            <button
+              onClick={() => setConfirmingClose(false)}
+              style={{
+                padding: "7px 14px", borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)", background: "var(--surface-2)",
+                color: "var(--text-muted)", fontWeight: 600, fontSize: 13, cursor: "pointer",
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
         {isCustom ? (
           <CustomModeSession
             mode={mode}
@@ -124,10 +174,10 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
             onCompleteTask={wrappedCompleteTask}
             onToggleChecklist={wrappedToggleChecklist}
             onAddChecklist={wrappedAddChecklist}
-            onClose={onClose}
+            onClose={handleClose}
           />
         ) : (
-          <Session preset={preset} tasks={items} onCompleteTask={wrappedCompleteTask} onToggleChecklist={wrappedToggleChecklist} onAddChecklist={wrappedAddChecklist} onClose={onClose} />
+          <Session preset={preset} tasks={items} onCompleteTask={wrappedCompleteTask} onToggleChecklist={wrappedToggleChecklist} onAddChecklist={wrappedAddChecklist} onClose={handleClose} />
         )}
 
         {/* ── Quick-Add bar ─────────────────────────────────── */}

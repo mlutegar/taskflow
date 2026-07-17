@@ -1,4 +1,6 @@
+import { useEffect, useRef } from "react";
 import styles from "../DailyFocus.module.css";
+import { logActivation } from "../../../lib/modeActivations";
 
 const VARIANTS = [
   { id: "hundred", label: "100 Músicas" },
@@ -10,6 +12,15 @@ export const DEFAULT_STATE = { variant: "hundred", count: 0, currentSong: "", al
 
 export default function MusicHelper({ state, onChange }) {
   const s = { ...DEFAULT_STATE, ...state };
+  const prevCount = useRef(s.count);
+
+  // Registra ativação quando o contador chega em 100
+  useEffect(() => {
+    if (s.variant === "hundred" && s.count === 100 && prevCount.current !== 100) {
+      logActivation("music");
+    }
+    prevCount.current = s.count;
+  }, [s.count, s.variant]);
 
   const setField = (field, val) => onChange({ ...s, [field]: val });
 
@@ -43,14 +54,28 @@ export default function MusicHelper({ state, onChange }) {
 
       {s.variant === "hundred" && (
         <>
+          {s.count === 100 && (
+            <div style={{
+              background: "linear-gradient(135deg, rgba(124,110,245,0.15), rgba(78,204,163,0.15))",
+              border: "1px solid var(--accent)",
+              borderRadius: "var(--radius-sm)",
+              padding: "12px 14px",
+              textAlign: "center",
+              animation: "fadeIn 0.4s ease",
+            }}>
+              <div style={{ fontSize: 28, marginBottom: 4 }}>🎉</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "var(--accent)" }}>100 músicas!</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>Sessão épica. Ativação registrada.</div>
+            </div>
+          )}
           <div>
             <div className={styles.counterLabel}>Música nº</div>
             <div className={styles.counter}>
               <button className={styles.counterBtn} onClick={() => setField("count", Math.max(0, s.count - 1))}>−</button>
               <div>
-                <div className={styles.counterNum}>{s.count}</div>
+                <div className={styles.counterNum} style={s.count === 100 ? { color: "var(--accent)" } : {}}>{s.count}</div>
               </div>
-              <button className={styles.counterBtn} onClick={() => setField("count", s.count + 1)}>+</button>
+              <button className={styles.counterBtn} onClick={() => setField("count", Math.min(100, s.count + 1))}>+</button>
             </div>
           </div>
           <div>

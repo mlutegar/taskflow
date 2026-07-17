@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import SubtaskFlow from "./SubtaskFlow";
 import SubtaskInline from "./SubtaskInline";
 import styles from "./session.module.css";
@@ -32,6 +33,19 @@ export default function WorkingTask({
 }) {
   const hasChecklist = task.checklist?.length > 0;
 
+  // Atalho de teclado: Enter conclui a tarefa (quando não há checklist e não há input focado)
+  useEffect(() => {
+    if (hasChecklist || !onComplete) return;
+    const handler = (e) => {
+      if (e.key === "Enter" && !["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(e.target.tagName)) {
+        e.preventDefault();
+        onComplete();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [hasChecklist, onComplete]);
+
   return (
     <>
       {badge}
@@ -49,7 +63,7 @@ export default function WorkingTask({
       </div>
       <div className={styles.actions}>
         {!hasChecklist && onComplete && (
-          <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={onComplete}>
+          <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={onComplete} title="Enter">
             {completeLabel}
           </button>
         )}

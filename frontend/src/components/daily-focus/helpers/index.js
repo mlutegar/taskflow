@@ -9,6 +9,12 @@ import RPGHelper, { DEFAULT_STATE as rpgDefault } from "./RPGHelper";
 import CafeRitualHelper, { DEFAULT_STATE as cafeDefault } from "./CafeRitualHelper";
 import TabHopHelper, { DEFAULT_STATE as tabhopDefault } from "./TabHopHelper";
 import CustomModeHelper, { DEFAULT_STATE as customDefault } from "./CustomModeHelper";
+import AguaHelper, { DEFAULT_STATE as aguaDefault } from "./AguaHelper";
+import MeditarHelper, { DEFAULT_STATE as meditarDefault } from "./MeditarHelper";
+import LerDiarioHelper, { DEFAULT_STATE as lerDiarioDefault } from "./LerDiarioHelper";
+import EsticarHelper, { DEFAULT_STATE as esticarDefault } from "./EsticarHelper";
+import LivroHelper, { DEFAULT_STATE as livroDefault } from "./LivroHelper";
+import ExercicioHelper, { DEFAULT_STATE as exercicioDefault } from "./ExercicioHelper";
 
 /**
  * Registry of all available helper panels for Daily Focus.
@@ -26,6 +32,13 @@ export const HELPER_REGISTRY = {
   rpg: { Component: RPGHelper, defaultState: rpgDefault },
   caferitual: { Component: CafeRitualHelper, defaultState: cafeDefault },
   tabhop: { Component: TabHopHelper, defaultState: tabhopDefault },
+  // Modos independentes de atividade
+  agua: { Component: AguaHelper, defaultState: aguaDefault },
+  meditar: { Component: MeditarHelper, defaultState: meditarDefault },
+  ler_diario: { Component: LerDiarioHelper, defaultState: lerDiarioDefault },
+  esticar: { Component: EsticarHelper, defaultState: esticarDefault },
+  livro: { Component: LivroHelper, defaultState: livroDefault },
+  exercicio: { Component: ExercicioHelper, defaultState: exercicioDefault },
 };
 
 /**
