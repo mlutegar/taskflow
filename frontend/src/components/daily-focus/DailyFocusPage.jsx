@@ -363,7 +363,8 @@ export default function DailyFocusPage() {
     setTimerDone(false);
     setTaskTimings([]);
     setRushMode(false);
-    setPhase("select");
+    setCheckinModeId(null);
+    setPhase("checkin");
     setLadderAnimating(true);
     setTimeout(() => setLadderAnimating(false), 500);
   };
