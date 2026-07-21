@@ -5,7 +5,29 @@ const MAX_ENTRIES = 200;
 
 export function logCheckinUsage(estadoId, modeId) {
   if (!estadoId || !modeId) return;
-  storageAppend(LS_KEY, { estadoId, modeId, date: new Date().toISOString().slice(0, 10) }, MAX_ENTRIES);
+  storageAppend(LS_KEY, {
+    estadoId,
+    modeId,
+    date: new Date().toISOString().slice(0, 10),
+    hour: new Date().getHours(),
+  }, MAX_ENTRIES);
+}
+
+const FEEDBACK_KEY = "checkinFeedback";
+const MAX_FEEDBACK = 200;
+
+export function logSessionFeedback(estadoId, modeId, rating) {
+  if (!estadoId && !modeId) return;
+  storageAppend(FEEDBACK_KEY, {
+    estadoId,
+    modeId,
+    rating, // 1 = positivo, -1 = negativo
+    date: new Date().toISOString().slice(0, 10),
+  }, MAX_FEEDBACK);
+}
+
+export function getSessionFeedback() {
+  return storageGet(FEEDBACK_KEY, []);
 }
 
 export function getCheckinLog() {

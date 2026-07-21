@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { getEstados } from "./stateToMode";
-import { getTopModesForEstado, getCheckinStreak } from "../../lib/checkinLog";
+import { getTopModesForEstado, getCheckinStreak, getCheckinLog } from "../../lib/checkinLog";
 import CheckInConfigPanel from "./CheckInConfigPanel";
 import styles from "./CheckInScreen.module.css";
 
@@ -11,6 +11,24 @@ import styles from "./CheckInScreen.module.css";
  *   onSelect  — (modeId, estadoId) → void  — usuário confirmou um modo
  *   onSkip    — () → void                  — usuário pulou o check-in
  */
+
+function getBestHourHint() {
+  try {
+    const log = getCheckinLog();
+    if (log.length < 5) return null;
+    const hourCounts = {};
+    for (const e of log) {
+      if (!e.date) continue;
+      const h = e.hour;
+      if (h == null) continue;
+      hourCounts[h] = (hourCounts[h] || 0) + 1;
+    }
+    const entries = Object.entries(hourCounts).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) return null;
+    const bestHour = parseInt(entries[0][0]);
+    return bestHour;
+  } catch { return null; }
+}
 
 function getSuggestedEstadoByTime() {
   const hour = new Date().getHours();
@@ -34,6 +52,9 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
   const [showAlt, setShowAlt]       = useState(false);
   const [leaving, setLeaving]       = useState(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return !localStorage.getItem("taskflow.checkin.onboarded"); } catch { return false; }
+  });
 
   // Captura se o componente montou com um estado pré-selecionado (último estado salvo)
   const wasPreSelected = useRef(!!selectedEstado);
@@ -80,8 +101,30 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
 
   const checkinStreak = getCheckinStreak();
 
+  const bestHour = getBestHourHint();
+  const currentHour = new Date().getHours();
+  const isNearBestHour = bestHour != null && Math.abs(currentHour - bestHour) <= 1;
+
   return (
-    <div className={`${styles.wrap} ${leaving ? styles.wrapLeaving : ""}`}>
+    <div className={`${styles.wrap} ${leaving ? styles.wrapLeaving : ""}`} data-estado={selectedEstado?.id ?? ""}>
+
+      {/* Onboarding banner — primeira visita */}
+      {showOnboarding && (
+        <div className={styles.onboardingBanner}>
+          <span className={styles.onboardingIcon}>💡</span>
+          <div className={styles.onboardingText}>
+            <strong>Como você está agora?</strong>
+            <span>Isso nos ajuda a sugerir o melhor modo de foco para você. Leva 2 segundos!</span>
+          </div>
+          <button
+            className={styles.onboardingClose}
+            onClick={() => {
+              setShowOnboarding(false);
+              try { localStorage.setItem("taskflow.checkin.onboarded", "1"); } catch {}
+            }}
+          >✕</button>
+        </div>
+      )}
 
       {/* Título + botão de configuração */}
       <div>
@@ -111,6 +154,11 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
           <button className={styles.timeTipBtn} onClick={() => handleEstadoClick(timeSuggested)}>
             {timeSuggested.emoji} {timeSuggested.label}
           </button>
+        </div>
+      )}
+      {isNearBestHour && (
+        <div className={styles.hourHint}>
+          ⏰ Você costuma ser mais produtivo por volta das {bestHour}h — hora certa!
         </div>
       )}
 

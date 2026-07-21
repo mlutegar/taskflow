@@ -149,3 +149,16 @@
   transition: opacity 0.15s;
 }
 .saveBtn:hover { opacity: 0.88; }
+
+.addBtn {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm, 8px);
+  padding: 6px 14px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.15s, color 0.15s;
+}
+.addBtn:hover { border-color: var(--primary); color: var(--primary); }

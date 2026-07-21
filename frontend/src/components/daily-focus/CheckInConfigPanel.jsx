@@ -21,6 +21,20 @@ export default function CheckInConfigPanel({ allModes = [], onClose }) {
     setEstados([...ESTADOS_DEFAULT]);
   }
 
+  function handleAdd() {
+    const id = `custom_${Date.now()}`;
+    setEstados((prev) => [...prev, {
+      id,
+      emoji: "⭐",
+      label: "Novo estado",
+      modeId: allModes[0]?.id ?? "",
+      motivo: "",
+      modeIdAlt: allModes[0]?.id ?? "",
+      motivoAlt: "",
+      custom: true,
+    }]);
+  }
+
   return (
     <ModalOverlay onClose={onClose}>
       <div className={styles.panel}>
@@ -32,8 +46,29 @@ export default function CheckInConfigPanel({ allModes = [], onClose }) {
           {estados.map((estado) => (
             <div key={estado.id} className={styles.estadoRow}>
               <div className={styles.estadoRowLabel}>
-                <span>{estado.emoji}</span>
-                <strong>{estado.label}</strong>
+                {estado.custom ? (
+                  <>
+                    <input
+                      value={estado.emoji}
+                      onChange={(e) => updateEstado(estado.id, "emoji", e.target.value)}
+                      style={{ width: "40px", textAlign: "center", fontSize: "18px", border: "none", background: "transparent" }}
+                    />
+                    <input
+                      value={estado.label}
+                      onChange={(e) => updateEstado(estado.id, "label", e.target.value)}
+                      style={{ fontSize: "14px", fontWeight: "bold", border: "none", background: "transparent", flex: 1 }}
+                    />
+                    <button
+                      onClick={() => setEstados((prev) => prev.filter((e) => e.id !== estado.id))}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger, #ef4444)", fontSize: "14px" }}
+                    >✕</button>
+                  </>
+                ) : (
+                  <>
+                    <span>{estado.emoji}</span>
+                    <strong>{estado.label}</strong>
+                  </>
+                )}
               </div>
 
               <div className={styles.field}>
@@ -86,6 +121,7 @@ export default function CheckInConfigPanel({ allModes = [], onClose }) {
         </div>
         <div className={styles.footer}>
           <button className={styles.resetBtn} onClick={handleReset}>↺ Restaurar padrão</button>
+          <button className={styles.addBtn} onClick={handleAdd}>+ Novo estado</button>
           <button className={styles.saveBtn} onClick={handleSave}>✓ Salvar</button>
         </div>
       </div>

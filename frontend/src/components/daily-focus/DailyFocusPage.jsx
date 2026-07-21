@@ -7,7 +7,7 @@ import { addSession, getHistory, getMaxLevel, updateMaxLevel, getStreak, getWeek
 import { tryUnlock } from "../../lib/dailyFocusAchievements";
 import { getDayLevel, setDayLevel, getUsedModes, addUsedModes } from "../../lib/dailyFocusDay";
 import { usageStats } from "../../lib/modeLog";
-import { logCheckinUsage, getCheckinCount } from "../../lib/checkinLog";
+import { logCheckinUsage, getCheckinCount, getCheckinStreak, logSessionFeedback } from "../../lib/checkinLog";
 import CheckInScreen from "./CheckInScreen";
 import styles from "./DailyFocus.module.css";
 import { MODES } from "../../data/modes";
@@ -111,6 +111,9 @@ export default function DailyFocusPage() {
   // Check-in: modo pré-selecionado pelo estado emocional (persiste na sessão)
   const [checkinModeId, setCheckinModeId] = useState(saved?.checkinModeId ?? null);
   const [checkinEstadoId, setCheckinEstadoId] = useState(saved?.checkinEstadoId ?? null);
+
+  // Feedback de sessão (não persiste)
+  const [sessionFeedback, setSessionFeedback] = useState(null); // null | "good" | "bad"
 
   // UI state (not persisted)
   const [showHelperPicker, setShowHelperPicker]   = useState(false);
@@ -378,6 +381,7 @@ export default function DailyFocusPage() {
     setRushMode(false);
     setCheckinModeId(null);
     setCheckinEstadoId(null);
+    setSessionFeedback(null);
     setPhase("checkin");
     setLadderAnimating(true);
     setTimeout(() => setLadderAnimating(false), 500);
@@ -398,6 +402,12 @@ export default function DailyFocusPage() {
       const newAch = tryUnlock(["self_aware"]);
       if (newAch.length) setNewAchievements((prev) => [...prev, ...newAch]);
     }
+    // Conquista: 7 dias seguidos de check-in
+    const streak = getCheckinStreak();
+    if (streak >= 7) {
+      const newAchs2 = tryUnlock(["observador"]);
+      if (newAchs2.length > 0) setNewAchievements((prev) => [...prev, ...newAchs2]);
+    }
     setPhase("select");
   };
 
@@ -415,6 +425,7 @@ export default function DailyFocusPage() {
     setRushMode(false);
     setCheckinModeId(null);
     setCheckinEstadoId(null);
+    setSessionFeedback(null);
     setPhase("checkin"); // volta para o check-in ao resetar
   };
 
@@ -800,6 +811,58 @@ export default function DailyFocusPage() {
                 </div>
               ) : null;
             })()}
+
+            {checkinEstadoId && checkinModeId && sessionFeedback === null && (() => {
+              const m = getModeById(checkinModeId);
+              return (
+                <div style={{
+                  marginTop: "12px",
+                  padding: "10px 14px",
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "13px",
+                  color: "var(--text-muted)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                }}>
+                  <span>O modo {m?.emoji} {m?.name} funcionou hoje?</span>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => {
+                        setSessionFeedback("good");
+                        logSessionFeedback(checkinEstadoId, checkinModeId, 1);
+                      }}
+                      style={{
+                        flex: 1, padding: "6px", borderRadius: "6px", border: "1px solid var(--border)",
+                        background: "var(--surface-2)", cursor: "pointer", fontSize: "16px",
+                      }}
+                    >👍</button>
+                    <button
+                      onClick={() => {
+                        setSessionFeedback("bad");
+                        logSessionFeedback(checkinEstadoId, checkinModeId, -1);
+                      }}
+                      style={{
+                        flex: 1, padding: "6px", borderRadius: "6px", border: "1px solid var(--border)",
+                        background: "var(--surface-2)", cursor: "pointer", fontSize: "16px",
+                      }}
+                    >👎</button>
+                  </div>
+                </div>
+              );
+            })()}
+            {sessionFeedback === "good" && (
+              <div style={{ fontSize: "12px", color: "var(--success)", marginTop: "8px" }}>
+                ✓ Ótimo! Vamos continuar recomendando esse modo para você.
+              </div>
+            )}
+            {sessionFeedback === "bad" && (
+              <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                ✓ Anotado. Vamos ajustar as sugestões.
+              </div>
+            )}
 
             {/* Task breakdown */}
             <div className={styles.celebrationTasks}>
