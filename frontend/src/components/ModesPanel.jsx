@@ -302,6 +302,27 @@ const MODES_INLINE_REMOVED = [
     tips: "Reler o diário cria perspectiva sobre seu crescimento. Datas aleatórias trazem surpresas que o modo linear não traz.",
   },
   {
+    id: "diario_falado",
+    emoji: "🗣️",
+    name: "Diário Falado",
+    tagline: "Registre o diário falando em voz alta — sem escrever",
+    color: "#a06bbf",
+    colorBg: "rgba(160,107,191,0.08)",
+    category: "Ritual",
+    session: "diario_falado",
+    context: ["🖥️ Desktop", "📖 Reflexão", "⚠️ Quando travado"],
+    prerequisite: "Estar numa sessão de foco. A gravação é feita num app externo de sua escolha.",
+    whyItWorks: "Falar em voz alta reduz a barreira de começar: pular o filtro de 'formular a frase certa por escrito' destrava quando a pessoa está paralisada.",
+    whenToUse: "Quando você está travado, com a cabeça cheia, ou quando escrever parece pesado demais pra começar.",
+    steps: [
+      "Abra um app de gravação externo (Notas de voz, Otter, WhisperMemo...)",
+      "Fale livremente — o que está sentindo, pensando, planejando",
+      "Grave por 2–5 minutos sem filtrar",
+      "Volte à tarefa com a cabeça mais leve",
+    ],
+    tips: "Falar em voz alta pula o filtro de 'formular a frase certa'. Serve para destravar quando escrever parece pesado demais.",
+  },
+  {
     id: "esticar",
     emoji: "🤸",
     name: "Esticar",
@@ -795,7 +816,12 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
               {mode.context?.length > 0 && (
                 <div className={styles.contextTags}>
                   {mode.context.map((tag) => (
-                    <span key={tag} className={styles.contextTag}>{tag}</span>
+                    <span
+                      key={tag}
+                      className={tag.startsWith("⚠️") ? styles.contextTagWarning : styles.contextTag}
+                    >
+                      {tag}
+                    </span>
                   ))}
                 </div>
               )}

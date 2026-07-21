@@ -88,3 +88,50 @@ export function getStats() {
 
   return { totalSessions, totalTasks, avgLevel, maxLevel: maxLvl, streak, rushCount };
 }
+
+/** Recorde máximo separado por modo (timer vs rush). */
+export function getMaxLevelByMode(isRush) {
+  const key = isRush ? "daily_focus_max_level_rush" : "daily_focus_max_level_timer";
+  try { return parseInt(localStorage.getItem(key) || "0", 10); } catch { return 0; }
+}
+
+export function updateMaxLevelByMode(level, isRush) {
+  const current = getMaxLevelByMode(isRush);
+  if (level > current) {
+    const key = isRush ? "daily_focus_max_level_rush" : "daily_focus_max_level_timer";
+    try { localStorage.setItem(key, String(level)); } catch {}
+    return true;
+  }
+  return false;
+}
+
+/** Retorna mapa { nivel: "DD/MM/YYYY" } com a data mais recente de cada nível concluído. */
+export function getLastDateByLevel() {
+  const map = {};
+  // iterar do mais antigo para o mais novo → o mais novo sobrescreve
+  [...getHistory()].reverse().forEach((entry) => {
+    map[entry.level] = entry.date;
+  });
+  return map;
+}
+
+/** Últimos 7 dias com contagem de sessões e nível máximo atingido em cada dia. */
+export function getWeeklyStats() {
+  const history = getHistory();
+  const today = new Date();
+  const result = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dateStr = d.toLocaleDateString("pt-BR");
+    const sessions = history.filter((e) => e.date === dateStr);
+    const maxLvl = sessions.length ? Math.max(...sessions.map((e) => e.level)) : 0;
+    result.push({
+      dateStr,
+      count: sessions.length,
+      maxLevel: maxLvl,
+      dayOfWeek: d.getDay(), // 0=dom, 6=sab
+    });
+  }
+  return result;
+}

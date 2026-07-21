@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { tasksApi } from "../../api/tasks";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 import { getHelper } from "./helpers/index";
-import { addSession, getHistory, getMaxLevel, updateMaxLevel, getStreak, getStats } from "../../lib/dailyFocusHistory";
+import { addSession, getHistory, getMaxLevel, updateMaxLevel, getStreak, getStats, getMaxLevelByMode, updateMaxLevelByMode, getLastDateByLevel, getWeeklyStats } from "../../lib/dailyFocusHistory";
 import { tryUnlock, getAllWithStatus } from "../../lib/dailyFocusAchievements";
 import { getDayLevel, setDayLevel, getUsedModes, addUsedModes } from "../../lib/dailyFocusDay";
 import { usageStats } from "../../lib/modeLog";
@@ -92,6 +92,44 @@ function playBeep(freq1 = 523, freq2 = 659, freq3 = 784) {
 function playTimerDoneSound() {
   // Beep descendente — "tempo esgotou"
   playBeep(784, 659, 523);
+}
+
+function playNewRecordSound() {
+  // Fanfarra ascendente — novo recorde!
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.13;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.28, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.start(t);
+      osc.stop(t + 0.35);
+    });
+  } catch {}
+}
+
+// ── Temas por etapa ──────────────────────────────────────
+const STAGE_THEMES = [
+  { emoji: "🔹", name: "Ignição" },
+  { emoji: "🟡", name: "Aquecimento" },
+  { emoji: "🟠", name: "Ritmo" },
+  { emoji: "🔥", name: "Chama" },
+  { emoji: "⚡", name: "Turbina" },
+  { emoji: "💜", name: "Máxima" },
+  { emoji: "👑", name: "Lenda" },
+  { emoji: "🚀", name: "Além" },
+];
+
+function getStageTheme(level) {
+  return STAGE_THEMES[Math.min(level - 1, STAGE_THEMES.length - 1)] || STAGE_THEMES[0];
 }
 
 // ── Sub-components ───────────────────────────────────────
@@ -388,6 +426,75 @@ function AchievementToast({ achievements, onDismiss }) {
   );
 }
 
+function StepsLadder({ currentLevel, maxLevel, lastDateByLevel = {}, animating = false }) {
+  const totalSteps = Math.min(8, Math.max(currentLevel + 2, (maxLevel || 0) + 1, 5));
+
+  return (
+    <div className={styles.stepsLadder}>
+      {Array.from({ length: totalSteps }, (_, i) => {
+        const step = i + 1;
+        const isDone = step < currentLevel;
+        const isCurrent = step === currentLevel;
+        const isRecord = step === maxLevel && maxLevel > 0;
+        const theme = getStageTheme(step);
+        const tooltip = isDone && lastDateByLevel[step]
+          ? `Etapa ${step} · ${theme.name} · ${lastDateByLevel[step]}`
+          : isCurrent
+          ? `Etapa ${step} · ${theme.name} · em andamento`
+          : `Etapa ${step} · ${theme.name}`;
+
+        return (
+          <div
+            key={step}
+            className={[
+              styles.ladderStep,
+              isDone ? styles.ladderStepDone : "",
+              isCurrent ? styles.ladderStepCurrent : "",
+              isCurrent && animating ? styles.ladderStepEnter : "",
+              isRecord ? styles.ladderStepRecord : "",
+            ].filter(Boolean).join(" ")}
+            style={{ height: `${28 + step * 10}px` }}
+            title={tooltip}
+          >
+            <span className={styles.ladderStepEmoji}>{theme.emoji}</span>
+            <span className={styles.ladderStepNum}>{step}</span>
+            {isDone && <span className={styles.ladderStepCheck}>✓</span>}
+            {isRecord && !isCurrent && <span className={styles.ladderStepTrophy}>🏆</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function WeekHeatmap() {
+  const weekData = getWeeklyStats();
+  const DAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+  return (
+    <div className={styles.weekHeatmap}>
+      {weekData.map((day, i) => {
+        const intensity = day.maxLevel === 0 ? "empty"
+          : day.maxLevel <= 2 ? "low"
+          : day.maxLevel <= 4 ? "mid"
+          : "high";
+        return (
+          <div
+            key={i}
+            className={styles.heatmapDay}
+            title={day.count > 0
+              ? `${day.dateStr} · ${day.count} sessão(ões) · Etapa máx: ${day.maxLevel}`
+              : day.dateStr}
+          >
+            <div className={`${styles.heatmapDot} ${styles[`heatmapDot_${intensity}`]}`} />
+            <span className={styles.heatmapLabel}>{DAY_LABELS[day.dayOfWeek]}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProgressDots({ total, current, done }) {
   return (
     <div className={styles.progressDots}>
@@ -625,6 +732,10 @@ export default function DailyFocusPage() {
   // Modos usados hoje (bloqueados no picker)
   const [usedModes, setUsedModes] = useState(() => getUsedModes());
 
+  // Recorde pessoal e progresso do dia
+  const maxLevel = getMaxLevel();
+  const dayLevel = getDayLevel();
+
   // Streak e modo sugerido (calculados uma vez ao montar)
   const streak = getStreak();
   const suggestedModeId = useMemo(() => {
@@ -648,6 +759,17 @@ export default function DailyFocusPage() {
   const [longPause, setLongPause]                 = useState(false);
   const [newRecord, setNewRecord]                 = useState(false);
   const [notifRequested, setNotifRequested]       = useState(false);
+  const [ladderAnimating, setLadderAnimating]     = useState(false);
+
+  // Recordes por modo
+  const maxLevelTimer = getMaxLevelByMode(false);
+  const maxLevelRush  = getMaxLevelByMode(true);
+  const lastDateByLevel = getLastDateByLevel();
+
+  // Meta semanal
+  const weeklyStats = getWeeklyStats();
+  const weeklyCount = weeklyStats.filter((d) => d.count > 0).length;
+  const WEEKLY_GOAL = 5;
 
   // Persist on state changes
   useEffect(() => {
@@ -828,7 +950,9 @@ export default function DailyFocusPage() {
 
   const completeSession = (completedTasks, timings, hadEarlyCompletion) => {
     const isNewRecord = updateMaxLevel(level);
+    updateMaxLevelByMode(level, rushMode);
     setNewRecord(isNewRecord);
+    if (isNewRecord) playNewRecordSound();
 
     // Save history
     addSession({
@@ -878,6 +1002,8 @@ export default function DailyFocusPage() {
     setTaskTimings([]);
     setRushMode(false);
     setPhase("select");
+    setLadderAnimating(true);
+    setTimeout(() => setLadderAnimating(false), 500);
   };
 
   const handleCheckinSelect = (modeId, estadoId) => {
@@ -914,12 +1040,28 @@ export default function DailyFocusPage() {
   };
 
   const shareSession = async () => {
-    const lines = [`🎯 Daily Focus — Nível ${level} completo! (${todayStr()})`, ""];
-    tasks.forEach((t, i) => {
-      const timing = taskTimings[i];
-      const timeStr = timing ? ` (${timing.used}/${timing.total}min${timing.early ? " ⚡" : ""})` : ` (${t.durationMin}min)`;
-      lines.push(`${i + 1}. ${t.title}${timeStr}`);
+    const theme = getStageTheme(level);
+    const stairWidth = Math.min(level, 8);
+    const stairLines = Array.from({ length: stairWidth }, (_, i) => {
+      const step = i + 1;
+      const t = getStageTheme(step);
+      const bar = "█".repeat(step);
+      const pad = " ".repeat(stairWidth - step);
+      return `${pad}${bar} ${t.emoji}${step}`;
     });
+    const recLine = maxLevel > 0 ? `🏆 Recorde pessoal: Etapa ${maxLevel}` : "";
+    const lines = [
+      `🎯 Daily Focus · Etapa ${level} · ${theme.emoji} ${theme.name} · ${todayStr()}`,
+      "",
+      ...stairLines,
+      "",
+      ...tasks.map((t, i) => {
+        const timing = taskTimings[i];
+        const timeStr = timing ? ` (${timing.used}/${timing.total}min${timing.early ? " ⚡" : ""})` : ` (${t.durationMin}min)`;
+        return `${i + 1}. ${t.title}${timeStr}`;
+      }),
+      ...(newRecord ? ["", "🏆 Novo recorde pessoal!"] : recLine ? ["", recLine] : []),
+    ];
     const text = lines.join("\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -1002,6 +1144,45 @@ export default function DailyFocusPage() {
                 </div>
               ) : null;
             })()}
+
+            {/* Heatmap semanal */}
+            <WeekHeatmap />
+
+            {/* Meta semanal */}
+            <div className={styles.weeklyMeta}>
+              <span>Esta semana:</span>
+              <span className={weeklyCount >= WEEKLY_GOAL ? styles.weeklyGoalReached : styles.weeklyMetaCount}>
+                {weeklyCount}/{WEEKLY_GOAL} dias
+              </span>
+              {weeklyCount >= WEEKLY_GOAL && <span>✅ Meta atingida!</span>}
+            </div>
+
+            {/* Badges de recorde e progresso do dia */}
+            {(maxLevel > 0 || dayLevel > 1) && (
+              <div className={styles.focusMetaRow}>
+                {maxLevel > 0 && (
+                  <span className={styles.recordBadge}>
+                    🏆 Seu recorde: Etapa {maxLevel}
+                  </span>
+                )}
+                {dayLevel > 1 && dayLevel <= level && (
+                  <span className={styles.dayProgressBadge}>
+                    Hoje: até Etapa {dayLevel}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Recordes separados por modo */}
+            {(maxLevelTimer > 0 || maxLevelRush > 0) && (
+              <div className={styles.typedRecordsRow}>
+                {maxLevelTimer > 0 && <span className={styles.typedRecordBadge}>⏱️ Timer: Etapa {maxLevelTimer}</span>}
+                {maxLevelRush > 0 && <span className={styles.typedRecordBadge}>🚀 Rush: Etapa {maxLevelRush}</span>}
+              </div>
+            )}
+
+            {/* Escada de etapas */}
+            <StepsLadder currentLevel={level} maxLevel={maxLevel} lastDateByLevel={lastDateByLevel} animating={ladderAnimating} />
 
             <div className={styles.selectTitleRow}>
               <div className={styles.selectTitle}>
@@ -1150,6 +1331,18 @@ export default function DailyFocusPage() {
               </div>
             )}
 
+            {/* Banner: quase batendo recorde */}
+            {level > maxLevel && maxLevel > 0 && currentIdx === tasks.length - 1 && (
+              <div className={styles.almostRecordBanner}>
+                🏆 Última tarefa! Complete para bater seu recorde de Etapa {maxLevel}!
+              </div>
+            )}
+            {level > maxLevel && maxLevel > 0 && currentIdx < tasks.length - 1 && (
+              <div className={styles.almostRecordBanner}>
+                ⚡ Sessão de recorde em andamento — Etapa {level}!
+              </div>
+            )}
+
             {/* Actions */}
             <div className={styles.workActions}>
               <button className={styles.doneBtn} onClick={handleCompleteTask}>
@@ -1169,9 +1362,13 @@ export default function DailyFocusPage() {
         {phase === "celebrate" && (
           <div className={styles.celebration}>
             <div className={styles.celebrationEmoji}>{newRecord ? "🏆" : "🎉"}</div>
-            <div className={styles.celebrationTitle}>Nível {level} completo!</div>
+            <div className={styles.celebrationTitle}>
+              {newRecord ? `🏆 Novo recorde! Etapa ${level}` : `Nível ${level} completo!`}
+            </div>
             {newRecord && (
-              <div className={styles.newRecordBadge}>🏆 Novo recorde pessoal!</div>
+              <div className={styles.newRecordHighlight}>
+                Você superou seu recorde anterior!
+              </div>
             )}
             <div className={styles.celebrationSub}>
               {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""} feita{tasks.length !== 1 ? "s" : ""}.

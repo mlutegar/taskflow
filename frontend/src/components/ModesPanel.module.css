@@ -410,6 +410,18 @@
   line-height: 1.6;
 }
 
+.contextTagWarning {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: rgba(240, 165, 64, 0.12);
+  color: #c8842a;
+  border: 1px solid rgba(240, 165, 64, 0.35);
+  white-space: nowrap;
+  line-height: 1.6;
+}
+
 .chevron {
   font-size: 18px;
   color: var(--text-muted);

@@ -14,6 +14,7 @@ import TabHopSession from "./sessions/TabHopSession";
 import CustomModeSession from "./sessions/CustomModeSession";
 import SingSession from "./sessions/SingSession";
 import PomodoroSession from "./sessions/PomodoroSession";
+import DiarioFaladoSession from "./sessions/DiarioFaladoSession";
 
 const SESSION_MAP = {
   music: MusicSession,
@@ -34,6 +35,7 @@ const SESSION_MAP = {
   esticar: SpliteSession,
   livro: SpliteSession,
   exercicio: SpliteSession,
+  diario_falado: DiarioFaladoSession,
 };
 
 export default function ModeSession({ modeId, mode, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }) {
