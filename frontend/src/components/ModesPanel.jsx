@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import ModeSession from "./ModeSession";
+import ModalOverlay from "./shared/ModalOverlay";
 import styles from "./ModesPanel.module.css";
 import dfStyles from "./daily-focus/DailyFocus.module.css";
 import { modeStatsApi } from "../api/modeStats";
@@ -512,7 +513,7 @@ function CreateModeModal({ onSave, onClose }) {
   const dialogRef = useDialog(onClose);
 
   return (
-    <div className={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <ModalOverlay onClose={onClose}>
       <div className={styles.modal} ref={dialogRef} role="dialog" aria-modal="true" aria-label="Criar modo personalizado" tabIndex={-1}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>✨ Criar Modo Personalizado</h2>
@@ -671,7 +672,7 @@ function CreateModeModal({ onSave, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

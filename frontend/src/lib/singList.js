@@ -2,25 +2,21 @@
 // Usada pelo CantarHelper (Modo de Apoio: "Cantar pra destravar").
 // Persistida em localStorage — sem autenticação, device-local.
 
-const LS_KEY = "taskflow.singList";
+import { storageGet, storageSet } from "./storage";
+
+const LS_KEY = "singList";
 
 // Sugestão pré-definida para novos usuários
 export const DEFAULT_LIST = ['Álbum "Caos" - Alê'];
 
 export function getList() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return [...DEFAULT_LIST];
-    const list = JSON.parse(raw);
-    if (!Array.isArray(list) || list.length === 0) return [...DEFAULT_LIST];
-    return list;
-  } catch {
-    return [...DEFAULT_LIST];
-  }
+  const list = storageGet(LS_KEY, null);
+  if (!list || !Array.isArray(list) || list.length === 0) return [...DEFAULT_LIST];
+  return list;
 }
 
 function persist(list) {
-  localStorage.setItem(LS_KEY, JSON.stringify(list));
+  storageSet(LS_KEY, list);
   return list;
 }
 

@@ -35,3 +35,8 @@ export function playTimerDone() {
 export function playBeep() {
   beep(523, 659, 784);
 }
+
+/** Rising arpeggio — new personal record */
+export function playNewRecord() {
+  beep(523, 784, 1047);
+}

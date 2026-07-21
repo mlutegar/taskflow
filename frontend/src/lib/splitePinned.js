@@ -1,7 +1,9 @@
 // Atividades "fixadas" como cards de Splite na página de Modos.
 // Persistidas em localStorage; default = as 6 atividades curadas.
 
-const LS_KEY = "taskflow.splitePinned";
+import { storageGet, storageSet } from "./storage";
+
+const LS_KEY = "splitePinned";
 
 export const DEFAULT_PINNED = [
   "Beber água",
@@ -30,19 +32,13 @@ export function metaFor(activity, index = 0) {
 }
 
 export function getPinned() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return [...DEFAULT_PINNED];
-    const list = JSON.parse(raw);
-    if (!Array.isArray(list)) return [...DEFAULT_PINNED];
-    return list;
-  } catch {
-    return [...DEFAULT_PINNED];
-  }
+  const list = storageGet(LS_KEY, null);
+  if (!list || !Array.isArray(list)) return [...DEFAULT_PINNED];
+  return list;
 }
 
 function persist(list) {
-  localStorage.setItem(LS_KEY, JSON.stringify(list));
+  storageSet(LS_KEY, list);
   return list;
 }
 

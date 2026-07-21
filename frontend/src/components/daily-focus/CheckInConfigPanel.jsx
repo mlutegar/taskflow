@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getEstados, saveEstados, resetEstados, ESTADOS_DEFAULT } from "./stateToMode";
 import styles from "./CheckInConfigPanel.module.css";
+import ModalOverlay from "../shared/ModalOverlay";
 
 export default function CheckInConfigPanel({ allModes = [], onClose }) {
   const [estados, setEstados] = useState(() => getEstados());
@@ -21,7 +22,7 @@ export default function CheckInConfigPanel({ allModes = [], onClose }) {
   }
 
   return (
-    <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <ModalOverlay onClose={onClose}>
       <div className={styles.panel}>
         <div className={styles.header}>
           <span className={styles.title}>⚙️ Editar mapeamento estado → modo</span>
@@ -88,6 +89,6 @@ export default function CheckInConfigPanel({ allModes = [], onClose }) {
           <button className={styles.saveBtn} onClick={handleSave}>✓ Salvar</button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

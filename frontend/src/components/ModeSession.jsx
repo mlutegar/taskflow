@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import styles from "./ModeSession.module.css";
+import ModalOverlay from "./shared/ModalOverlay";
 import { useDialog } from "../lib/useDialog";
 import { logActivation } from "../lib/modeActivations";
 import MusicSession from "./sessions/MusicSession";
@@ -136,7 +137,7 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
   if (!Session && !isCustom) return null;
 
   return (
-    <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+    <ModalOverlay onClose={handleClose}>
       <div className={styles.modal} ref={dialogRef} role="dialog" aria-modal="true" aria-label={mode?.name ? `Sessão: ${mode.name}` : "Sessão de modo"} tabIndex={-1}>
         {/* ── Confirmação de encerramento ─── */}
         {confirmingClose && (
@@ -257,6 +258,6 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
           )}
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

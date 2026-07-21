@@ -356,7 +356,15 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
           {task.completed && "✓"}
         </button>
 
-        <div className={styles.content} onClick={() => setExpanded((v) => !v)}>
+        <div
+          className={styles.content}
+          onClick={() => setExpanded((v) => !v)}
+          role="button"
+          tabIndex={0}
+          aria-expanded={expanded}
+          aria-label={`${task.title} — clique para ${expanded ? "recolher" : "expandir"} detalhes`}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((v) => !v); } }}
+        >
           <div className={styles.titleRow}>
             <span className={styles.title}>{task.title}</span>
             <span className={`${styles.priority} ${styles[priority.cls]}`}>{priority.label}</span>

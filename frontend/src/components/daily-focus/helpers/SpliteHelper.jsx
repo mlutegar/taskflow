@@ -41,7 +41,15 @@ export default function SpliteHelper({ state, onChange }) {
           {filtered.length > 0 && (
             <div className={styles.activityResults}>
               {filtered.map((a) => (
-                <div key={a} className={styles.activityResultItem} onClick={() => selectActivity(a)}>
+                <div
+                  key={a}
+                  className={styles.activityResultItem}
+                  onClick={() => selectActivity(a)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Selecionar atividade: ${a}`}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectActivity(a); } }}
+                >
                   {a}
                 </div>
               ))}

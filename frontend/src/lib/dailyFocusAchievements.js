@@ -1,3 +1,5 @@
+import { storageGet, storageSet } from "./storage";
+
 const LS_KEY = "daily_focus_achievements";
 
 export const ACHIEVEMENTS = [
@@ -14,17 +16,11 @@ export const ACHIEVEMENTS = [
 ];
 
 function getUnlocked() {
-  try {
-    return JSON.parse(localStorage.getItem(LS_KEY) || "[]");
-  } catch {
-    return [];
-  }
+  return storageGet(LS_KEY, []);
 }
 
 function saveUnlocked(list) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(list));
-  } catch {}
+  storageSet(LS_KEY, list);
 }
 
 export function getAllWithStatus() {

@@ -3,6 +3,7 @@ import TaskSelector from "../TaskSelector";
 import CountdownTimer from "../CountdownTimer";
 import SubtaskInline from "./SubtaskInline";
 import SubtaskFlow from "./SubtaskFlow";
+import BaseSession from "./BaseSession";
 import styles from "./session.module.css";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 
@@ -39,25 +40,15 @@ export default function EspressoSession({ tasks, onCompleteTask, onToggleCheckli
   };
 
   return (
-    <div className={styles.root}>
-      <div className={styles.header}>
-        <span className={styles.headerEmoji}>☕</span>
-        <div className={styles.headerMeta}>
-          <span className={styles.headerTitle}>Espresso Sprint</span>
-          <span className={styles.headerSub}>Sprint {sprints + 1} • ☕ {coffees} • ✅ {completed}</span>
-        </div>
-        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
-      </div>
-
-      <div className={styles.body}>
-
-        {wasRestored && step !== "coffee_check" && step !== "summary" && (
-          <div className={styles.resumeBanner}>
-            ↩ Sessão restaurada — Sprint {sprints + 1}, ☕ {coffees}, {completed} tarefa(s)
-            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
-          </div>
-        )}
-
+    <BaseSession
+      emoji="☕"
+      title="Espresso Sprint"
+      sub={`Sprint ${sprints + 1} • ☕ ${coffees} • ✅ ${completed}`}
+      onClose={handleClose}
+      showResume={wasRestored && step !== "coffee_check" && step !== "summary"}
+      resumeMessage={`↩ Sessão restaurada — Sprint ${sprints + 1}, ☕ ${coffees}, ${completed} tarefa(s)`}
+      onDismissResume={() => setWasRestored(false)}
+    >
         {step === "coffee_check" && (
           <>
             <div className={styles.promptBox}>
@@ -156,7 +147,6 @@ export default function EspressoSession({ tasks, onCompleteTask, onToggleCheckli
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
           </>
         )}
-      </div>
-    </div>
+    </BaseSession>
   );
 }

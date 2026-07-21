@@ -3,6 +3,7 @@ import TaskSelector from "../TaskSelector";
 import CountdownTimer from "../CountdownTimer";
 import SubtaskInline from "./SubtaskInline";
 import SubtaskFlow from "./SubtaskFlow";
+import BaseSession from "./BaseSession";
 import styles from "./session.module.css";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 
@@ -38,25 +39,15 @@ export default function MomentumSession({ tasks, onCompleteTask, onToggleCheckli
   };
 
   return (
-    <div className={styles.root}>
-      <div className={styles.header}>
-        <span className={styles.headerEmoji}>⚡</span>
-        <div className={styles.headerMeta}>
-          <span className={styles.headerTitle}>Momentum Mode</span>
-          <span className={styles.headerSub}>{completed} tarefa(s) concluída(s)</span>
-        </div>
-        <button className={styles.closeBtn} onClick={handleClose}>✕</button>
-      </div>
-
-      <div className={styles.body}>
-
-        {wasRestored && step !== "phone_check" && step !== "summary" && (
-          <div className={styles.resumeBanner}>
-            ↩ Sessão restaurada — {completed} tarefa(s) concluída(s)
-            <button className={styles.resumeDismiss} onClick={() => setWasRestored(false)}>✕</button>
-          </div>
-        )}
-
+    <BaseSession
+      emoji="⚡"
+      title="Momentum Mode"
+      sub={`${completed} tarefa(s) concluída(s)`}
+      onClose={handleClose}
+      showResume={wasRestored && step !== "phone_check" && step !== "summary"}
+      resumeMessage={`↩ Sessão restaurada — ${completed} tarefa(s) concluída(s)`}
+      onDismissResume={() => setWasRestored(false)}
+    >
         {step === "phone_check" && (
           <>
             <div className={styles.promptBox}>
@@ -144,7 +135,6 @@ export default function MomentumSession({ tasks, onCompleteTask, onToggleCheckli
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
           </>
         )}
-      </div>
-    </div>
+    </BaseSession>
   );
 }

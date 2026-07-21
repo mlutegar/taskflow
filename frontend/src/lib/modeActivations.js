@@ -9,7 +9,9 @@
  * Retenção: 365 dias.
  */
 
-const KEY = "taskflow.modeActivations";
+import { storageGet, storageSet } from "./storage";
+
+const KEY = "modeActivations";
 const RETENTION_DAYS = 365;
 
 function todayIso() {
@@ -23,24 +25,14 @@ function cutoff() {
 }
 
 function load() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    const entries = JSON.parse(raw);
-    // Limpa entradas antigas
-    const limit = cutoff();
-    return entries.filter((e) => e.date >= limit);
-  } catch {
-    return [];
-  }
+  const entries = storageGet(KEY, []);
+  // Limpa entradas antigas
+  const limit = cutoff();
+  return Array.isArray(entries) ? entries.filter((e) => e.date >= limit) : [];
 }
 
 function save(entries) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(entries));
-  } catch {
-    // Sem espaço no localStorage — ignora
-  }
+  storageSet(KEY, entries);
 }
 
 /**

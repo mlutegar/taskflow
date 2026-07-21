@@ -1,7 +1,9 @@
 // Lista de músicas "cantáveis" usada pelos modos de cantar (SingSession).
 // Editável e persistida em localStorage — mesmo padrão de lib/activities.js.
 
-const LS_KEY = "taskflow.singableSongs";
+import { storageGet, storageSet } from "./storage";
+
+const LS_KEY = "singableSongs";
 
 export const DEFAULT_SONGS = [
   "Bohemian Rhapsody — Queen",
@@ -19,19 +21,13 @@ export const DEFAULT_SONGS = [
 ];
 
 export function getSongs() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return [...DEFAULT_SONGS];
-    const list = JSON.parse(raw);
-    if (!Array.isArray(list)) return [...DEFAULT_SONGS];
-    return list;
-  } catch {
-    return [...DEFAULT_SONGS];
-  }
+  const list = storageGet(LS_KEY, null);
+  if (!list || !Array.isArray(list)) return [...DEFAULT_SONGS];
+  return list;
 }
 
 function persist(list) {
-  localStorage.setItem(LS_KEY, JSON.stringify(list));
+  storageSet(LS_KEY, list);
   return list;
 }
 

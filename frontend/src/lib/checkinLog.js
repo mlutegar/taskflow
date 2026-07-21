@@ -1,23 +1,15 @@
-const LS_KEY = "taskflow.checkinLog";
+import { storageGet, storageAppend } from "./storage";
+
+const LS_KEY = "checkinLog";
 const MAX_ENTRIES = 200;
 
 export function logCheckinUsage(estadoId, modeId) {
   if (!estadoId || !modeId) return;
-  try {
-    const log = getCheckinLog();
-    log.push({ estadoId, modeId, date: new Date().toISOString().slice(0, 10) });
-    // Mantém apenas as últimas MAX_ENTRIES entradas
-    const trimmed = log.slice(-MAX_ENTRIES);
-    localStorage.setItem(LS_KEY, JSON.stringify(trimmed));
-  } catch {}
+  storageAppend(LS_KEY, { estadoId, modeId, date: new Date().toISOString().slice(0, 10) }, MAX_ENTRIES);
 }
 
 export function getCheckinLog() {
-  try {
-    return JSON.parse(localStorage.getItem(LS_KEY) || "[]");
-  } catch {
-    return [];
-  }
+  return storageGet(LS_KEY, []);
 }
 
 /** Total de check-ins realizados (para conquista "Auto-conhecimento"). */

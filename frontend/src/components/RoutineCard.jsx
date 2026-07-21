@@ -127,7 +127,15 @@ export default function RoutineCard({
           {routine.is_completed_today && "✓"}
         </button>
 
-        <div className={styles.content} onClick={() => setExpanded((v) => !v)}>
+        <div
+          className={styles.content}
+          onClick={() => setExpanded((v) => !v)}
+          role="button"
+          tabIndex={0}
+          aria-expanded={expanded}
+          aria-label={`${routine.title} — clique para ${expanded ? "recolher" : "expandir"} detalhes`}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((v) => !v); } }}
+        >
           <div className={styles.titleRow}>
             <span className={styles.title}>{routine.title}</span>
             <span className={`${styles.badge} ${routine.is_completed_today ? styles.badgeDone : styles.badgePending}`}>

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import TaskSelector from "../TaskSelector";
-import SessionHeader from "./SessionHeader";
-import ResumeBanner from "./ResumeBanner";
+import BaseSession from "./BaseSession";
 import WorkingTask from "./WorkingTask";
 import CountdownTimer from "../CountdownTimer";
 import styles from "./session.module.css";
@@ -45,19 +44,15 @@ export default function PomodoroSession({ preset, tasks, onCompleteTask, onToggl
   };
 
   return (
-    <div className={styles.root}>
-      <SessionHeader
-        emoji="🍅"
-        title="Pomodoro"
-        sub={`${duration} min • ${rounds} round${rounds !== 1 ? "s" : ""} • ${completed} tarefa(s)`}
-        onClose={handleClose}
-      />
-
-      <div className={styles.body}>
-        <ResumeBanner show={wasRestored && step !== "pick_duration" && step !== "summary"} onDismiss={() => setWasRestored(false)}>
-          ↩ Sessão restaurada — {completed} tarefa(s), {rounds} round(s)
-        </ResumeBanner>
-
+    <BaseSession
+      emoji="🍅"
+      title="Pomodoro"
+      sub={`${duration} min • ${rounds} round${rounds !== 1 ? "s" : ""} • ${completed} tarefa(s)`}
+      onClose={handleClose}
+      showResume={wasRestored && step !== "pick_duration" && step !== "summary"}
+      resumeMessage={`↩ Sessão restaurada — ${completed} tarefa(s), ${rounds} round(s)`}
+      onDismissResume={() => setWasRestored(false)}
+    >
         {/* Escolha de duração */}
         {step === "pick_duration" && (
           <>
@@ -146,7 +141,6 @@ export default function PomodoroSession({ preset, tasks, onCompleteTask, onToggl
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
           </>
         )}
-      </div>
-    </div>
+    </BaseSession>
   );
 }

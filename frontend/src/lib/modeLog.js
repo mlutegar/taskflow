@@ -1,7 +1,9 @@
 // Log local de conclusões por modo (para "mais usados na semana").
 // Guarda { modeId, date: "YYYY-MM-DD" } e retém ~90 dias. Por dispositivo.
 
-const LS_KEY = "taskflow.modeLog";
+import { storageGet, storageSet } from "./storage";
+
+const LS_KEY = "modeLog";
 const RETAIN_DAYS = 90;
 
 function todayIso() {
@@ -9,19 +11,12 @@ function todayIso() {
 }
 
 function read() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    const list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
+  const list = storageGet(LS_KEY, []);
+  return Array.isArray(list) ? list : [];
 }
 
 function write(list) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(list));
-  } catch {}
+  storageSet(LS_KEY, list);
 }
 
 /** Registra uma conclusão de tarefa no modo informado. */
