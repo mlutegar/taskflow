@@ -63,6 +63,13 @@
   font-weight: 600;
 }
 
+.checkinStreak {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--warning);
+  font-weight: 600;
+}
+
 /* ── Time tip ──────────────────────────────────────────── */
 .timeTip {
   font-size: 12px;

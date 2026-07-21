@@ -52,6 +52,15 @@ export const ESTADOS_DEFAULT = [
     motivoAlt: "5 minutos com uma tarefa micro criam âncora de foco mesmo com a mente dispersa.",
   },
   {
+    id: "bem",
+    emoji: "😊",
+    label: "Estou bem",
+    modeId: null,
+    motivo: null,
+    modeIdAlt: null,
+    motivoAlt: null,
+  },
+  {
     id: "energizado",
     emoji: "⚡",
     label: "Energizado",

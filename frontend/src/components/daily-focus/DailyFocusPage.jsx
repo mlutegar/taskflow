@@ -11,6 +11,7 @@ import { logCheckinUsage, getCheckinCount } from "../../lib/checkinLog";
 import CheckInScreen from "./CheckInScreen";
 import styles from "./DailyFocus.module.css";
 import { MODES } from "../../data/modes";
+import { ESTADOS_DEFAULT } from "./stateToMode";
 import HelperPickerModal from "./components/HelperPickerModal";
 import HistoryPanel from "./components/HistoryPanel";
 import AchievementToast from "./components/AchievementToast";
@@ -59,6 +60,16 @@ function sendNotif(title, body) {
   }
 }
 
+// ── Celebrate messages by estado ────────────────────────
+const ESTADO_CELEBRATE_MSG = {
+  travado:    "Conseguiu sair do lugar mesmo travado — isso é o mais difícil. 💪",
+  cansado:    "Focou mesmo cansado. Isso é disciplina de verdade. 🌟",
+  ansioso:    "Transformou ansiedade em produção. Resiliência em ação. ⚡",
+  sem_foco:   "Criou foco do zero. Nada de fácil nisso. 🔥",
+  disperso:   "Ancorou a mente e fez acontecer. Missão cumprida. 🪟",
+  energizado: "Aproveitou o pico de energia do jeito certo. 🚀",
+};
+
 // ── Main Page ────────────────────────────────────────────
 
 export default function DailyFocusPage() {
@@ -99,6 +110,7 @@ export default function DailyFocusPage() {
 
   // Check-in: modo pré-selecionado pelo estado emocional (persiste na sessão)
   const [checkinModeId, setCheckinModeId] = useState(saved?.checkinModeId ?? null);
+  const [checkinEstadoId, setCheckinEstadoId] = useState(saved?.checkinEstadoId ?? null);
 
   // UI state (not persisted)
   const [showHelperPicker, setShowHelperPicker]   = useState(false);
@@ -126,8 +138,8 @@ export default function DailyFocusPage() {
 
   // Persist on state changes
   useEffect(() => {
-    persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId });
-  }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId]);
+    persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId });
+  }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId]);
 
   // Atualiza document.title conforme a fase
   useEffect(() => {
@@ -324,6 +336,7 @@ export default function DailyFocusPage() {
       tasks: completedTasks.map((t) => t.title),
       timings,
       rushMode,
+      estadoId: checkinEstadoId ?? null,
     });
 
     // Check achievements
@@ -364,6 +377,7 @@ export default function DailyFocusPage() {
     setTaskTimings([]);
     setRushMode(false);
     setCheckinModeId(null);
+    setCheckinEstadoId(null);
     setPhase("checkin");
     setLadderAnimating(true);
     setTimeout(() => setLadderAnimating(false), 500);
@@ -371,6 +385,7 @@ export default function DailyFocusPage() {
 
   const handleCheckinSelect = (modeId, estadoId) => {
     setCheckinModeId(modeId);
+    setCheckinEstadoId(estadoId ?? null);
     logCheckinUsage(estadoId, modeId);
     // Pré-aplica na primeira tarefa se ela ainda não tiver modo selecionado
     setTasks((prev) => {
@@ -399,6 +414,7 @@ export default function DailyFocusPage() {
     setTaskTimings([]);
     setRushMode(false);
     setCheckinModeId(null);
+    setCheckinEstadoId(null);
     setPhase("checkin"); // volta para o check-in ao resetar
   };
 
@@ -454,6 +470,26 @@ export default function DailyFocusPage() {
         <div className={styles.headerMeta}>
           <span className={styles.headerLevel}>Nível {level}</span>
           {streak >= 2 && <span className={styles.streakBadge}>🔥 {streak}</span>}
+          {phase === "work" && checkinEstadoId && (() => {
+            const estadoInfo = ESTADOS_DEFAULT.find((e) => e.id === checkinEstadoId);
+            const modoInfo = checkinModeId ? getModeById(checkinModeId) : null;
+            return estadoInfo ? (
+              <span style={{
+                fontSize: "11px",
+                color: "var(--text-muted)",
+                background: "var(--surface-2)",
+                border: "1px solid var(--border)",
+                padding: "2px 8px",
+                borderRadius: "20px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}>
+                {estadoInfo.emoji}
+                {modoInfo ? ` · ${modoInfo.emoji}` : ""}
+              </span>
+            ) : null;
+          })()}
         </div>
         <div className={styles.headerActions}>
           <button className={styles.iconBtn} onClick={() => setShowHistory(true)} title="Histórico">📋</button>
@@ -734,9 +770,36 @@ export default function DailyFocusPage() {
               </div>
             )}
             <div className={styles.celebrationSub}>
-              {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""} feita{tasks.length !== 1 ? "s" : ""}.
-              O Nível {level + 1} tem {level + 1} tarefa{level + 1 !== 1 ? "s" : ""}.
+              {checkinEstadoId && ESTADO_CELEBRATE_MSG[checkinEstadoId]
+                ? ESTADO_CELEBRATE_MSG[checkinEstadoId]
+                : `${tasks.length} tarefa${tasks.length !== 1 ? "s" : ""} feita${tasks.length !== 1 ? "s" : ""}. O Nível ${level + 1} tem ${level + 1} tarefa${level + 1 !== 1 ? "s" : ""}.`
+              }
             </div>
+            {checkinEstadoId && ESTADO_CELEBRATE_MSG[checkinEstadoId] && (
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""} · Nível {level} → {level + 1}
+              </div>
+            )}
+            {checkinEstadoId && (() => {
+              const e = ESTADOS_DEFAULT.find((est) => est.id === checkinEstadoId);
+              const m = checkinModeId ? getModeById(checkinModeId) : null;
+              return e ? (
+                <div style={{
+                  fontSize: "13px",
+                  color: "var(--text-muted)",
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "8px 14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}>
+                  <span>{e.emoji} {e.label}</span>
+                  {m && <><span style={{ color: "var(--border)" }}>·</span><span>{m.emoji} {m.name}</span></>}
+                </div>
+              ) : null;
+            })()}
 
             {/* Task breakdown */}
             <div className={styles.celebrationTasks}>

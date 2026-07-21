@@ -32,3 +32,21 @@ export function getTopModesForEstado(estadoId) {
     .map(([modeId, count]) => ({ modeId, count }))
     .sort((a, b) => b.count - a.count);
 }
+
+/** Dias consecutivos com pelo menos 1 check-in (incluindo hoje). */
+export function getCheckinStreak() {
+  const log = getCheckinLog();
+  if (!log.length) return 0;
+  const dates = [...new Set(log.map((e) => e.date))].sort().reverse();
+  const today = new Date().toISOString().slice(0, 10);
+  if (dates[0] !== today) return 0; // não usou hoje
+  let streak = 1;
+  for (let i = 1; i < dates.length; i++) {
+    const prev = new Date(dates[i - 1]);
+    const curr = new Date(dates[i]);
+    const diff = (prev - curr) / (1000 * 60 * 60 * 24);
+    if (diff === 1) streak++;
+    else break;
+  }
+  return streak;
+}

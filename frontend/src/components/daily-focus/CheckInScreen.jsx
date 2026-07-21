@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { getEstados } from "./stateToMode";
+import { getTopModesForEstado, getCheckinStreak } from "../../lib/checkinLog";
 import CheckInConfigPanel from "./CheckInConfigPanel";
 import styles from "./CheckInScreen.module.css";
 
@@ -45,6 +46,13 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
   }
 
   function handleEstadoClick(estado) {
+    if (estado.modeId === null) {
+      // Estado neutro: pula direto para a seleção de tarefas
+      try { localStorage.setItem("taskflow.checkin.lastEstado", estado.id); } catch {}
+      setLeaving(true);
+      setTimeout(() => onSkip(), 220);
+      return;
+    }
     if (selectedEstado?.id === estado.id) {
       setSelectedEstado(null);
       setShowAlt(false);
@@ -61,8 +69,16 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
     setTimeout(() => onSelect(modeId, selectedEstado?.id), 220);
   }
 
-  const mainMode = selectedEstado ? getModeInfo(selectedEstado.modeId) : null;
+  // Recomendação personalizada: usa histórico se disponível
+  const personalTop = selectedEstado ? getTopModesForEstado(selectedEstado.id) : [];
+  const personalModeId = personalTop.length >= 2 ? personalTop[0].modeId : null; // só personaliza se tiver histórico suficiente
+  const effectiveModeId = personalModeId ?? selectedEstado?.modeId;
+  const isPersonalized = !!personalModeId && personalModeId !== selectedEstado?.modeId;
+
+  const mainMode = selectedEstado ? getModeInfo(effectiveModeId) : null;
   const altMode  = selectedEstado ? getModeInfo(selectedEstado.modeIdAlt) : null;
+
+  const checkinStreak = getCheckinStreak();
 
   return (
     <div className={`${styles.wrap} ${leaving ? styles.wrapLeaving : ""}`}>
@@ -82,6 +98,9 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
         </div>
         {wasPreSelected.current && selectedEstado && (
           <div className={styles.lastStateBadge}>↩ último estado salvo</div>
+        )}
+        {checkinStreak >= 2 && (
+          <div className={styles.checkinStreak}>🧠 {checkinStreak} dias seguidos de check-in</div>
         )}
       </div>
 
@@ -116,7 +135,9 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
             <div style={{ flex: 1 }}>
               <div className={styles.recoHeaderLabel}>Recomendado para você</div>
             </div>
-            <span className={styles.recoBadge}>✨ recomendado</span>
+            <span className={styles.recoBadge}>
+              {isPersonalized ? "📊 seu histórico" : "✨ recomendado"}
+            </span>
           </div>
 
           <div className={styles.recoBody}>
@@ -132,7 +153,7 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
 
             <button
               className={styles.recoUseBtn}
-              onClick={() => handleSelect(selectedEstado.modeId)}
+              onClick={() => handleSelect(effectiveModeId)}
             >
               Usar {mainMode.emoji} {mainMode.name} →
             </button>

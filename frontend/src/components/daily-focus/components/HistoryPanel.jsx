@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { getHistory, getMaxLevel, getStats } from "../../../lib/dailyFocusHistory";
+import { ESTADOS_DEFAULT } from "../../stateToMode";
 import { getAllWithStatus } from "../../../lib/dailyFocusAchievements";
 import ModalOverlay from "../../shared/ModalOverlay";
 import styles from "../DailyFocus.module.css";
@@ -87,6 +88,14 @@ function HistoryPanel({ onClose }) {
                     <div className={styles.historyEntryHeader}>
                       <span className={styles.historyEntryLevel}>Nível {entry.level}</span>
                       {entry.rushMode && <span className={styles.tag}>🚀 Rush</span>}
+                      {entry.estadoId && (() => {
+                        const est = ESTADOS_DEFAULT.find((e) => e.id === entry.estadoId);
+                        return est ? (
+                          <span className={styles.tag} title={est.label}>
+                            {est.emoji} {est.label}
+                          </span>
+                        ) : null;
+                      })()}
                       <span className={styles.historyEntryDate}>{entry.date} · {entry.completedAt}</span>
                     </div>
                     <div className={styles.historyEntryTasks}>
