@@ -10,6 +10,7 @@ export const ACHIEVEMENTS = [
   { id: "five_sessions", emoji: "💪", name: "Consistente",         desc: "5 sessões completas no Daily Focus" },
   { id: "ten_sessions",  emoji: "🏆", name: "Dedicado",            desc: "10 sessões completas no Daily Focus" },
   { id: "level_2",       emoji: "📈", name: "Subindo",             desc: "Chegou ao Nível 2 pela primeira vez" },
+  { id: "self_aware",   emoji: "🧠", name: "Auto-conhecimento",   desc: "Usou o check-in de estado 5 vezes" },
 ];
 
 function getUnlocked() {

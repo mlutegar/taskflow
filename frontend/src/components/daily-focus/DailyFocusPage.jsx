@@ -6,6 +6,8 @@ import { addSession, getHistory, getMaxLevel, updateMaxLevel, getStreak, getStat
 import { tryUnlock, getAllWithStatus } from "../../lib/dailyFocusAchievements";
 import { getDayLevel, setDayLevel, getUsedModes, addUsedModes } from "../../lib/dailyFocusDay";
 import { usageStats } from "../../lib/modeLog";
+import { logCheckinUsage, getCheckinCount } from "../../lib/checkinLog";
+import CheckInScreen from "./CheckInScreen";
 import styles from "./DailyFocus.module.css";
 import { MODES, HELPER_GROUPS } from "../../data/modes";
 
@@ -614,7 +616,7 @@ export default function DailyFocusPage() {
   const [helperStates, setHelperStates]     = useState(saved?.helperStates ?? {}); // { modeId: state }
   const [timerRemaining, setTimerRemaining] = useState(saved?.timerRemaining ?? null);
   const [timerRunning, setTimerRunning]     = useState(false);
-  const [phase, setPhase]                   = useState(saved?.phase ?? "select");
+  const [phase, setPhase]                   = useState(saved?.phase ?? "checkin");
   const [timerDone, setTimerDone]           = useState(false);
   const [rushMode, setRushMode]             = useState(saved?.rushMode ?? false);
   const [taskTimings, setTaskTimings]       = useState(saved?.taskTimings ?? []); // [{used, total}]
@@ -631,6 +633,9 @@ export default function DailyFocusPage() {
     return available[0]?.modeId ?? null;
   }, [usedModes]);
 
+  // Check-in: modo pré-selecionado pelo estado emocional (persiste na sessão)
+  const [checkinModeId, setCheckinModeId] = useState(saved?.checkinModeId ?? null);
+
   // UI state (not persisted)
   const [showHelperPicker, setShowHelperPicker]   = useState(false);
   const [pickerForTask, setPickerForTask]         = useState(null); // index | null (null = work-phase global)
@@ -646,8 +651,8 @@ export default function DailyFocusPage() {
 
   // Persist on state changes
   useEffect(() => {
-    persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings });
-  }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings]);
+    persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId });
+  }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId]);
 
   // Atualiza document.title conforme a fase
   useEffect(() => {
@@ -875,6 +880,23 @@ export default function DailyFocusPage() {
     setPhase("select");
   };
 
+  const handleCheckinSelect = (modeId, estadoId) => {
+    setCheckinModeId(modeId);
+    logCheckinUsage(estadoId, modeId);
+    // Pré-aplica na primeira tarefa se ela ainda não tiver modo selecionado
+    setTasks((prev) => {
+      if (prev[0]?.helperModeId) return prev;
+      return prev.map((t, i) => i === 0 ? { ...t, helperModeId: modeId } : t);
+    });
+    initHelperIfNeeded(modeId);
+    // Conquista "Auto-conhecimento": 5 check-ins
+    if (getCheckinCount() >= 5) {
+      const newAch = tryUnlock(["self_aware"]);
+      if (newAch.length) setNewAchievements((prev) => [...prev, ...newAch]);
+    }
+    setPhase("select");
+  };
+
   const handleReset = () => {
     if (!window.confirm("Resetar tudo? O nível voltará para 1.")) return;
     clearSaved();
@@ -887,7 +909,8 @@ export default function DailyFocusPage() {
     setTimerDone(false);
     setTaskTimings([]);
     setRushMode(false);
-    setPhase("select");
+    setCheckinModeId(null);
+    setPhase("checkin"); // volta para o check-in ao resetar
   };
 
   const shareSession = async () => {
@@ -939,9 +962,47 @@ export default function DailyFocusPage() {
       {/* Content */}
       <div className={styles.content}>
 
+        {/* ── CHECK-IN PHASE ── */}
+        {phase === "checkin" && (
+          <CheckInScreen
+            allModes={ALL_MODES}
+            onSelect={handleCheckinSelect}
+            onSkip={() => setPhase("select")}
+          />
+        )}
+
         {/* ── SELECT PHASE ── */}
         {phase === "select" && (
           <div>
+            {/* Banner do modo sugerido pelo check-in */}
+            {checkinModeId && (() => {
+              const m = getModeById(checkinModeId);
+              return m ? (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "10px 14px",
+                  marginBottom: "16px",
+                  background: "rgba(124,110,245,0.08)",
+                  border: "1px solid rgba(124,110,245,0.3)",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "13px",
+                }}>
+                  <span style={{ fontSize: "18px" }}>{m.emoji}</span>
+                  <span>
+                    <span style={{ fontWeight: 700 }}>{m.name}</span>
+                    <span style={{ color: "var(--text-muted)", marginLeft: "6px" }}>sugerido para você</span>
+                  </span>
+                  <button
+                    onClick={() => setCheckinModeId(null)}
+                    style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--text-muted)", fontSize: "16px", cursor: "pointer", padding: "0 4px", lineHeight: 1 }}
+                    title="Remover sugestão"
+                  >×</button>
+                </div>
+              ) : null;
+            })()}
+
             <div className={styles.selectTitleRow}>
               <div className={styles.selectTitle}>
                 Nível {level} — {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""}
@@ -989,7 +1050,7 @@ export default function DailyFocusPage() {
                   canMoveUp={i > 0}
                   canMoveDown={i < tasks.length - 1}
                   usedModes={usedModes}
-                  suggestedModeId={suggestedModeId}
+                  suggestedModeId={checkinModeId ?? suggestedModeId}
                 />
               ))}
             </div>

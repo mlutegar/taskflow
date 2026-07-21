@@ -1,0 +1,151 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 300;
+}
+
+.panel {
+  background: var(--surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  width: 100%;
+  max-width: 600px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.closeBtn {
+  font-size: 22px;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  line-height: 1;
+  padding: 2px 6px;
+}
+.closeBtn:hover { color: var(--text); }
+
+.body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.estadoRow {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.estadoRowLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.fieldSelect {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  cursor: pointer;
+}
+.fieldSelect:focus { border-color: var(--accent); }
+
+.fieldTextarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s;
+  min-height: 52px;
+}
+.fieldTextarea:focus { border-color: var(--accent); }
+
+.footer {
+  display: flex;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.resetBtn {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s, border-color 0.15s;
+}
+.resetBtn:hover { color: var(--danger); border-color: var(--danger); }
+
+.saveBtn {
+  flex: 1;
+  padding: 10px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+.saveBtn:hover { opacity: 0.88; }
