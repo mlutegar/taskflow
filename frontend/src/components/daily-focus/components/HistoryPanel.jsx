@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { getHistory, getMaxLevel, getStats } from "../../../lib/dailyFocusHistory";
-import { ESTADOS_DEFAULT } from "../../stateToMode";
+import { ESTADOS_DEFAULT } from "../stateToMode";
 import { getAllWithStatus } from "../../../lib/dailyFocusAchievements";
 import ModalOverlay from "../../shared/ModalOverlay";
 import styles from "../DailyFocus.module.css";
