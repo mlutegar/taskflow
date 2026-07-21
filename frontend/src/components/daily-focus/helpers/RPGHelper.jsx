@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import styles from "../DailyFocus.module.css";
 
 const LS_KEY = "taskflow_rpg_save";

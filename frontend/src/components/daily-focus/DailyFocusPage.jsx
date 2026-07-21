@@ -495,7 +495,7 @@ function WeekHeatmap() {
   );
 }
 
-function ProgressDots({ total, current, done }) {
+function ProgressDots({ total, current, done: _done }) {
   return (
     <div className={styles.progressDots}>
       {Array.from({ length: total }, (_, i) => (
@@ -565,7 +565,7 @@ function DailyTimer({ totalSeconds, initialRemaining, running, onTick, onComplet
   );
 }
 
-function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes, usedModes = [], suggestedModeId = null }) {
+function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes: _allModes, usedModes = [], suggestedModeId = null }) {
   const [query, setQuery] = useState(slot.title);
   const [results, setResults] = useState([]);
   const [todayTasks, setTodayTasks] = useState([]);
@@ -727,7 +727,7 @@ export default function DailyFocusPage() {
   const [timerDone, setTimerDone]           = useState(false);
   const [rushMode, setRushMode]             = useState(saved?.rushMode ?? false);
   const [taskTimings, setTaskTimings]       = useState(saved?.taskTimings ?? []); // [{used, total}]
-  const [taskStartRemaining, setTaskStartRemaining] = useState(null);
+  const [_taskStartRemaining, setTaskStartRemaining] = useState(null);
 
   // Modos usados hoje (bloqueados no picker)
   const [usedModes, setUsedModes] = useState(() => getUsedModes());
@@ -735,6 +735,12 @@ export default function DailyFocusPage() {
   // Recorde pessoal e progresso do dia
   const maxLevel = getMaxLevel();
   const dayLevel = getDayLevel();
+
+  // All modes (built-in + custom)
+  const ALL_MODES = useMemo(() => {
+    const custom = JSON.parse(localStorage.getItem("customModes") || "[]");
+    return [...MODES, ...custom];
+  }, []);
 
   // Streak e modo sugerido (calculados uma vez ao montar)
   const streak = getStreak();
@@ -758,7 +764,7 @@ export default function DailyFocusPage() {
   const [pausedSince, setPausedSince]             = useState(null); // timestamp
   const [longPause, setLongPause]                 = useState(false);
   const [newRecord, setNewRecord]                 = useState(false);
-  const [notifRequested, setNotifRequested]       = useState(false);
+  const [_notifRequested, _setNotifRequested]       = useState(false);
   const [ladderAnimating, setLadderAnimating]     = useState(false);
 
   // Recordes por modo

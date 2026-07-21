@@ -191,7 +191,7 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
   const dotColor = PRIORITY_COLORS[task.priority] || "var(--text-muted)";
   const done = task.completed;
 
-  const allItems = task.checklist || [];
+  const allItems = useMemo(() => task.checklist || [], [task.checklist]);
 
   // Só subtarefas raiz (sem parent)
   const rootSubtasks = useMemo(
@@ -296,7 +296,7 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
   // Inicia com o cache local para evitar flash, depois sincroniza com o BD
   const [todayIds, setTodayIds] = useState(loadCachedIds);
   const [showPicker, setShowPicker] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+  const [_syncing, _setSyncing] = useState(false);
 
   // ── Carrega do BD ao montar ──────────────────────────────────────────────
   useEffect(() => {

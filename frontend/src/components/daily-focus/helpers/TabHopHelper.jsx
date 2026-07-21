@@ -74,7 +74,8 @@ export default function TabHopHelper({ state, onChange }) {
               className={styles.helperSmallBtn}
               onClick={() => {
                 const t = s.tabs;
-                const ni = (s.currentIdx + 1) % t.length;
+                // ni computed but not used here; kept for reference
+                // const ni = (s.currentIdx + 1) % t.length;
                 onChange({ ...s, tabs: [...t, { name: tabInput, visits: 0 }] });
               }}
               style={{ display: "none" }}

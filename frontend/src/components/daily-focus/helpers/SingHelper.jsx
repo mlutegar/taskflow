@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getSongs, randomSong } from "../../../lib/singableSongs";
+import { randomSong } from "../../../lib/singableSongs";
 import styles from "../DailyFocus.module.css";
 
 const VARIANTS = [

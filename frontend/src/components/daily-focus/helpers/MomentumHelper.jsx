@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import styles from "../DailyFocus.module.css";
 
 const MINI_DURATION = 300; // 5 min

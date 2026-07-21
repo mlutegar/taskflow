@@ -46,7 +46,7 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
       setSelectedTask(null);
       setStep(available.length > 0 ? "select_task" : "summary");
     }
-  }, [step, selectedTask, available.length]); // eslint-disable-line
+  }, [step, selectedTask, available.length]);
 
   // Detecta conclusão "por fora" — se a tarefa selecionada foi marcada como
   // concluída fora da sessão (ex: na aba Tarefas), avança o ciclo automaticamente.
