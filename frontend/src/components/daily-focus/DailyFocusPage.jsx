@@ -7,6 +7,7 @@ import { tryUnlock, getAllWithStatus } from "../../lib/dailyFocusAchievements";
 import { getDayLevel, setDayLevel, getUsedModes, addUsedModes } from "../../lib/dailyFocusDay";
 import { usageStats } from "../../lib/modeLog";
 import styles from "./DailyFocus.module.css";
+import { MODES, HELPER_GROUPS } from "../../data/modes";
 
 // ── utils ────────────────────────────────────────────────
 function makeTasks(level) {
@@ -33,53 +34,22 @@ function nowTimeStr() {
   return new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
-// ── Mode catalog (for picker) ────────────────────────────
-const ALL_MODES = [
-  { id: "music",      emoji: "🎵", name: "Music Mode",           tagline: "Encontre a música certa, faça a tarefa certa" },
-  { id: "sing_one",   emoji: "🎙️", name: "Cantar 1 Música",      tagline: "Cante uma música inteira, depois faça uma tarefa" },
-  { id: "sing_ten",   emoji: "🎤", name: "10 Músicas Cantáveis", tagline: "Monte uma fila de 10 músicas" },
-  { id: "tiktok",     emoji: "📱", name: "TikTok Mode",          tagline: "Ciclos progressivos: videos → tarefas" },
-  { id: "splite",     emoji: "🔪", name: "Splite Mode",          tagline: "Ciclos com atividade personalizada" },
-  { id: "lazyfal",    emoji: "🦅", name: "Lazy Falcon Mode",     tagline: "Ciclos com tarefas salvas para depois" },
-  { id: "momentum",   emoji: "⚡", name: "Momentum Mode",        tagline: "Quebre a inércia com sessões de 5 minutos" },
-  { id: "espresso",   emoji: "☕", name: "Espresso Sprint",      tagline: "Sprints de 25 min com rastreamento de café" },
-  { id: "rpg",        emoji: "🎮", name: "RPG Class Mode",       tagline: "Produtividade gamificada com classes" },
-  { id: "caferitual", emoji: "🫖", name: "Café Ritual",          tagline: "Shot de café + a música certa = estado de pico" },
-  { id: "tabhop",     emoji: "📲", name: "Tab Hop",              tagline: "Rotação entre apps abertos" },
-  // Modos de atividade independentes
-  { id: "agua",       emoji: "💧", name: "Beber Água",           tagline: "Contador de copos com meta diária" },
-  { id: "meditar",    emoji: "🧘", name: "Meditar",              tagline: "Timer de meditação entre tarefas" },
-  { id: "ler_diario", emoji: "📖", name: "Ler Diário",           tagline: "Sorteia data e conta entradas lidas" },
-  { id: "esticar",    emoji: "🤸", name: "Esticar",              tagline: "Timer de 5 min de alongamento" },
-  { id: "livro",      emoji: "📚", name: "Ler Livro",            tagline: "Contador de capítulos lidos" },
-  { id: "exercicio",  emoji: "🏃", name: "Exercício Rápido",     tagline: "Contador de rounds de exercício" },
-  { id: "pomodoro",   emoji: "🍅", name: "Pomodoro",             tagline: "Timer personalizado — você define a duração" },
-];
-
-const HELPER_GROUPS = [
-  { label: "Música",       ids: ["music", "sing_one", "sing_ten"] },
-  { label: "Ciclos",       ids: ["tiktok", "splite", "lazyfal"] },
-  { label: "Foco",         ids: ["momentum", "espresso", "rpg", "pomodoro"] },
-  { label: "Ritual/Mobile",ids: ["caferitual", "tabhop"] },
-  { label: "Ritual",       ids: ["agua", "meditar", "ler_diario", "esticar", "livro", "exercicio"] },
-];
-
+// ── Mode helpers ─────────────────────────────────────────
 function getModeById(id) {
   if (!id) return null;
-  return (
-    ALL_MODES.find((m) => m.id === id) ||
-    JSON.parse(localStorage.getItem("customModes") || "[]").find((m) => m.id === id)
-  );
+  const custom = JSON.parse(localStorage.getItem("customModes") || "[]");
+  return [...MODES, ...custom].find((m) => m.id === id) || null;
 }
 
 function getGroupsWithCustom(usageMap = {}) {
-  const customModes = JSON.parse(localStorage.getItem("customModes") || "[]");
+  const customModes = JSON.parse(localStorage.getItem("customModes") || "[]")
+    .filter((m) => m.prerequisite?.trim() && m.whyItWorks?.trim() && m.whenToUse?.trim());
   const sortByUsage = (modes) =>
     [...modes].sort((a, b) => (usageMap[b.id] || 0) - (usageMap[a.id] || 0));
   return [
     ...HELPER_GROUPS.map((g) => ({
       label: g.label,
-      modes: sortByUsage(g.ids.map((id) => ALL_MODES.find((m) => m.id === id)).filter(Boolean)),
+      modes: sortByUsage(g.ids.map((id) => MODES.find((m) => m.id === id)).filter(Boolean)),
     })),
     ...(customModes.length > 0 ? [{ label: "Personalizados", modes: sortByUsage(customModes) }] : []),
   ];
@@ -125,58 +95,157 @@ function playTimerDoneSound() {
 // ── Sub-components ───────────────────────────────────────
 
 function HelperPickerModal({ current, usedModes = [], suggestedModeId = null, onSelect, onClose, onRemove }) {
+  const [preview, setPreview] = useState(null);
+  const [search, setSearch] = useState("");
+  // "forward" = lista→preview (slide da direita), "back" = preview→lista (slide da esquerda)
+  const [animDir, setAnimDir] = useState("forward");
+
   const usageMap = Object.fromEntries(usageStats(30).map(({ modeId, count }) => [modeId, count]));
-  const groups = getGroupsWithCustom(usageMap);
+  const allGroups = getGroupsWithCustom(usageMap);
+
+  // Filtro de busca aplicado sobre todos os grupos
+  const groups = search.trim()
+    ? [{
+        label: "Resultados",
+        modes: allGroups.flatMap((g) => g.modes).filter(
+          (m) => m.name.toLowerCase().includes(search.toLowerCase()) ||
+                 m.tagline.toLowerCase().includes(search.toLowerCase())
+        ),
+      }]
+    : allGroups;
+
+  const openPreview = (m) => {
+    setAnimDir("forward");
+    setPreview(m);
+  };
+
+  const closePreview = () => {
+    setAnimDir("back");
+    setPreview(null);
+  };
+
+  const handlePickItem = (m, isUsed) => {
+    if (isUsed) return;
+    openPreview(m);
+  };
+
+  const previewAnimClass = animDir === "forward"
+    ? styles.modePreviewForward
+    : styles.modePreviewBack;
+
   return (
     <div className={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className={styles.modal}>
         <div className={styles.modalHeader}>
-          <span className={styles.modalTitle}>🎯 Escolher Modo de Apoio</span>
+          <span className={styles.modalTitle}>
+            {preview ? `${preview.emoji} ${preview.name}` : "🎯 Escolher Modo de Apoio"}
+          </span>
           <button className={styles.modalClose} onClick={onClose}>×</button>
         </div>
         <div className={styles.modalBody}>
-          {onRemove && current && (
-            <div style={{ padding: "10px 18px", borderBottom: "1px solid var(--border)" }}>
-              <button
-                className={styles.changeHelperBtn}
-                style={{ width: "100%", padding: "8px" }}
-                onClick={() => { onRemove(); onClose(); }}
-              >
-                × Remover modo de apoio desta tarefa
+          {preview ? (
+            <div
+              key={preview.id}
+              className={`${styles.modePreview} ${previewAnimClass}`}
+              style={{ "--preview-color": preview.color || "var(--accent)" }}
+            >
+              <button className={styles.previewBack} onClick={closePreview}>
+                ← Voltar à lista
               </button>
+              <p className={styles.previewTagline}>{preview.tagline}</p>
+              <div className={styles.previewField}>
+                <span className={styles.previewFieldLabel}>✅ Pré-requisito</span>
+                <p className={styles.previewFieldText}>{preview.prerequisite}</p>
+              </div>
+              <div className={styles.previewField}>
+                <span className={styles.previewFieldLabel}>🧠 Por que funciona</span>
+                <p className={styles.previewFieldText}>{preview.whyItWorks}</p>
+              </div>
+              <div className={styles.previewField}>
+                <span className={styles.previewFieldLabel}>🕐 Quando usar</span>
+                <p className={styles.previewFieldText}>{preview.whenToUse}</p>
+              </div>
+              {current === preview.id ? (
+                <div className={styles.previewActiveNote}>
+                  ✓ Este modo já está selecionado para esta tarefa
+                </div>
+              ) : (
+                <button
+                  className={styles.previewStartBtn}
+                  onClick={() => { onSelect(preview.id); onClose(); }}
+                >
+                  ▶ Iniciar {preview.name}
+                </button>
+              )}
+            </div>
+          ) : (
+            <div key="list" className={`${styles.pickerList} ${previewAnimClass}`}>
+              {/* Busca */}
+              <div className={styles.pickerSearch}>
+                <input
+                  className={styles.pickerSearchInput}
+                  type="text"
+                  placeholder="🔍 Buscar modo…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  autoFocus
+                />
+                {search && (
+                  <button className={styles.pickerSearchClear} onClick={() => setSearch("")}>×</button>
+                )}
+              </div>
+
+              {onRemove && current && (
+                <div style={{ padding: "6px 18px 10px", borderBottom: "1px solid var(--border)" }}>
+                  <button
+                    className={styles.changeHelperBtn}
+                    style={{ width: "100%", padding: "8px" }}
+                    onClick={() => { onRemove(); onClose(); }}
+                  >
+                    × Remover modo de apoio desta tarefa
+                  </button>
+                </div>
+              )}
+
+              {groups.map((g) => (
+                <div key={g.label} className={styles.pickerGroup}>
+                  <div className={styles.pickerGroupLabel}>{g.label}</div>
+                  {g.modes.length === 0 && (
+                    <div className={styles.pickerEmpty}>Nenhum modo encontrado</div>
+                  )}
+                  {g.modes.map((m) => {
+                    const isUsed = usedModes.includes(m.id);
+                    const isActive = current === m.id;
+                    const isSuggested = !isUsed && m.id === suggestedModeId;
+                    return (
+                      <div
+                        key={m.id}
+                        className={`${styles.pickerItem} ${isActive ? styles.pickerItemActive : ""} ${isUsed ? styles.pickerItemUsed : ""}`}
+                        onClick={() => handlePickItem(m, isUsed)}
+                      >
+                        <span className={styles.pickerEmoji}>{m.emoji}</span>
+                        <div className={styles.pickerInfo}>
+                          <div className={styles.pickerName}>
+                            {m.name}
+                            {isSuggested && <span className={styles.pickerRecommended}>✨ recomendado</span>}
+                          </div>
+                          <div className={styles.pickerTagline}>
+                            {isUsed ? "✓ já testado hoje" : m.tagline}
+                          </div>
+                        </div>
+                        {isUsed
+                          ? <span className={styles.pickerLock}>🔒</span>
+                          : isActive
+                            ? <span className={styles.pickerCheck}>✓</span>
+                            : <span className={styles.pickerChevron}>›</span>
+                        }
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
-          {groups.map((g) => (
-            <div key={g.label} className={styles.pickerGroup}>
-              <div className={styles.pickerGroupLabel}>{g.label}</div>
-              {g.modes.map((m) => {
-                const isUsed = usedModes.includes(m.id);
-                const isSuggested = !isUsed && m.id === suggestedModeId;
-                return (
-                  <div
-                    key={m.id}
-                    className={`${styles.pickerItem} ${current === m.id ? styles.pickerItemActive : ""} ${isUsed ? styles.pickerItemUsed : ""}`}
-                    onClick={isUsed ? undefined : () => { onSelect(m.id); onClose(); }}
-                  >
-                    <span className={styles.pickerEmoji}>{m.emoji}</span>
-                    <div className={styles.pickerInfo}>
-                      <div className={styles.pickerName}>
-                        {m.name}
-                        {isSuggested && <span className={styles.pickerRecommended}>✨ recomendado</span>}
-                      </div>
-                      <div className={styles.pickerTagline}>
-                        {isUsed ? "✓ já testado hoje" : m.tagline}
-                      </div>
-                    </div>
-                    {isUsed
-                      ? <span className={styles.pickerLock}>🔒</span>
-                      : current === m.id && <span className={styles.pickerCheck}>✓</span>
-                    }
-                  </div>
-                );
-              })}
-            </div>
-          ))}
         </div>
       </div>
     </div>

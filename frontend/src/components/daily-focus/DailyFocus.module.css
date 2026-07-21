@@ -899,6 +899,160 @@
   margin-left: auto;
 }
 
+.pickerChevron {
+  font-size: 18px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: 0.5;
+}
+
+/* ── Picker Search ─────────────────────────────────────── */
+.pickerList {
+  display: flex;
+  flex-direction: column;
+}
+
+.pickerSearch {
+  position: relative;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pickerSearchInput {
+  width: 100%;
+  padding: 7px 30px 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.14s;
+}
+.pickerSearchInput:focus { border-color: var(--accent); }
+
+.pickerSearchClear {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0.6;
+  transition: opacity 0.14s;
+}
+.pickerSearchClear:hover { opacity: 1; }
+
+.pickerEmpty {
+  padding: 12px 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* ── Mode Preview Panel ────────────────────────────────── */
+@keyframes slideFromRight {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideFromLeft {
+  from { opacity: 0; transform: translateX(-18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.modePreviewForward { animation: slideFromRight 0.18s ease; }
+.modePreviewBack    { animation: slideFromLeft  0.18s ease; }
+
+.modePreview {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 20px;
+}
+
+.previewBack {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  align-self: flex-start;
+  opacity: 0.7;
+  transition: opacity 0.14s;
+}
+.previewBack:hover { opacity: 1; }
+
+.previewTagline {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.previewField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--preview-color, var(--accent));
+}
+
+.previewFieldLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--preview-color, var(--accent));
+}
+
+.previewFieldText {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.previewStartBtn {
+  margin-top: 4px;
+  padding: 11px 20px;
+  background: var(--preview-color, var(--accent));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  align-self: stretch;
+}
+.previewStartBtn:hover  { opacity: 0.88; }
+.previewStartBtn:active { transform: scale(0.97); }
+
+.previewActiveNote {
+  margin-top: 4px;
+  padding: 10px 14px;
+  background: rgba(78,204,163,0.1);
+  border: 1px solid rgba(78,204,163,0.3);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: #4ecca3;
+  font-weight: 600;
+  text-align: center;
+}
+
 /* ── Celebration ───────────────────────────────────────── */
 .celebration {
   display: flex;

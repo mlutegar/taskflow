@@ -7,8 +7,9 @@ import { getPinned, metaFor } from "../lib/splitePinned";
 import { logCompletion, usageStats } from "../lib/modeLog";
 import { getAllActivations } from "../lib/modeActivations";
 import { useDialog } from "../lib/useDialog";
+import { MODES, CATEGORY_BY_ID, CATEGORY_ORDER } from "../data/modes";
 
-const MODES = [
+const MODES_INLINE_REMOVED = [
   {
     id: "music",
     emoji: "🎵",
@@ -17,6 +18,9 @@ const MODES = [
     color: "#7c6ef5",
     colorBg: "rgba(124,110,245,0.08)",
     context: ["🖥️ Desktop", "🎧 Música"],
+    prerequisite: "Spotify (ou qualquer player) aberto e fones de ouvido disponíveis.",
+    whyItWorks: "A busca ativa pela música cria um ritual de transição mental — o ato de procurar já ativa o foco antes mesmo de começar a tarefa.",
+    whenToUse: "Quando você está disperso e precisa de uma âncora sonora para entrar no ritmo.",
     steps: [
       "Abra o Spotify e passe por ~100 músicas",
       "Quando encontrar UMA que ressoa, volte aqui",
@@ -33,6 +37,9 @@ const MODES = [
     color: "#e05252",
     colorBg: "rgba(224,82,82,0.08)",
     context: ["📱 Mobile", "🔄 Ciclos"],
+    prerequisite: "Celular com TikTok (ou Reels/Shorts) aberto e tarefas definidas.",
+    whyItWorks: "Usa a dopamina dos vídeos como recompensa controlada, criando ciclos crescentes de trabalho com reforço positivo.",
+    whenToUse: "Quando você está com vontade de procrastinar no TikTok — transforma o hábito em ferramenta.",
     steps: [
       "Ciclo 1: Assista 5 vídeos → Faça 1 tarefa",
       "Ciclo 2: Assista 10 vídeos → Faça 2 tarefas",
@@ -49,6 +56,9 @@ const MODES = [
     color: "#f0a540",
     colorBg: "rgba(240,165,64,0.08)",
     context: ["🖥️ Desktop", "🔄 Ciclos"],
+    prerequisite: "Uma atividade de recompensa definida (qualquer coisa que você goste e seja rápida).",
+    whyItWorks: "Ciclos progressivos com recompensa personalizável — o controle sobre a recompensa aumenta a motivação intrínseca.",
+    whenToUse: "Quando você quer ciclos de foco com uma recompensa que não seja redes sociais.",
     steps: [
       "Escolha uma atividade da sua lista personalizada",
       "Ciclo 1: Atividade 1× → 1 tarefa",
@@ -65,6 +75,9 @@ const MODES = [
     color: "#4ecca3",
     colorBg: "rgba(78,204,163,0.08)",
     context: ["🖥️ Desktop", "⏱️ Timer"],
+    prerequisite: "Celular longe do alcance e uma tarefa qualquer selecionada.",
+    whyItWorks: "5 minutos remove a barreira psicológica de começar — a inércia quebrada raramente volta, então você continua naturalmente.",
+    whenToUse: "Quando você está travado e não consegue começar nada — é para vencer a resistência inicial.",
     steps: [
       "Confirme que o celular está longe",
       "Selecione uma tarefa para trabalhar",
@@ -81,6 +94,9 @@ const MODES = [
     color: "#c8874a",
     colorBg: "rgba(200,135,74,0.08)",
     context: ["🖥️ Desktop", "☕ Café", "⏱️ Timer"],
+    prerequisite: "Café preparado (ou prestes a tomar).",
+    whyItWorks: "Combina o efeito estimulante da cafeína com sprints cronometrados, maximizando o estado de alerta em blocos mensuráveis.",
+    whenToUse: "Quando você tem energia de café disponível e quer extrair o máximo de cada dose.",
     steps: [
       "Confirme que tomou café (sessão registrada)",
       "Selecione uma tarefa para o sprint",
@@ -97,6 +113,9 @@ const MODES = [
     color: "#b06ef5",
     colorBg: "rgba(176,110,245,0.08)",
     context: ["🖥️ Desktop", "🎮 Gamificação"],
+    prerequisite: "Sem pré-requisito externo — basta querer gamificar a sessão.",
+    whyItWorks: "Transforma tarefas em quests com XP e classes, ativando a motivação por progressão e identidade do personagem.",
+    whenToUse: "Quando as abordagens comuns parecem monótonas e você precisa de um elemento lúdico para se engajar.",
     classes: [
       { emoji: "⚔️", name: "Warrior", desc: "30 min, bônus de stamina", color: "#e05252" },
       { emoji: "🧙‍♂️", name: "Mage", desc: "25 min, +25% XP em estudo", color: "#7c6ef5" },
@@ -118,6 +137,9 @@ const MODES = [
     color: "#4ea8cc",
     colorBg: "rgba(78,168,204,0.08)",
     context: ["🖥️ Desktop", "🔄 Ciclos"],
+    prerequisite: "Uma atividade de recompensa definida e projetos com progresso parcial possível.",
+    whyItWorks: "Ciclos progressivos com a opção de salvar progresso parcial — ideal para projetos longos que não cabem numa sessão.",
+    whenToUse: "Quando você trabalha em projetos que levam múltiplas sessões e quer registrar progresso parcial.",
     steps: [
       "Escolha uma atividade da lista",
       "Faça ciclos progressivos (n atividades → n tarefas)",
@@ -134,6 +156,9 @@ const MODES = [
     color: "#d4960a",
     colorBg: "rgba(212,150,10,0.08)",
     context: ["🖥️ Desktop", "☕ Café", "🎧 Música"],
+    prerequisite: "Café quente preparado + Spotify (ou player) aberto.",
+    whyItWorks: "Âncora física (café) + âncora mental (música) juntas criam um estado de confiança e pico de energia mais forte do que cada uma separada.",
+    whenToUse: "Quando você precisa de máxima energia e confiança para uma sessão importante.",
     steps: [
       "Prepare e tome um shot de café quente (âncora física)",
       "Abra o Spotify e passe por ~100 músicas",
@@ -150,6 +175,9 @@ const MODES = [
     color: "#2d9bf0",
     colorBg: "rgba(45,155,240,0.08)",
     context: ["📱 Mobile", "🚇 Transporte"],
+    prerequisite: "Apps que você vai usar abertos no celular antes de iniciar.",
+    whyItWorks: "Distribui o foco entre múltiplas tarefas em rotação, evitando a fadiga de concentração única durante deslocamentos.",
+    whenToUse: "Em transporte público ou momentos fragmentados onde foco longo não é possível.",
     steps: [
       "Abra os apps que vai usar hoje no celular",
       "Adicione cada um como uma 'aba' aqui",
@@ -172,6 +200,9 @@ const MODES = [
     session: "sing",
     preset: { variant: "one" },
     context: ["🖥️ Desktop", "🎤 Voz"],
+    prerequisite: "Uma música que você ama disponível para tocar.",
+    whyItWorks: "Cantar libera tensão, ativa a respiração e cria um reset emocional — o estado pós-canto é naturalmente mais leve e focado.",
+    whenToUse: "Quando você está tenso ou com energia represada antes de uma tarefa.",
     steps: [
       "Escolha uma música que você ama",
       "Cante junto do começo ao fim",
@@ -191,6 +222,9 @@ const MODES = [
     session: "sing",
     preset: { variant: "ten" },
     context: ["🖥️ Desktop", "🎤 Voz", "🔄 Ciclos"],
+    prerequisite: "Spotify ou app de música aberto para explorar e cantar junto.",
+    whyItWorks: "A curadoria da fila de músicas mantém a sessão leve e divertida enquanto o trabalho acontece em segundo plano.",
+    whenToUse: "Para sessões longas onde você quer tornar o trabalho mais prazeroso com música curada.",
     steps: [
       "Encontre uma música que dá vontade de cantar",
       "Registre na fila e faça uma tarefa cantando junto",
@@ -212,6 +246,9 @@ const MODES = [
     session: "splite",
     preset: { activity: "Beber água", emoji: "💧", name: "Beber Água" },
     context: ["🖥️ Desktop", "💧 Saúde"],
+    prerequisite: "Copo ou garrafa de água próximos ao computador.",
+    whyItWorks: "Hidratação melhora concentração. Vincular água às tarefas cria um ritual simples de autocuidado fácil de manter.",
+    whenToUse: "Durante qualquer sessão — especialmente em dias quentes ou sessões longas.",
     steps: [
       "Beba um copo de água antes de cada tarefa",
       "Marque o copo no contador",
@@ -231,6 +268,9 @@ const MODES = [
     session: "splite",
     preset: { activity: "Meditar", emoji: "🧘", name: "Meditar" },
     context: ["🖥️ Desktop", "🧘 Mindfulness"],
+    prerequisite: "Local tranquilo por 5 a 20 minutos entre as tarefas.",
+    whyItWorks: "Meditações curtas entre tarefas reduzem a fadiga de decisão, diminuem o cortisol e aumentam a clareza mental.",
+    whenToUse: "Quando a cabeça está cheia e você precisa de um reset mental entre blocos de trabalho.",
     steps: [
       "Escolha a duração: 5, 10, 15 ou 20 minutos",
       "Feche os olhos e medite antes da tarefa",
@@ -250,6 +290,9 @@ const MODES = [
     session: "splite",
     preset: { activity: "Ler diário", emoji: "📖", name: "Ler Diário" },
     context: ["🖥️ Desktop", "📖 Reflexão"],
+    prerequisite: "Diário pessoal (físico ou digital) acessível durante a sessão.",
+    whyItWorks: "Reler o diário cria perspectiva sobre crescimento pessoal, reduzindo ansiedade e aumentando motivação pelo progresso já feito.",
+    whenToUse: "Como ritual de abertura de sessão ou pausa reflexiva entre tarefas.",
     steps: [
       "Clique em 'Sortear data' para obter uma data aleatória",
       "Abra seu diário e leia a entrada daquela data",
@@ -269,6 +312,9 @@ const MODES = [
     session: "splite",
     preset: { activity: "Esticar 5 minutos", emoji: "🤸", name: "Esticar" },
     context: ["🖥️ Desktop", "🤸 Movimento"],
+    prerequisite: "Espaço físico para se levantar e movimentar (não precisa de equipamento).",
+    whyItWorks: "Movimento libera tensão muscular acumulada e aumenta a circulação, melhorando o estado físico e cognitivo.",
+    whenToUse: "Após períodos longos sentado — especialmente em sessões com mais de 1 hora de trabalho.",
     steps: [
       "Levante da cadeira e estique por 5 minutos",
       "Foque em pescoço, ombros e costas",
@@ -288,6 +334,9 @@ const MODES = [
     session: "splite",
     preset: { activity: "Ler um capítulo de livro", emoji: "📚", name: "Ler Livro" },
     context: ["🖥️ Desktop", "📚 Leitura"],
+    prerequisite: "Livro físico ou e-reader à mão durante a sessão.",
+    whyItWorks: "Livros entre tarefas criam uma transição suave e reduzem o impulso de abrir redes sociais nos intervalos.",
+    whenToUse: "Quando você quer avançar em leituras enquanto trabalha, usando as pausas de forma intencional.",
     steps: [
       "Registre o livro que está lendo",
       "Leia um capítulo antes de cada tarefa",
@@ -307,6 +356,9 @@ const MODES = [
     session: "splite",
     preset: { activity: "Fazer exercícios rápidos", emoji: "🏃", name: "Exercício Rápido" },
     context: ["🖥️ Desktop", "🏃 Movimento"],
+    prerequisite: "Espaço para se movimentar (burpees, agachamentos etc. — sem equipamento necessário).",
+    whyItWorks: "Exercício aumenta dopamina e oxigenação cerebral, criando um estado de clareza e energia após cada round.",
+    whenToUse: "Quando você está sobrecarregado e precisa de uma descarga de energia antes de cada tarefa.",
     steps: [
       "Faça um round de exercícios rápidos (burpees, agachamentos, etc.)",
       "Marque o round no contador",
@@ -327,6 +379,9 @@ const MODES = [
     category: "Foco",
     session: "pomodoro",
     context: ["🖥️ Desktop", "⏱️ Timer"],
+    prerequisite: "Sem pré-requisito — apenas escolha a duração ideal para você.",
+    whyItWorks: "Blocos de tempo definidos criam urgência saudável e eliminam a paralisia de 'quanto tempo isso vai levar'.",
+    whenToUse: "Para qualquer tipo de tarefa — especialmente quando você tem autonomia para definir o ritmo da sessão.",
     steps: [
       "Escolha a duração: 15, 25, 30, 45 ou 60 minutos",
       "Selecione uma tarefa para trabalhar",
@@ -335,7 +390,7 @@ const MODES = [
     ],
     tips: "Diferente do Momentum (5 min fixos) e Espresso (25 min), o Pomodoro deixa você definir o tempo ideal para cada sessão.",
   },
-];
+]; // <- array inline descontinuado; dados vêm de src/data/modes.js
 
 // ── Cards do Splite separados por atividade (reutilizam a SpliteSession com preset) ──
 // Gerados dinamicamente a partir das atividades "fixadas" (lib/splitePinned.js).
@@ -355,6 +410,9 @@ function buildSpliteModes(pinnedActivities) {
       session: "splite",
       preset: { activity },
       context: ["🖥️ Desktop", "🔄 Ciclos"],
+      prerequisite: `"${activity}" disponível para usar como pausa entre as tarefas.`,
+      whyItWorks: `Ciclos progressivos com "${activity}" como recompensa treinável — a atividade fixa cria um ritual previsível e motivador.`,
+      whenToUse: `Quando você quer ciclos de foco com "${activity}" como recompensa consistente.`,
       steps: [
         `Ciclo 1: "${activity}" 1× → 1 tarefa`,
         `Ciclo 2: "${activity}" 2× → 2 tarefas`,
@@ -365,18 +423,6 @@ function buildSpliteModes(pinnedActivities) {
     };
   });
 }
-
-// Categoria de cada modo embutido (fallback quando o objeto não traz `category`)
-const CATEGORY_BY_ID = {
-  music: "Música", sing_one: "Música", sing_ten: "Música",
-  tiktok: "Ciclos", splite: "Ciclos", lazyfal: "Ciclos",
-  momentum: "Foco", espresso: "Foco", rpg: "Foco",
-  caferitual: "Ritual", tabhop: "Mobile",
-  agua: "Ritual", meditar: "Ritual", ler_diario: "Ritual",
-  esticar: "Ritual", livro: "Ritual", exercicio: "Ritual",
-};
-
-const CATEGORY_ORDER = ["Música", "Ciclos", "Foco", "Ritual", "Mobile", "Personalizados"];
 
 const categoryOf = (m) =>
   m.isCustom ? "Personalizados" : (m.category || CATEGORY_BY_ID[m.id] || "Outros");
@@ -401,6 +447,9 @@ function CreateModeModal({ onSave, onClose }) {
   const [color, setColor] = useState("#7c6ef5");
   const [steps, setSteps] = useState(["", "", ""]);
   const [tips, setTips] = useState("");
+  const [prerequisite, setPrerequisite] = useState("");
+  const [whyItWorks, setWhyItWorks] = useState("");
+  const [whenToUse, setWhenToUse] = useState("");
   const [errors, setErrors] = useState({});
 
   const validate = () => {
@@ -408,6 +457,9 @@ function CreateModeModal({ onSave, onClose }) {
     if (!name.trim()) e.name = "Nome é obrigatório";
     if (!tagline.trim()) e.tagline = "Tagline é obrigatória";
     if (steps.filter((s) => s.trim()).length === 0) e.steps = "Adicione pelo menos um passo";
+    if (!prerequisite.trim()) e.prerequisite = "Pré-requisito é obrigatório";
+    if (!whyItWorks.trim()) e.whyItWorks = "\"Por que funciona\" é obrigatório";
+    if (!whenToUse.trim()) e.whenToUse = "\"Quando usar\" é obrigatório";
     return e;
   };
 
@@ -425,6 +477,9 @@ function CreateModeModal({ onSave, onClose }) {
       colorBg: hexToRgba(color, 0.08),
       steps: steps.filter((s) => s.trim()),
       tips: tips.trim() || undefined,
+      prerequisite: prerequisite.trim(),
+      whyItWorks: whyItWorks.trim(),
+      whenToUse: whenToUse.trim(),
       isCustom: true,
     });
   };
@@ -536,6 +591,45 @@ function CreateModeModal({ onSave, onClose }) {
             </div>
           </div>
 
+          {/* Prerequisite */}
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>✅ Pré-requisito *</label>
+            <textarea
+              className={`${styles.formTextarea} ${errors.prerequisite ? styles.inputError : ""}`}
+              placeholder="O que o usuário precisa ter/fazer antes de iniciar este modo?"
+              value={prerequisite}
+              onChange={(e) => { setPrerequisite(e.target.value); setErrors((p) => ({ ...p, prerequisite: "" })); }}
+              rows={2}
+            />
+            {errors.prerequisite && <span className={styles.errorText}>{errors.prerequisite}</span>}
+          </div>
+
+          {/* Why it works */}
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>🧠 Por que funciona *</label>
+            <textarea
+              className={`${styles.formTextarea} ${errors.whyItWorks ? styles.inputError : ""}`}
+              placeholder="A lógica por trás deste modo — por que ele é eficaz?"
+              value={whyItWorks}
+              onChange={(e) => { setWhyItWorks(e.target.value); setErrors((p) => ({ ...p, whyItWorks: "" })); }}
+              rows={2}
+            />
+            {errors.whyItWorks && <span className={styles.errorText}>{errors.whyItWorks}</span>}
+          </div>
+
+          {/* When to use */}
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>🕐 Quando usar *</label>
+            <textarea
+              className={`${styles.formTextarea} ${errors.whenToUse ? styles.inputError : ""}`}
+              placeholder="Em que situação ou estado mental este modo é mais indicado?"
+              value={whenToUse}
+              onChange={(e) => { setWhenToUse(e.target.value); setErrors((p) => ({ ...p, whenToUse: "" })); }}
+              rows={2}
+            />
+            {errors.whenToUse && <span className={styles.errorText}>{errors.whenToUse}</span>}
+          </div>
+
           {/* Tips */}
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>Dica (opcional)</label>
@@ -637,7 +731,13 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     localStorage.setItem("customModes", JSON.stringify(updated));
   };
 
-  const allModes = [...MODES, ...buildSpliteModes(pinnedSplite), ...customModes];
+  const hasRequiredFields = (m) =>
+    !!(m.prerequisite?.trim() && m.whyItWorks?.trim() && m.whenToUse?.trim());
+
+  const incompleteCustomModes = customModes.filter((m) => !hasRequiredFields(m));
+
+  const allModes = [...MODES, ...buildSpliteModes(pinnedSplite), ...customModes]
+    .filter(hasRequiredFields);
   const modeById = Object.fromEntries(allModes.map((m) => [m.id, m]));
 
   // Top modos da semana (com metadados conhecidos)
@@ -687,6 +787,11 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
                 )}
               </div>
               <span className={styles.cardTagline}>{mode.tagline}</span>
+              {!open && mode.prerequisite && (
+                <span className={styles.cardPrereqHint} title="Pré-requisito">
+                  ✅ {mode.prerequisite}
+                </span>
+              )}
               {mode.context?.length > 0 && (
                 <div className={styles.contextTags}>
                   {mode.context.map((tag) => (
@@ -728,6 +833,21 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
                 </span>
               </div>
             )}
+
+            <div className={styles.infoGrid}>
+              <div className={styles.infoItem}>
+                <span className={styles.infoLabel}>✅ Pré-requisito</span>
+                <p className={styles.infoText}>{mode.prerequisite}</p>
+              </div>
+              <div className={styles.infoItem}>
+                <span className={styles.infoLabel}>🧠 Por que funciona</span>
+                <p className={styles.infoText}>{mode.whyItWorks}</p>
+              </div>
+              <div className={styles.infoItem}>
+                <span className={styles.infoLabel}>🕐 Quando usar</span>
+                <p className={styles.infoText}>{mode.whenToUse}</p>
+              </div>
+            </div>
 
             <div className={styles.section}>
               <span className={styles.sectionLabel}>Como funciona</span>
@@ -788,6 +908,19 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         </div>
         <span className={dfStyles.dailyFocusCardArrow}>↗</span>
       </div>
+
+      {incompleteCustomModes.length > 0 && (
+        <div className={styles.incompleteWarning}>
+          <span className={styles.incompleteIcon}>⚠️</span>
+          <span>
+            <strong>{incompleteCustomModes.length}</strong> modo{incompleteCustomModes.length > 1 ? "s" : ""} personalizado{incompleteCustomModes.length > 1 ? "s" : ""} oculto{incompleteCustomModes.length > 1 ? "s" : ""} por faltarem campos obrigatórios:{" "}
+            {incompleteCustomModes.map((m) => m.name).join(", ")}.
+          </span>
+          <button className={styles.incompleteEditBtn} onClick={() => setShowCreate(true)}>
+            Criar completo →
+          </button>
+        </div>
+      )}
 
       <div className={styles.panelHeader}>
         <p className={styles.subtitle}>

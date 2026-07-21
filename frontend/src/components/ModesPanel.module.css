@@ -4,6 +4,40 @@
   gap: 20px;
 }
 
+/* ── Incomplete Custom Modes Warning ──────────────────────── */
+.incompleteWarning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(240,165,64,0.1);
+  border: 1px solid rgba(240,165,64,0.3);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.incompleteIcon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.incompleteEditBtn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid rgba(240,165,64,0.5);
+  color: #f0a540;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s;
+}
+.incompleteEditBtn:hover { background: rgba(240,165,64,0.15); }
+
 /* ── Panel Header ─────────────────────────────────────── */
 .panelHeader {
   display: flex;
@@ -345,6 +379,18 @@
   display: block;
 }
 
+/* ── Prerequisite hint (card fechado) ──────────────────── */
+.cardPrereqHint {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  max-width: 100%;
+}
+
 .contextTags {
   display: flex;
   flex-wrap: wrap;
@@ -439,6 +485,39 @@
 @keyframes fadeSlide {
   from { opacity: 0; transform: translateY(-5px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Info Grid (prerequisite / why / when) ─────────────── */
+.infoGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--mode-color);
+}
+
+.infoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.infoLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--mode-color);
+  opacity: 0.9;
+}
+
+.infoText {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0;
 }
 
 /* ── Section ───────────────────────────────────────────── */
