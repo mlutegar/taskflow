@@ -16,6 +16,8 @@ import EsticarHelper, { DEFAULT_STATE as esticarDefault } from "./EsticarHelper"
 import LivroHelper, { DEFAULT_STATE as livroDefault } from "./LivroHelper";
 import ExercicioHelper, { DEFAULT_STATE as exercicioDefault } from "./ExercicioHelper";
 import PomodoroHelper, { DEFAULT_STATE as pomodoroDefault } from "./PomodoroHelper";
+import DiarioFaladoHelper, { DEFAULT_STATE as diarioFaladoDefault } from "./DiarioFaladoHelper";
+import CantarHelper, { DEFAULT_STATE as cantarDefault } from "./CantarHelper";
 
 /**
  * Registry of all available helper panels for Daily Focus.
@@ -41,6 +43,8 @@ export const HELPER_REGISTRY = {
   livro: { Component: LivroHelper, defaultState: livroDefault },
   exercicio: { Component: ExercicioHelper, defaultState: exercicioDefault },
   pomodoro: { Component: PomodoroHelper, defaultState: pomodoroDefault },
+  diario_falado: { Component: DiarioFaladoHelper, defaultState: diarioFaladoDefault },
+  cantar: { Component: CantarHelper, defaultState: cantarDefault },
 };
 
 /**

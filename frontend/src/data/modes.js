@@ -180,6 +180,28 @@ export const MODES = [
     tips: "Criado para deslocamentos onde você não consegue manter foco longo. Cada aba exige apenas um pequeno avanço — a rotação cria progresso distribuído.",
   },
 
+  // ── Cantar pra destravar ──
+  {
+    id: "cantar",
+    emoji: "🎤",
+    name: "Cantar pra destravar",
+    tagline: "Canta uma música que você gosta pra sair do bloqueio",
+    color: "#e0679b",
+    colorBg: "rgba(224,103,155,0.08)",
+    category: "Música",
+    context: ["🖥️ Desktop", "🎤 Voz"],
+    prerequisite: "Ter pelo menos uma música/álbum na lista (já vem com sugestão pré-definida).",
+    whyItWorks: "Cantar uma música conhecida ativa o corpo e a voz, quebra o estado de paralisia e muda o estado emocional — mais fácil retomar o foco depois.",
+    whenToUse: "Quando você está travado, sem energia ou desanimado pra começar a tarefa.",
+    steps: [
+      "Veja a sugestão de música/álbum em destaque",
+      "Cante em voz alta (pelo menos um trecho)",
+      "Clique em 'Já cantei' quando terminar",
+      "Volte para a tarefa com o estado emocional renovado",
+    ],
+    tips: "Cantar ativa o corpo e a voz. Mesmo 1 minuto de canto já muda o estado emocional — não precisa ser perfeito.",
+  },
+
   // ── Modos de cantar ──
   {
     id: "sing_one",
@@ -386,7 +408,7 @@ export const MODES = [
 
 // IDs agrupados por categoria (para o picker do DailyFocus)
 export const HELPER_GROUPS = [
-  { label: "Música",        ids: ["music", "sing_one", "sing_ten"] },
+  { label: "Música",        ids: ["music", "sing_one", "sing_ten", "cantar"] },
   { label: "Ciclos",        ids: ["tiktok", "splite", "lazyfal"] },
   { label: "Foco",          ids: ["momentum", "espresso", "rpg", "pomodoro"] },
   { label: "Ritual/Mobile", ids: ["caferitual", "tabhop"] },
@@ -395,7 +417,7 @@ export const HELPER_GROUPS = [
 
 // Categoria de cada modo embutido (fallback quando o objeto não traz `category`)
 export const CATEGORY_BY_ID = {
-  music: "Música", sing_one: "Música", sing_ten: "Música",
+  music: "Música", sing_one: "Música", sing_ten: "Música", cantar: "Música",
   tiktok: "Ciclos", splite: "Ciclos", lazyfal: "Ciclos",
   momentum: "Foco", espresso: "Foco", rpg: "Foco",
   caferitual: "Ritual", tabhop: "Mobile",
