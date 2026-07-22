@@ -1,0 +1,311 @@
+/* ── Layout ──────────────────────────────────────── */
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+}
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+/* ── Period selector ─────────────────────────────── */
+.periodRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 28px;
+}
+
+.periodBtn {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.periodBtn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.periodBtn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Section ─────────────────────────────────────── */
+.section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+}
+
+/* ── Hero stats ──────────────────────────────────── */
+.heroGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 520px) {
+  .heroGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.statCard {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 14px 12px;
+  text-align: center;
+}
+
+.statValue {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.statLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.statAccent { color: var(--accent); }
+.statSuccess { color: var(--success); }
+.statWarning { color: var(--warning); }
+
+/* ── Heatmap ─────────────────────────────────────── */
+.heatmapGrid {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.heatmapCell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  flex-shrink: 0;
+  transition: transform 0.1s;
+}
+
+.heatmapCell:hover {
+  transform: scale(1.3);
+}
+
+.heatmapCell[data-level="1"] { background: rgba(124,110,245,0.25); }
+.heatmapCell[data-level="2"] { background: rgba(124,110,245,0.5); }
+.heatmapCell[data-level="3"] { background: rgba(124,110,245,0.75); }
+.heatmapCell[data-level="4"] { background: var(--accent); }
+
+.heatmapLegend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.heatmapLegendCells {
+  display: flex;
+  gap: 3px;
+}
+
+/* ── Charts ──────────────────────────────────────── */
+.chartWrap {
+  height: 200px;
+  width: 100%;
+}
+
+/* ── Mode bars ───────────────────────────────────── */
+.modeBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.modeBarLabel {
+  font-size: 13px;
+  color: var(--text);
+  width: 130px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modeBarTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.modeBarFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.modeBarCount {
+  font-size: 12px;
+  color: var(--text-muted);
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Estado bars ─────────────────────────────────── */
+.estadoRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.estadoEmoji {
+  font-size: 18px;
+  width: 24px;
+  flex-shrink: 0;
+}
+
+.estadoLabel {
+  font-size: 13px;
+  color: var(--text);
+  width: 90px;
+  flex-shrink: 0;
+}
+
+.estadoTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.estadoFill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--success);
+  transition: width 0.4s ease;
+}
+
+.estadoCount {
+  font-size: 12px;
+  color: var(--text-muted);
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.bestEstado {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: rgba(78, 204, 163, 0.1);
+  border: 1px solid rgba(78, 204, 163, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--success);
+}
+
+/* ── Achievements ────────────────────────────────── */
+.achGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.achCard {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 12px 10px;
+  text-align: center;
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+
+.achCard.locked {
+  opacity: 0.35;
+  filter: grayscale(0.8);
+}
+
+.achEmoji {
+  font-size: 24px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.achName {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+
+.achDesc {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* ── Avg time ────────────────────────────────────── */
+.avgRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.avgBig {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.avgDetail {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── Empty state ─────────────────────────────────── */
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 24px 0;
+}
