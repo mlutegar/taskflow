@@ -316,6 +316,27 @@ export const MODES = [
     tips: "Reler o diário cria perspectiva sobre seu crescimento. Datas aleatórias trazem surpresas que o modo linear não traz.",
   },
   {
+    id: "diario_falado",
+    emoji: "🗣️",
+    name: "Diário Falado",
+    tagline: "Registre o diário falando em voz alta — sem escrever",
+    color: "#a06bbf",
+    colorBg: "rgba(160,107,191,0.08)",
+    category: "Ritual",
+    session: "diario_falado",
+    context: ["🖥️ Desktop", "📖 Reflexão", "⚠️ Quando travado"],
+    prerequisite: "Estar numa sessão de foco. A gravação é feita num app externo de sua escolha.",
+    whyItWorks: "Falar em voz alta reduz a barreira de começar: pular o filtro de 'formular a frase certa por escrito' destrava quando a pessoa está paralisada.",
+    whenToUse: "Quando você está travado, com a cabeça cheia, ou quando escrever parece pesado demais pra começar.",
+    steps: [
+      "Abra um app de gravação externo (Notas de voz, Otter, WhisperMemo...)",
+      "Fale livremente — o que está sentindo, pensando, planejando",
+      "Grave por 2–5 minutos sem filtrar",
+      "Volte à tarefa com a cabeça mais leve",
+    ],
+    tips: "Falar em voz alta pula o filtro de 'formular a frase certa'. Serve para destravar quando escrever parece pesado demais.",
+  },
+  {
     id: "esticar",
     emoji: "🤸",
     name: "Esticar",
@@ -412,7 +433,7 @@ export const HELPER_GROUPS = [
   { label: "Ciclos",        ids: ["tiktok", "splite", "lazyfal"] },
   { label: "Foco",          ids: ["momentum", "espresso", "rpg", "pomodoro"] },
   { label: "Ritual/Mobile", ids: ["caferitual", "tabhop"] },
-  { label: "Ritual",        ids: ["agua", "meditar", "ler_diario", "esticar", "livro", "exercicio"] },
+  { label: "Ritual",        ids: ["agua", "meditar", "ler_diario", "diario_falado", "esticar", "livro", "exercicio"] },
 ];
 
 // Categoria de cada modo embutido (fallback quando o objeto não traz `category`)
@@ -421,7 +442,7 @@ export const CATEGORY_BY_ID = {
   tiktok: "Ciclos", splite: "Ciclos", lazyfal: "Ciclos",
   momentum: "Foco", espresso: "Foco", rpg: "Foco",
   caferitual: "Ritual", tabhop: "Mobile",
-  agua: "Ritual", meditar: "Ritual", ler_diario: "Ritual",
+  agua: "Ritual", meditar: "Ritual", ler_diario: "Ritual", diario_falado: "Ritual",
   esticar: "Ritual", livro: "Ritual", exercicio: "Ritual",
 };
 
