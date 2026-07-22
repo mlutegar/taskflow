@@ -43,7 +43,7 @@ export default function CheckInConfigPanel({ allModes = [], onClose }) {
           <button className={styles.closeBtn} onClick={onClose}>×</button>
         </div>
         <div className={styles.body}>
-          {estados.map((estado) => (
+          {estados.filter((e) => e.modeId !== null).map((estado) => (
             <div key={estado.id} className={styles.estadoRow}>
               <div className={styles.estadoRowLabel}>
                 {estado.custom ? (

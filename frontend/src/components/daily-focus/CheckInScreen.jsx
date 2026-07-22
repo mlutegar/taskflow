@@ -46,7 +46,9 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
   const [selectedEstado, setSelectedEstado] = useState(() => {
     try {
       const lastId = localStorage.getItem("taskflow.checkin.lastEstado");
-      return lastId ? (estados.find((e) => e.id === lastId) ?? null) : null;
+      // "bem" tem modeId=null — não pré-selecionar (não tem card de recomendação)
+      if (!lastId || lastId === "bem") return null;
+      return estados.find((e) => e.id === lastId && e.modeId !== null) ?? null;
     } catch { return null; }
   });
   const [showAlt, setShowAlt]       = useState(false);
