@@ -3,12 +3,18 @@ import { storageGet, storageAppend } from "./storage";
 const LS_KEY = "checkinLog";
 const MAX_ENTRIES = 200;
 
+// Fix #11: usar data local para evitar bug de fuso horário
+function localIsoDate() {
+  const d = new Date();
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+}
+
 export function logCheckinUsage(estadoId, modeId) {
   if (!estadoId || !modeId) return;
   storageAppend(LS_KEY, {
     estadoId,
     modeId,
-    date: new Date().toISOString().slice(0, 10),
+    date: localIsoDate(),
     hour: new Date().getHours(),
   }, MAX_ENTRIES);
 }
@@ -22,7 +28,7 @@ export function logSessionFeedback(estadoId, modeId, rating) {
     estadoId,
     modeId,
     rating, // 1 = positivo, -1 = negativo
-    date: new Date().toISOString().slice(0, 10),
+    date: localIsoDate(),
   }, MAX_FEEDBACK);
 }
 
@@ -60,7 +66,7 @@ export function getCheckinStreak() {
   const log = getCheckinLog();
   if (!log.length) return 0;
   const dates = [...new Set(log.map((e) => e.date))].sort().reverse();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   if (dates[0] !== today) return 0; // não usou hoje
   let streak = 1;
   for (let i = 1; i < dates.length; i++) {

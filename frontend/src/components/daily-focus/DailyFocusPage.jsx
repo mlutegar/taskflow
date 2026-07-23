@@ -28,8 +28,21 @@ function makeTasks(level) {
     supabaseId: null,
     durationMin: (level - i) * 15,
     done: false,
-    helperModeId: null,
+    helperModeIds: [],
   }));
+}
+
+// Migra sessões antigas que usavam helperModeId (string) para helperModeIds (array)
+function migrateTasks(tasks) {
+  if (!Array.isArray(tasks)) return tasks;
+  return tasks.map((t) => {
+    if ("helperModeId" in t && !("helperModeIds" in t)) {
+      const { helperModeId, ...rest } = t;
+      return { ...rest, helperModeIds: helperModeId ? [helperModeId] : [] };
+    }
+    if (!("helperModeIds" in t)) return { ...t, helperModeIds: [] };
+    return t;
+  });
 }
 
 function todayStr() {
@@ -76,7 +89,7 @@ export default function DailyFocusPage() {
   const { saved, persist, clearSaved } = useSessionPersist("daily_focus");
 
   const [level, setLevel]                   = useState(saved?.level ?? getDayLevel());
-  const [tasks, setTasks]                   = useState(saved?.tasks ?? makeTasks(1));
+  const [tasks, setTasks]                   = useState(() => migrateTasks(saved?.tasks ?? makeTasks(1)));
   const [currentIdx, setCurrentIdx]         = useState(saved?.currentIdx ?? 0);
   const [helperStates, setHelperStates]     = useState(saved?.helperStates ?? {}); // { modeId: state }
   const [timerRemaining, setTimerRemaining] = useState(saved?.timerRemaining ?? null);
@@ -104,7 +117,7 @@ export default function DailyFocusPage() {
   const streak = getStreak();
   const suggestedModeId = useMemo(() => {
     const stats = usageStats(30);
-    const available = stats.filter((s) => !usedModes.includes(s.modeId));
+    const available = stats.filter((s) => !usedModes[s.modeId]);
     return available[0]?.modeId ?? null;
   }, [usedModes]);
 
@@ -114,6 +127,9 @@ export default function DailyFocusPage() {
 
   // Feedback de sessão (não persiste)
   const [sessionFeedback, setSessionFeedback] = useState(null); // null | "good" | "bad"
+
+  // Aba ativa no painel de helpers quando há 2+ modos (não persiste)
+  const [activeHelperTab, setActiveHelperTab] = useState(null); // modeId | null
 
   // UI state (not persisted)
   const [showHelperPicker, setShowHelperPicker]   = useState(false);
@@ -134,10 +150,22 @@ export default function DailyFocusPage() {
   const maxLevelRush  = getMaxLevelByMode(true);
   const lastDateByLevel = getLastDateByLevel();
 
+  // Fix #9: Meta semanal configurável (cicla entre 3, 5, 7 ao clicar)
+  const WEEKLY_GOAL_OPTIONS = [3, 5, 7];
+  const [weeklyGoal, setWeeklyGoal] = useState(() => {
+    const saved = parseInt(localStorage.getItem("taskflow.weeklyGoal") || "5", 10);
+    return WEEKLY_GOAL_OPTIONS.includes(saved) ? saved : 5;
+  });
+  const cycleWeeklyGoal = () => {
+    const next = WEEKLY_GOAL_OPTIONS[(WEEKLY_GOAL_OPTIONS.indexOf(weeklyGoal) + 1) % WEEKLY_GOAL_OPTIONS.length];
+    setWeeklyGoal(next);
+    localStorage.setItem("taskflow.weeklyGoal", String(next));
+  };
+
   // Meta semanal
   const weeklyStats = getWeeklyStats();
   const weeklyCount = weeklyStats.filter((d) => d.count > 0).length;
-  const WEEKLY_GOAL = 5;
+  const WEEKLY_GOAL = weeklyGoal;
 
   // Persist on state changes
   useEffect(() => {
@@ -199,10 +227,14 @@ export default function DailyFocusPage() {
 
   const currentTask = tasks[currentIdx] || {};
   const totalSecs = (currentTask.durationMin || 0) * 60;
-  const activeHelperModeId = currentTask.helperModeId;
-  const helperEntry = getHelper(activeHelperModeId);
-  const helperMode = getModeById(activeHelperModeId);
-  const currentHelperState = helperStates[activeHelperModeId] || {};
+  const activeHelperModeIds = currentTask.helperModeIds ?? [];
+  // Aba ativa = tab selecionada manualmente, ou o primeiro modo, ou null
+  const activeTabModeId = (activeHelperTab && activeHelperModeIds.includes(activeHelperTab))
+    ? activeHelperTab
+    : activeHelperModeIds[0] ?? null;
+  const helperEntry = getHelper(activeTabModeId);
+  const helperMode = getModeById(activeTabModeId);
+  const currentHelperState = helperStates[activeTabModeId] || {};
 
   // ── helpers ──────────────────────────────────────────
   const updateTask = (i, val) =>
@@ -254,12 +286,12 @@ export default function DailyFocusPage() {
 
   const handleHelperChange = useCallback((newState) => {
     setHelperStates((prev) => {
-      const modeId = tasks[currentIdx]?.helperModeId;
+      const modeId = activeTabModeId;
       if (!modeId) return prev;
       const resolved = typeof newState === "function" ? newState(prev[modeId] || {}) : newState;
       return { ...prev, [modeId]: resolved };
     });
-  }, [tasks, currentIdx]);
+  }, [activeTabModeId]);
 
   // When switching to a new task, init helper state if needed
   const initHelperIfNeeded = (modeId) => {
@@ -271,28 +303,28 @@ export default function DailyFocusPage() {
     });
   };
 
+  // Adiciona um modo à tarefa (não substitui, empurra pro array)
   const handleSelectHelper = (modeId) => {
-    if (pickerForTask !== null) {
-      // Slot-level picker (select phase or work-phase per-task)
-      updateTask(pickerForTask, { ...tasks[pickerForTask], helperModeId: modeId });
-      initHelperIfNeeded(modeId);
-    } else {
-      // Work-phase "add/change for current task"
-      updateTask(currentIdx, { ...tasks[currentIdx], helperModeId: modeId });
-      initHelperIfNeeded(modeId);
-    }
+    const taskIdx = pickerForTask !== null ? pickerForTask : currentIdx;
+    setTasks((prev) => prev.map((t, i) => {
+      if (i !== taskIdx) return t;
+      const ids = t.helperModeIds ?? [];
+      if (ids.includes(modeId)) return t; // já está
+      return { ...t, helperModeIds: [...ids, modeId] };
+    }));
+    initHelperIfNeeded(modeId);
     setPickerForTask(null);
     setShowHelperPicker(false);
   };
 
-  const handleRemoveHelper = () => {
-    if (pickerForTask !== null) {
-      updateTask(pickerForTask, { ...tasks[pickerForTask], helperModeId: null });
-    } else {
-      updateTask(currentIdx, { ...tasks[currentIdx], helperModeId: null });
-    }
-    setPickerForTask(null);
-    setShowHelperPicker(false);
+  // Remove um modo específico de uma tarefa
+  const handleRemoveHelperById = (modeId, taskIdx) => {
+    setTasks((prev) => prev.map((t, i) => {
+      if (i !== taskIdx) return t;
+      return { ...t, helperModeIds: (t.helperModeIds ?? []).filter((id) => id !== modeId) };
+    }));
+    // Se a aba ativa foi removida, volta para null (vai pegar o primeiro)
+    if (activeHelperTab === modeId) setActiveHelperTab(null);
   };
 
   const handleCompleteTask = () => {
@@ -321,7 +353,8 @@ export default function DailyFocusPage() {
       setTimerDone(false);
       setLongPause(false);
       setPausedSince(null);
-      initHelperIfNeeded(updated[nextIdx].helperModeId);
+      setActiveHelperTab(null);
+      (updated[nextIdx].helperModeIds ?? []).forEach(initHelperIfNeeded);
     }
   };
 
@@ -352,7 +385,7 @@ export default function DailyFocusPage() {
     if (level >= 3) toUnlock.push("level_3");
     if (level >= 5) toUnlock.push("level_5");
     if (rushMode) toUnlock.push("rush_master");
-    if (completedTasks.some((t) => t.helperModeId)) toUnlock.push("helper_user");
+    if (completedTasks.some((t) => (t.helperModeIds ?? []).length > 0)) toUnlock.push("helper_user");
     if (hadEarlyCompletion || timings.some((t) => t.early)) toUnlock.push("early_bird");
 
     const newAch = tryUnlock(toUnlock);
@@ -361,7 +394,7 @@ export default function DailyFocusPage() {
     // Salva nível do dia e modos usados
     setDayLevel(level);
     const modesUsedThisSession = completedTasks
-      .map((t) => t.helperModeId)
+      .flatMap((t) => t.helperModeIds ?? [])
       .filter(Boolean);
     addUsedModes(modesUsedThisSession);
     setUsedModes(getUsedModes());
@@ -393,8 +426,8 @@ export default function DailyFocusPage() {
     logCheckinUsage(estadoId, modeId);
     // Pré-aplica na primeira tarefa se ela ainda não tiver modo selecionado
     setTasks((prev) => {
-      if (prev[0]?.helperModeId) return prev;
-      return prev.map((t, i) => i === 0 ? { ...t, helperModeId: modeId } : t);
+      if ((prev[0]?.helperModeIds ?? []).length > 0) return prev;
+      return prev.map((t, i) => i === 0 ? { ...t, helperModeIds: modeId ? [modeId] : [] } : t);
     });
     initHelperIfNeeded(modeId);
     // Conquista "Auto-conhecimento": 5 check-ins
@@ -558,13 +591,20 @@ export default function DailyFocusPage() {
             {/* Heatmap semanal */}
             <WeekHeatmap />
 
-            {/* Meta semanal */}
+            {/* Fix #9: Meta semanal configurável (clique para alternar entre 3/5/7 dias) */}
             <div className={styles.weeklyMeta}>
               <span>Esta semana:</span>
               <span className={weeklyCount >= WEEKLY_GOAL ? styles.weeklyGoalReached : styles.weeklyMetaCount}>
                 {weeklyCount}/{WEEKLY_GOAL} dias
               </span>
               {weeklyCount >= WEEKLY_GOAL && <span>✅ Meta atingida!</span>}
+              <button
+                onClick={cycleWeeklyGoal}
+                title={`Meta atual: ${WEEKLY_GOAL} dias/semana. Clique para alternar.`}
+                style={{ marginLeft: "auto", fontSize: "10px", color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+              >
+                meta: {WEEKLY_GOAL}d ⟳
+              </button>
             </div>
 
             {/* Badges de recorde e progresso do dia */}
@@ -646,6 +686,13 @@ export default function DailyFocusPage() {
               ))}
             </div>
 
+            {/* Fix #7: estimativa total de tempo */}
+            {!rushMode && (
+              <div style={{ textAlign: "center", fontSize: "12px", color: "var(--text-muted)", marginBottom: "10px" }}>
+                ⏱️ ~{tasks.reduce((s, t) => s + (t.durationMin || 0), 0)}min de foco no total
+              </div>
+            )}
+
             <button className={styles.startBtn} disabled={!allFilled} onClick={startSession}>
               {allFilled ? (rushMode ? "🚀 Começar no Modo Rush" : "▶ Começar sessão") : "Preencha todas as tarefas"}
             </button>
@@ -725,19 +772,42 @@ export default function DailyFocusPage() {
               </div>
             )}
 
-            {/* Helper panel */}
-            {helperEntry && helperMode && (
+            {/* Helper panel — suporta múltiplos modos com tabs */}
+            {activeHelperModeIds.length > 0 && (
               <div className={styles.helperPanel}>
-                <div className={styles.helperPanelHeader}>
-                  <span className={styles.helperPanelEmoji}>{helperMode.emoji}</span>
-                  <span className={styles.helperPanelName}>{helperMode.name}</span>
-                  <span className={styles.helperPanelBadge}>modo de apoio</span>
-                </div>
-                <helperEntry.Component
-                  state={currentHelperState}
-                  onChange={handleHelperChange}
-                  modeConfig={helperMode}
-                />
+                {/* Tab strip: só aparece quando há 2+ modos */}
+                {activeHelperModeIds.length > 1 && (
+                  <div className={styles.helperTabs}>
+                    {activeHelperModeIds.map((modeId) => {
+                      const m = getModeById(modeId);
+                      if (!m) return null;
+                      return (
+                        <button
+                          key={modeId}
+                          className={`${styles.helperTab} ${modeId === activeTabModeId ? styles.helperTabActive : ""}`}
+                          onClick={() => setActiveHelperTab(modeId)}
+                        >
+                          {m.emoji} {m.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* Header simples quando só há 1 modo */}
+                {activeHelperModeIds.length === 1 && helperMode && (
+                  <div className={styles.helperPanelHeader}>
+                    <span className={styles.helperPanelEmoji}>{helperMode.emoji}</span>
+                    <span className={styles.helperPanelName}>{helperMode.name}</span>
+                    <span className={styles.helperPanelBadge}>modo de apoio</span>
+                  </div>
+                )}
+                {helperEntry && helperMode && (
+                  <helperEntry.Component
+                    state={currentHelperState}
+                    onChange={handleHelperChange}
+                    modeConfig={helperMode}
+                  />
+                )}
               </div>
             )}
 
@@ -762,7 +832,9 @@ export default function DailyFocusPage() {
                 className={styles.changeHelperBtn}
                 onClick={() => { setPickerForTask(null); setShowHelperPicker(true); }}
               >
-                {helperMode ? `🔄 Trocar modo de apoio (${helperMode.name})` : "🎯 Adicionar modo de apoio"}
+                {activeHelperModeIds.length > 0
+                  ? `+ Adicionar modo  ${activeHelperModeIds.map((id) => getModeById(id)?.emoji ?? "").join("")}`
+                  : "🎯 Adicionar modo de apoio"}
               </button>
             </div>
           </div>
@@ -897,11 +969,14 @@ export default function DailyFocusPage() {
       {/* Modals */}
       {showHelperPicker && (
         <HelperPickerModal
-          current={activeHelperModeId}
+          currentIds={
+            pickerForTask !== null
+              ? (tasks[pickerForTask]?.helperModeIds ?? [])
+              : activeHelperModeIds
+          }
           usedModes={usedModes}
           suggestedModeId={suggestedModeId}
           onSelect={handleSelectHelper}
-          onRemove={activeHelperModeId ? handleRemoveHelper : null}
           onClose={handleCloseHelperPicker}
         />
       )}

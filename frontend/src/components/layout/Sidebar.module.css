@@ -14,10 +14,11 @@
   gap: 4px;
   z-index: 100;
   transition: width 0.2s ease;
+  overflow: hidden;
 }
 
 .sidebar:hover {
-  width: 180px;
+  width: 188px;
 }
 
 .logo {
@@ -44,7 +45,6 @@
   gap: 10px;
   padding: 10px 16px;
   cursor: pointer;
-  border-radius: 0;
   color: var(--text-muted);
   text-decoration: none;
   font-size: 13px;
@@ -56,6 +56,7 @@
   background: none;
   width: 100%;
   text-align: left;
+  position: relative;
 }
 
 .navItem:hover {
@@ -68,11 +69,49 @@
   background: rgba(124, 110, 245, 0.1);
 }
 
-.navIcon {
-  font-size: 18px;
+/* ── Icon + badge wrapper ───────────────────────────── */
+.navIconWrap {
+  position: relative;
   flex-shrink: 0;
   width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navIcon {
+  font-size: 18px;
+}
+
+/* Badge pequeno sobre o ícone (visível mesmo recolhido) */
+.streakBadge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: var(--warning);
+  color: #000;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 1px 4px;
+  line-height: 1.3;
+  min-width: 14px;
   text-align: center;
+}
+
+/* Versão inline visível quando sidebar está expandida */
+.streakBadgeInline {
+  font-size: 11px;
+  color: var(--warning);
+  opacity: 0;
+  transition: opacity 0.15s;
+  margin-left: auto;
+  padding-right: 4px;
+}
+
+.sidebar:hover .streakBadgeInline {
+  opacity: 1;
 }
 
 .navLabel {
@@ -111,6 +150,7 @@
     border-top: 1px solid var(--border);
     padding: 0;
     justify-content: space-around;
+    overflow: visible;
   }
 
   .logo {
@@ -146,6 +186,15 @@
 
   .sidebar:hover {
     width: 100%;
+  }
+
+  .streakBadgeInline {
+    display: none;
+  }
+
+  .streakBadge {
+    top: -4px;
+    right: -6px;
   }
 
   .pageArea {

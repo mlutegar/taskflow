@@ -18,7 +18,9 @@ function getGroupsWithCustom(usageMap = {}) {
   ];
 }
 
-function HelperPickerModal({ current, usedModes = [], suggestedModeId = null, onSelect, onClose, onRemove }) {
+function HelperPickerModal({ current, currentIds, usedModes = {}, suggestedModeId = null, onSelect, onClose, onRemove }) {
+  // Suporta tanto o formato antigo (current: string) quanto o novo (currentIds: string[])
+  const selectedIds = currentIds ?? (current ? [current] : []);
   const [preview, setPreview] = useState(null);
   const [search, setSearch] = useState("");
   // "forward" = lista→preview (slide da direita), "back" = preview→lista (slide da esquerda)
@@ -48,8 +50,7 @@ function HelperPickerModal({ current, usedModes = [], suggestedModeId = null, on
     setPreview(null);
   };
 
-  const handlePickItem = (m, isUsed) => {
-    if (isUsed) return;
+  const handlePickItem = (m) => {
     openPreview(m);
   };
 
@@ -62,7 +63,7 @@ function HelperPickerModal({ current, usedModes = [], suggestedModeId = null, on
       <div className={styles.modal}>
         <div className={styles.modalHeader}>
           <span className={styles.modalTitle}>
-            {preview ? `${preview.emoji} ${preview.name}` : "🎯 Escolher Modo de Apoio"}
+            {preview ? `${preview.emoji} ${preview.name}` : "🎯 Adicionar Modo de Apoio"}
           </span>
           <button className={styles.modalClose} onClick={onClose}>×</button>
         </div>
@@ -89,16 +90,16 @@ function HelperPickerModal({ current, usedModes = [], suggestedModeId = null, on
                 <span className={styles.previewFieldLabel}>🕐 Quando usar</span>
                 <p className={styles.previewFieldText}>{preview.whenToUse}</p>
               </div>
-              {current === preview.id ? (
+              {selectedIds.includes(preview.id) ? (
                 <div className={styles.previewActiveNote}>
-                  ✓ Este modo já está selecionado para esta tarefa
+                  ✓ Este modo já está adicionado nesta tarefa
                 </div>
               ) : (
                 <button
                   className={styles.previewStartBtn}
                   onClick={() => { onSelect(preview.id); onClose(); }}
                 >
-                  ▶ Iniciar {preview.name}
+                  ▶ Adicionar {preview.name}
                 </button>
               )}
             </div>
@@ -119,15 +120,22 @@ function HelperPickerModal({ current, usedModes = [], suggestedModeId = null, on
                 )}
               </div>
 
-              {onRemove && current && (
-                <div style={{ padding: "6px 18px 10px", borderBottom: "1px solid var(--border)" }}>
-                  <button
-                    className={styles.changeHelperBtn}
-                    style={{ width: "100%", padding: "8px" }}
-                    onClick={() => { onRemove(); onClose(); }}
-                  >
-                    × Remover modo de apoio desta tarefa
-                  </button>
+              {selectedIds.length > 0 && (
+                <div style={{ padding: "6px 18px 10px", borderBottom: "1px solid var(--border)", display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
+                  {selectedIds.map((id) => {
+                    const m = allGroups.flatMap((g) => g.modes).find((x) => x.id === id);
+                    return m ? (
+                      <span key={id} style={{
+                        display: "inline-flex", alignItems: "center", gap: "4px",
+                        fontSize: "11px", fontWeight: 600,
+                        padding: "2px 10px 2px 10px", borderRadius: "20px",
+                        background: "rgba(124,110,245,0.1)", border: "1px solid var(--accent)", color: "var(--accent)",
+                      }}>
+                        {m.emoji} {m.name}
+                      </span>
+                    ) : null;
+                  })}
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>ativos</span>
                 </div>
               )}
 
@@ -138,19 +146,20 @@ function HelperPickerModal({ current, usedModes = [], suggestedModeId = null, on
                     <div className={styles.pickerEmpty}>Nenhum modo encontrado</div>
                   )}
                   {g.modes.map((m) => {
-                    const isUsed = usedModes.includes(m.id);
-                    const isActive = current === m.id;
+                    const count = usedModes[m.id] ?? 0;
+                    const isUsed = count > 0;
+                    const isActive = selectedIds.includes(m.id);
                     const isSuggested = !isUsed && m.id === suggestedModeId;
+                    const usedLabel = count === 1 ? "✓ usado 1x hoje" : `✓ usado ${count}x hoje`;
                     return (
                       <div
                         key={m.id}
                         className={`${styles.pickerItem} ${isActive ? styles.pickerItemActive : ""} ${isUsed ? styles.pickerItemUsed : ""}`}
-                        onClick={() => handlePickItem(m, isUsed)}
+                        onClick={() => handlePickItem(m)}
                         role="button"
-                        tabIndex={isUsed ? -1 : 0}
-                        aria-label={`Selecionar modo ${m.name}${isUsed ? " (já usado hoje)" : ""}`}
-                        aria-disabled={isUsed}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePickItem(m, isUsed); } }}
+                        tabIndex={0}
+                        aria-label={`Selecionar modo ${m.name}${isUsed ? ` (${usedLabel})` : ""}`}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlePickItem(m); } }}
                       >
                         <span className={styles.pickerEmoji}>{m.emoji}</span>
                         <div className={styles.pickerInfo}>
@@ -159,13 +168,13 @@ function HelperPickerModal({ current, usedModes = [], suggestedModeId = null, on
                             {isSuggested && <span className={styles.pickerRecommended}>✨ recomendado</span>}
                           </div>
                           <div className={styles.pickerTagline}>
-                            {isUsed ? "✓ já testado hoje" : m.tagline}
+                            {isUsed ? usedLabel : m.tagline}
                           </div>
                         </div>
-                        {isUsed
-                          ? <span className={styles.pickerLock}>🔒</span>
-                          : isActive
-                            ? <span className={styles.pickerCheck}>✓</span>
+                        {isActive
+                          ? <span className={styles.pickerCheck}>✓</span>
+                          : isUsed
+                            ? <span className={styles.pickerLock}>{count}×</span>
                             : <span className={styles.pickerChevron}>›</span>
                         }
                       </div>

@@ -57,6 +57,14 @@
   margin-bottom: 16px;
 }
 
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 10px;
+}
+
 .sectionTitle {
   font-size: 13px;
   font-weight: 700;
@@ -64,6 +72,120 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 16px;
+}
+
+.sectionHeader .sectionTitle {
+  margin-bottom: 0;
+}
+
+/* Export button */
+.exportBtn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.exportBtn:hover { color: var(--text); border-color: var(--text-muted); }
+
+/* Delta comparativo */
+.deltaPositive {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--success);
+  background: rgba(78,204,163,0.1);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.deltaNegative {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger);
+  background: rgba(224,82,82,0.1);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+/* View toggle (mais usados / mais eficazes) */
+.viewToggle {
+  display: flex;
+  gap: 4px;
+}
+.viewBtn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.viewBtn:hover { color: var(--text); }
+.viewBtnActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Session history list */
+.sessionList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sessionRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+.sessionLevel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+.sessionInfo { flex: 1; min-width: 0; }
+.sessionDate {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+.sessionTag {
+  background: var(--surface);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  border: 1px solid var(--border);
+}
+.sessionTasks {
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sessionMore {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 8px;
 }
 
 /* ── Hero stats ──────────────────────────────────── */

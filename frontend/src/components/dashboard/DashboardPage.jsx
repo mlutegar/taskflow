@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import {
-  BarChart, Bar, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, LineChart, Line, ReferenceLine,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { getHistory, getStats, getStreak, getMaxLevel } from "../../lib/dailyFocusHistory";
 import { usageStats } from "../../lib/modeLog";
@@ -20,7 +20,16 @@ function parsePtBR(str) {
 
 function toIso(ptbrStr) {
   const d = parsePtBR(ptbrStr);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+// Fix #11: usa data local, não UTC
+function localIsoDate() {
+  const d = new Date();
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 }
 
 function daysAgo(n) {
@@ -29,8 +38,16 @@ function daysAgo(n) {
   return d;
 }
 
-function isoToday() {
-  return new Date().toISOString().slice(0, 10);
+function daysAgoIso(n) {
+  const d = daysAgo(n);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+}
+
+// Fix #1: tooltip com data formatada em pt-BR
+function formatIsoToPtBR(iso) {
+  const [y, m, d] = iso.split("-");
+  const date = new Date(Number(y), Number(m) - 1, Number(d));
+  return date.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" });
 }
 
 const PERIOD_OPTS = [
@@ -41,12 +58,32 @@ const PERIOD_OPTS = [
 ];
 
 const TOOLTIP_STYLE = {
-  backgroundColor: "var(--surface)",
-  border: "1px solid var(--border)",
+  backgroundColor: "#1a1a22",
+  border: "1px solid #2e2e3e",
   borderRadius: 8,
-  color: "var(--text)",
+  color: "#e8e8f0",
   fontSize: 12,
 };
+
+// ── Fix #4: Exportar dados ────────────────────────────────────────────────────
+function handleExport() {
+  const history = getHistory();
+  const checkinLog = getCheckinLog();
+  const feedback = getSessionFeedback();
+  const data = {
+    exportedAt: new Date().toISOString(),
+    sessions: history,
+    checkinLog,
+    feedback,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `taskflow-dados-${localIsoDate()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 // ── subcomponents ─────────────────────────────────────────────────────────────
 
@@ -58,7 +95,12 @@ function HeroStats({ history, streak }) {
 
   return (
     <div className={styles.section}>
-      <div className={styles.sectionTitle}>Visão geral</div>
+      <div className={styles.sectionHeader}>
+        <div className={styles.sectionTitle}>Visão geral</div>
+        <button className={styles.exportBtn} onClick={handleExport} title="Exportar todos os dados como JSON">
+          ⬇ exportar
+        </button>
+      </div>
       <div className={styles.heroGrid}>
         <div className={styles.statCard}>
           <div className={`${styles.statValue} ${styles.statAccent}`}>{streak}</div>
@@ -81,6 +123,11 @@ function HeroStats({ history, streak }) {
   );
 }
 
+// Fix #1: tooltip com data legível
+function HeatmapTooltip({ iso, count }) {
+  return `${formatIsoToPtBR(iso)}: ${count} sessão${count !== 1 ? "ões" : ""}`;
+}
+
 function ActivityHeatmap({ history, days }) {
   const cells = useMemo(() => {
     const map = {};
@@ -92,8 +139,7 @@ function ActivityHeatmap({ history, days }) {
     const result = [];
     const n = Math.min(days, 90);
     for (let i = n - 1; i >= 0; i--) {
-      const d = daysAgo(i);
-      const iso = d.toISOString().slice(0, 10);
+      const iso = daysAgoIso(i);
       const count = map[iso] || 0;
       const level = count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : count <= 3 ? 3 : 4;
       result.push({ iso, count, level });
@@ -110,7 +156,7 @@ function ActivityHeatmap({ history, days }) {
             key={c.iso}
             className={styles.heatmapCell}
             data-level={c.level}
-            title={`${c.iso}: ${c.count} sessão${c.count !== 1 ? "ões" : ""}`}
+            title={HeatmapTooltip(c)}  // Fix #1: data formatada
           />
         ))}
       </div>
@@ -138,8 +184,8 @@ function SessionsBarChart({ history, days }) {
     const result = [];
     const n = Math.min(days, 30);
     for (let i = n - 1; i >= 0; i--) {
+      const iso = daysAgoIso(i);
       const d = daysAgo(i);
-      const iso = d.toISOString().slice(0, 10);
       const label = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
       result.push({ label, sessões: map[iso] || 0 });
     }
@@ -154,16 +200,16 @@ function SessionsBarChart({ history, days }) {
       <div className={styles.chartWrap}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} barSize={8}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#2e2e3e" />
             <XAxis
               dataKey="label"
-              tick={{ fill: "var(--text-muted)", fontSize: 10 }}
+              tick={{ fill: "#7a7a9a", fontSize: 10 }}
               tickLine={false}
               interval={Math.floor(data.length / 6)}
             />
-            <YAxis tick={{ fill: "var(--text-muted)", fontSize: 10 }} tickLine={false} allowDecimals={false} />
+            <YAxis tick={{ fill: "#7a7a9a", fontSize: 10 }} tickLine={false} allowDecimals={false} />
             <Tooltip contentStyle={TOOLTIP_STYLE} />
-            <Bar dataKey="sessões" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="sessões" fill="#7c6ef5" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -171,32 +217,71 @@ function SessionsBarChart({ history, days }) {
   );
 }
 
-function LevelLineChart({ history, days }) {
-  const data = useMemo(() => {
-    const cutoff = daysAgo(days).toISOString().slice(0, 10);
-    return [...history]
+// Fix #2: linha fantasma do período anterior
+function LevelLineChart({ history, days, allHistory }) {
+  const { current, previous, avgCurrent, avgPrevious } = useMemo(() => {
+    const cutoff = daysAgoIso(days);
+    const prevCutoff = daysAgoIso(days * 2);
+
+    const current = [...allHistory]
       .filter((e) => toIso(e.date) >= cutoff)
       .reverse()
-      .map((e, i) => ({
-        idx: i + 1,
-        nível: e.level,
-        data: e.date,
-      }));
-  }, [history, days]);
+      .map((e, i) => ({ idx: i + 1, nível: e.level, data: e.date }));
 
-  if (data.length < 2) return null;
+    const previous = [...allHistory]
+      .filter((e) => {
+        const iso = toIso(e.date);
+        return iso >= prevCutoff && iso < cutoff;
+      })
+      .reverse()
+      .map((e, i) => ({ idx: i + 1, anterior: e.level }));
+
+    const avg = (arr) => arr.length ? Math.round(arr.reduce((s, e) => s + e.level, 0) / arr.length * 10) / 10 : null;
+    const currentFiltered = allHistory.filter((e) => toIso(e.date) >= cutoff);
+    const prevFiltered = allHistory.filter((e) => { const iso = toIso(e.date); return iso >= prevCutoff && iso < cutoff; });
+
+    return {
+      current,
+      previous,
+      avgCurrent: avg(currentFiltered),
+      avgPrevious: avg(prevFiltered),
+    };
+  }, [history, days, allHistory]);
+
+  if (current.length < 2) return null;
+
+  // Mescla atual + anterior por índice
+  const maxLen = Math.max(current.length, previous.length);
+  const merged = Array.from({ length: maxLen }, (_, i) => ({
+    idx: i + 1,
+    ...(current[i] || {}),
+    ...(previous[i] || {}),
+  }));
+
+  const delta = avgCurrent !== null && avgPrevious !== null
+    ? Math.round((avgCurrent - avgPrevious) * 10) / 10
+    : null;
 
   return (
     <div className={styles.section}>
-      <div className={styles.sectionTitle}>Evolução de nível</div>
+      <div className={styles.sectionHeader}>
+        <div className={styles.sectionTitle}>Evolução de nível</div>
+        {delta !== null && (
+          <div className={delta >= 0 ? styles.deltaPositive : styles.deltaNegative}>
+            {delta >= 0 ? "▲" : "▼"} {Math.abs(delta)} vs período anterior
+          </div>
+        )}
+      </div>
       <div className={styles.chartWrap}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="idx" tick={{ fill: "var(--text-muted)", fontSize: 10 }} tickLine={false} label={{ value: "sessão", position: "insideBottomRight", fill: "var(--text-muted)", fontSize: 10, offset: -4 }} />
-            <YAxis tick={{ fill: "var(--text-muted)", fontSize: 10 }} tickLine={false} allowDecimals={false} domain={[1, "dataMax"]} />
+          <LineChart data={merged}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#2e2e3e" />
+            <XAxis dataKey="idx" tick={{ fill: "#7a7a9a", fontSize: 10 }} tickLine={false} />
+            <YAxis tick={{ fill: "#7a7a9a", fontSize: 10 }} tickLine={false} allowDecimals={false} domain={[1, "dataMax"]} />
             <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => `Sessão ${v}`} />
-            <Line type="monotone" dataKey="nível" stroke="var(--accent)" strokeWidth={2} dot={false} />
+            <Legend wrapperStyle={{ fontSize: 11, color: "#7a7a9a" }} />
+            <Line type="monotone" dataKey="nível" stroke="#7c6ef5" strokeWidth={2} dot={false} name="Período atual" />
+            <Line type="monotone" dataKey="anterior" stroke="#7a7a9a" strokeWidth={1.5} strokeDasharray="4 4" dot={false} name="Período anterior" />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -204,41 +289,81 @@ function LevelLineChart({ history, days }) {
   );
 }
 
+// Fix #3: modo mais eficaz (cruzar feedback com uso)
 function TopModes({ days }) {
-  const stats = useMemo(() => usageStats(days === 9999 ? 365 : days), [days]);
-  const max = stats[0]?.count || 1;
-  const top = stats.slice(0, 8);
+  const [view, setView] = useState("usado"); // "usado" | "eficaz"
 
-  if (!top.length) return (
-    <div className={styles.section}>
-      <div className={styles.sectionTitle}>Modos mais usados</div>
-      <div className={styles.empty}>Nenhum modo usado ainda.</div>
-    </div>
-  );
+  const { byUsage, byEfficacy } = useMemo(() => {
+    const cutoff = daysAgoIso(days === 9999 ? 365 : days);
+    const stats = usageStats(days === 9999 ? 365 : days);
+
+    const feedback = getSessionFeedback().filter((e) => e.date >= cutoff);
+    const pos = {};
+    const total = {};
+    for (const f of feedback) {
+      if (!f.modeId) continue;
+      total[f.modeId] = (total[f.modeId] || 0) + 1;
+      if (f.rating === 1) pos[f.modeId] = (pos[f.modeId] || 0) + 1;
+    }
+
+    const byEfficacy = Object.entries(total)
+      .filter(([, t]) => t >= 2) // mínimo 2 feedbacks para ser relevante
+      .map(([modeId, t]) => ({
+        modeId,
+        count: Math.round(((pos[modeId] || 0) / t) * 100),
+        total: t,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    return { byUsage: stats.slice(0, 8), byEfficacy };
+  }, [days]);
+
+  const activeList = view === "usado" ? byUsage : byEfficacy;
+  const max = view === "usado"
+    ? (byUsage[0]?.count || 1)
+    : 100;
+
+  const isEmpty = activeList.length === 0;
 
   return (
     <div className={styles.section}>
-      <div className={styles.sectionTitle}>Modos mais usados</div>
-      {top.map(({ modeId, count }) => {
-        const mode = MODES.find((m) => m.id === modeId);
-        const label = mode ? `${mode.emoji} ${mode.name}` : modeId;
-        return (
-          <div key={modeId} className={styles.modeBar}>
-            <div className={styles.modeBarLabel} title={label}>{label}</div>
-            <div className={styles.modeBarTrack}>
-              <div className={styles.modeBarFill} style={{ width: `${(count / max) * 100}%` }} />
+      <div className={styles.sectionHeader}>
+        <div className={styles.sectionTitle}>Modos</div>
+        <div className={styles.viewToggle}>
+          <button className={`${styles.viewBtn} ${view === "usado" ? styles.viewBtnActive : ""}`} onClick={() => setView("usado")}>Mais usados</button>
+          <button className={`${styles.viewBtn} ${view === "eficaz" ? styles.viewBtnActive : ""}`} onClick={() => setView("eficaz")}>Mais eficazes</button>
+        </div>
+      </div>
+      {isEmpty ? (
+        <div className={styles.empty}>
+          {view === "eficaz" ? "Dê feedbacks (👍/👎) ao final das sessões para ver aqui." : "Nenhum modo usado ainda."}
+        </div>
+      ) : (
+        activeList.map(({ modeId, count }) => {
+          const mode = MODES.find((m) => m.id === modeId);
+          const label = mode ? `${mode.emoji} ${mode.name}` : modeId;
+          const pct = Math.round((count / max) * 100);
+          return (
+            <div key={modeId} className={styles.modeBar}>
+              <div className={styles.modeBarLabel} title={label}>{label}</div>
+              <div className={styles.modeBarTrack}>
+                <div className={styles.modeBarFill} style={{ width: `${pct}%` }} />
+              </div>
+              <div className={styles.modeBarCount}>
+                {view === "eficaz" ? `${count}%` : count}
+              </div>
             </div>
-            <div className={styles.modeBarCount}>{count}</div>
-          </div>
-        );
-      })}
+          );
+        })
+      )}
     </div>
   );
 }
 
 function EstadosSection({ days }) {
   const { freq, best } = useMemo(() => {
-    const cutoff = daysAgo(days).toISOString().slice(0, 10);
+    const cutoff = daysAgoIso(days === 9999 ? 3650 : days);
     const log = getCheckinLog().filter((e) => e.date >= cutoff);
     const feedback = getSessionFeedback().filter((e) => e.date >= cutoff);
 
@@ -247,7 +372,6 @@ function EstadosSection({ days }) {
       freq[e.estadoId] = (freq[e.estadoId] || 0) + 1;
     }
 
-    // best = estado com mais feedbacks positivos
     const pos = {};
     for (const f of feedback) {
       if (f.rating === 1 && f.estadoId) {
@@ -303,7 +427,7 @@ function Achievements() {
       <div className={styles.sectionTitle}>Conquistas — {unlocked}/{all.length} desbloqueadas</div>
       <div className={styles.achGrid}>
         {all.map((a) => (
-          <div key={a.id} className={`${styles.achCard} ${a.unlocked ? "" : styles.locked}`}>
+          <div key={a.id} className={`${styles.achCard} ${a.unlocked ? "" : styles.locked}`} title={a.desc}>
             <span className={styles.achEmoji}>{a.emoji}</span>
             <div className={styles.achName}>{a.name}</div>
             <div className={styles.achDesc}>{a.desc}</div>
@@ -314,16 +438,14 @@ function Achievements() {
   );
 }
 
-function AvgTime({ history, days }) {
+function AvgTime({ history }) {
   const { avg, total } = useMemo(() => {
-    const cutoff = daysAgo(days).toISOString().slice(0, 10);
-    const filtered = history.filter((e) => toIso(e.date) >= cutoff);
-    const allTimings = filtered.flatMap((e) => e.timings || []);
+    const allTimings = history.flatMap((e) => e.timings || []);
     const used = allTimings.filter((t) => t.used > 0).map((t) => t.used);
     if (!used.length) return { avg: null, total: 0 };
     const avgMs = used.reduce((s, v) => s + v, 0) / used.length;
     return { avg: Math.round(avgMs / 60), total: used.length };
-  }, [history, days]);
+  }, [history]);
 
   return (
     <div className={styles.section}>
@@ -343,18 +465,53 @@ function AvgTime({ history, days }) {
   );
 }
 
+// Fix #8: Histórico de sessões com link para navegar ao dashboard
+function SessionHistory({ history }) {
+  if (!history.length) return null;
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>Sessões recentes</div>
+      <div className={styles.sessionList}>
+        {history.slice(0, 10).map((entry, i) => {
+          const estado = ESTADOS_DEFAULT.find((e) => e.id === entry.estadoId);
+          return (
+            <div key={i} className={styles.sessionRow}>
+              <div className={styles.sessionLevel}>Nv.{entry.level}</div>
+              <div className={styles.sessionInfo}>
+                <div className={styles.sessionDate}>
+                  {entry.date} · {entry.completedAt}
+                  {entry.rushMode && <span className={styles.sessionTag}>🚀 Rush</span>}
+                  {estado && <span className={styles.sessionTag}>{estado.emoji} {estado.label}</span>}
+                </div>
+                <div className={styles.sessionTasks}>
+                  {entry.tasks.slice(0, 2).join(" · ")}
+                  {entry.tasks.length > 2 && ` +${entry.tasks.length - 2}`}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {history.length > 10 && (
+        <div className={styles.sessionMore}>+{history.length - 10} sessões mais antigas</div>
+      )}
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const [periodIdx, setPeriodIdx] = useState(1); // 30d default
   const days = PERIOD_OPTS[periodIdx].days;
 
+  const allHistory = useMemo(() => getHistory(), []);
+
   const history = useMemo(() => {
-    const all = getHistory();
-    if (days >= 9999) return all;
-    const cutoff = daysAgo(days).toISOString().slice(0, 10);
-    return all.filter((e) => toIso(e.date) >= cutoff);
-  }, [days]);
+    if (days >= 9999) return allHistory;
+    const cutoff = daysAgoIso(days);
+    return allHistory.filter((e) => toIso(e.date) >= cutoff);
+  }, [days, allHistory]);
 
   const streak = getStreak();
 
@@ -378,11 +535,12 @@ export default function DashboardPage() {
       <HeroStats history={history} streak={streak} />
       <ActivityHeatmap history={history} days={days} />
       <SessionsBarChart history={history} days={days} />
-      <LevelLineChart history={history} days={days} />
+      <LevelLineChart history={history} days={days} allHistory={allHistory} />
       <TopModes days={days} />
       <EstadosSection days={days} />
       <Achievements />
-      <AvgTime history={history} days={days} />
+      <AvgTime history={history} />
+      <SessionHistory history={history} />
     </div>
   );
 }

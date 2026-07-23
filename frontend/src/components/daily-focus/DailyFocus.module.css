@@ -882,10 +882,8 @@
 }
 
 .pickerItemUsed {
-  opacity: 0.45;
-  cursor: not-allowed;
-  filter: grayscale(0.7);
-  pointer-events: none;
+  opacity: 0.7;
+  filter: grayscale(0.35);
 }
 
 .pickerItemUsed .pickerTagline {
@@ -1190,6 +1188,72 @@
   background: rgba(124,110,245,0.1);
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* ── Mode chips (múltiplos modos por tarefa) ───────────── */
+.slotHelperArea {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.modeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 6px 3px 10px;
+  border-radius: 20px;
+  background: rgba(124,110,245,0.1);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.modeChipRemove {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.6;
+  transition: opacity 0.12s;
+}
+.modeChipRemove:hover { opacity: 1; }
+
+/* ── Helper panel tabs (fase de trabalho, 2+ modos) ───── */
+.helperTabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.helperTabs::-webkit-scrollbar { display: none; }
+
+.helperTab {
+  flex: none;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+.helperTab:hover { color: var(--text); }
+
+.helperTabActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
 /* ── Progress dots ─────────────────────────────────────── */

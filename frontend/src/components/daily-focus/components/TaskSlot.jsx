@@ -62,7 +62,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
     setEditingDuration(false);
   };
 
-  const helperMode = getModeById(slot.helperModeId);
+  const helperModeIds = slot.helperModeIds ?? [];
   const showTodaySuggestions = !query.trim() && todayTasks.length > 0;
 
   return (
@@ -146,25 +146,50 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
             onClick={clear}
             role="button"
             tabIndex={0}
-            aria-label="Remover modo"
+            aria-label="Remover tarefa"
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clear(); } }}
           >× limpar</span>
         )}
-        <button
-          className={`${styles.slotHelperBtn} ${helperMode ? styles.slotHelperBtnActive : ""}`}
-          onClick={() => setShowHelperPicker(true)}
-        >
-          {helperMode ? `${helperMode.emoji} ${helperMode.name}` : "+ Modo de apoio"}
-        </button>
+        <div className={styles.slotHelperArea}>
+          {helperModeIds.map((modeId) => {
+            const m = getModeById(modeId);
+            if (!m) return null;
+            return (
+              <span key={modeId} className={styles.modeChip}>
+                {m.emoji} {m.name}
+                <button
+                  className={styles.modeChipRemove}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange({ ...slot, helperModeIds: helperModeIds.filter((id) => id !== modeId) });
+                  }}
+                  title={`Remover ${m.name}`}
+                  aria-label={`Remover ${m.name}`}
+                >×</button>
+              </span>
+            );
+          })}
+          <button
+            className={`${styles.slotHelperBtn} ${helperModeIds.length > 0 ? styles.slotHelperBtnActive : ""}`}
+            onClick={() => setShowHelperPicker(true)}
+            title="Adicionar modo de apoio"
+          >
+            {helperModeIds.length > 0 ? "+" : "+ Modo de apoio"}
+          </button>
+        </div>
       </div>
 
       {showHelperPicker && (
         <HelperPickerModal
-          current={slot.helperModeId}
+          currentIds={helperModeIds}
           usedModes={usedModes}
           suggestedModeId={suggestedModeId}
-          onSelect={(id) => onChange({ ...slot, helperModeId: id })}
-          onRemove={() => onChange({ ...slot, helperModeId: null })}
+          onSelect={(id) => {
+            if (!helperModeIds.includes(id)) {
+              onChange({ ...slot, helperModeIds: [...helperModeIds, id] });
+            }
+            setShowHelperPicker(false);
+          }}
           onClose={() => setShowHelperPicker(false)}
         />
       )}

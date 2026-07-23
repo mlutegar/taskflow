@@ -1,8 +1,7 @@
 import Sidebar from "./Sidebar";
 import styles from "./Sidebar.module.css";
 
-export default function AppShell({ children }) {
-  const currentHash = "#" + (window.location.hash || "/");
+export default function AppShell({ children, currentHash }) {
   return (
     <div className={styles.shell}>
       <Sidebar currentHash={currentHash} />
