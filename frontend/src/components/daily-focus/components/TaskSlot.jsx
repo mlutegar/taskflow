@@ -15,7 +15,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
   const [results, setResults] = useState([]);
   const [todayTasks, setTodayTasks] = useState([]);
   const debounce = useRef(null);
-  const [showHelperPicker, setShowHelperPicker] = useState(false);
+  const [showHelperPicker, setShowHelperPicker] = useState(false); // "durante" | "entre" | false
   const [editingDuration, setEditingDuration] = useState(false);
   const [durationInput, setDurationInput] = useState(String(slot.durationMin));
 
@@ -63,6 +63,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
   };
 
   const helperModeIds = slot.helperModeIds ?? [];
+  const interModeIds = slot.interModeIds ?? [];
   const showTodaySuggestions = !query.trim() && todayTasks.length > 0;
 
   return (
@@ -150,7 +151,10 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clear(); } }}
           >× limpar</span>
         )}
+
+        {/* ── Modos DURANTE a tarefa ── */}
         <div className={styles.slotHelperArea}>
+          <span className={styles.slotHelperLabel}>🎯 Durante</span>
           {helperModeIds.map((modeId) => {
             const m = getModeById(modeId);
             if (!m) return null;
@@ -171,22 +175,68 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
           })}
           <button
             className={`${styles.slotHelperBtn} ${helperModeIds.length > 0 ? styles.slotHelperBtnActive : ""}`}
-            onClick={() => setShowHelperPicker(true)}
-            title="Adicionar modo de apoio"
+            onClick={() => setShowHelperPicker("durante")}
+            title="Adicionar modo durante a tarefa"
           >
-            {helperModeIds.length > 0 ? "+" : "+ Modo de apoio"}
+            {helperModeIds.length > 0 ? "+" : "+ Adicionar"}
+          </button>
+        </div>
+
+        {/* ── Modos ENTRE tarefas ── */}
+        <div className={styles.slotHelperArea}>
+          <span className={styles.slotHelperLabel}>☕ Entre</span>
+          {interModeIds.map((modeId) => {
+            const m = getModeById(modeId);
+            if (!m) return null;
+            return (
+              <span key={modeId} className={`${styles.modeChip} ${styles.modeChipInter}`}>
+                {m.emoji} {m.name}
+                <button
+                  className={styles.modeChipRemove}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange({ ...slot, interModeIds: interModeIds.filter((id) => id !== modeId) });
+                  }}
+                  title={`Remover ${m.name}`}
+                  aria-label={`Remover ${m.name}`}
+                >×</button>
+              </span>
+            );
+          })}
+          <button
+            className={`${styles.slotHelperBtn} ${styles.slotHelperBtnInter} ${interModeIds.length > 0 ? styles.slotHelperBtnActive : ""}`}
+            onClick={() => setShowHelperPicker("entre")}
+            title="Adicionar modo entre tarefas"
+          >
+            {interModeIds.length > 0 ? "+" : "+ Adicionar"}
           </button>
         </div>
       </div>
 
-      {showHelperPicker && (
+      {showHelperPicker === "durante" && (
         <HelperPickerModal
           currentIds={helperModeIds}
           usedModes={usedModes}
           suggestedModeId={suggestedModeId}
+          filterType="durante"
           onSelect={(id) => {
             if (!helperModeIds.includes(id)) {
               onChange({ ...slot, helperModeIds: [...helperModeIds, id] });
+            }
+            setShowHelperPicker(false);
+          }}
+          onClose={() => setShowHelperPicker(false)}
+        />
+      )}
+
+      {showHelperPicker === "entre" && (
+        <HelperPickerModal
+          currentIds={interModeIds}
+          usedModes={usedModes}
+          filterType="entre"
+          onSelect={(id) => {
+            if (!interModeIds.includes(id)) {
+              onChange({ ...slot, interModeIds: [...interModeIds, id] });
             }
             setShowHelperPicker(false);
           }}

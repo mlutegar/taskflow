@@ -397,6 +397,102 @@
 }
 .changeHelperBtn:hover { color: var(--text); border-color: var(--text-muted); }
 
+/* ── Hold / Task Switcher ───────────────────────────────── */
+.holdBtn {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.holdBtn:hover { color: var(--text); border-color: var(--text-muted); }
+
+.taskSwitcher {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 8px;
+}
+
+.taskSwitcherTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.taskSwitcherList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.taskSwitcherItem {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+}
+.taskSwitcherItem:hover { border-color: var(--accent); background: var(--surface); }
+
+.taskSwitcherItemTitle {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskSwitcherItemMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.holdBadge {
+  background: var(--warning, #f59e0b);
+  color: #000;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.taskSwitcherCancel {
+  width: 100%;
+  padding: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.taskSwitcherCancel:hover { color: var(--text); }
+
 /* ── Helper Panel (generic) ────────────────────────────── */
 .helperPanel {
   background: var(--surface);
@@ -421,6 +517,21 @@
   font-weight: 700;
   flex: 1;
 }
+
+.helperPanelRemove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.5;
+  transition: opacity 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.helperPanelRemove:hover { opacity: 1; color: var(--danger, #e05252); }
 
 .helperPanelBadge {
   font-size: 11px;
@@ -1165,10 +1276,10 @@
 
 .slotFooter {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   margin-top: 6px;
-  gap: 8px;
+  gap: 4px;
 }
 
 .slotHelperBtn {
@@ -1196,8 +1307,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  flex: 1;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .modeChip {
@@ -1227,33 +1337,70 @@
 }
 .modeChipRemove:hover { opacity: 1; }
 
-/* ── Helper panel tabs (fase de trabalho, 2+ modos) ───── */
-.helperTabs {
-  display: flex;
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  scrollbar-width: none;
+/* Chip variante "entre tarefas" (cor âmbar) */
+.modeChipInter {
+  background: rgba(240,165,64,0.1);
+  border-color: #f0a540;
+  color: #c87f0a;
 }
-.helperTabs::-webkit-scrollbar { display: none; }
+.modeChipInter .modeChipRemove { color: #c87f0a; }
 
-.helperTab {
-  flex: none;
-  padding: 8px 14px;
-  font-size: 12px;
-  font-weight: 600;
+/* Label pequena antes dos chips ("🎯 Durante" / "☕ Entre") */
+.slotHelperLabel {
+  font-size: 10px;
+  font-weight: 700;
   color: var(--text-muted);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  transition: color 0.12s, border-color 0.12s;
   white-space: nowrap;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
 }
-.helperTab:hover { color: var(--text); }
 
-.helperTabActive {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+/* Botão "entre tarefas" em âmbar */
+.slotHelperBtnInter { color: #c87f0a; }
+.slotHelperBtnInter:hover { border-color: #f0a540; color: #c87f0a; }
+
+/* ── Painel "entre tarefas" (aparece na pausa) ──────────── */
+.interPanel {
+  border: 1px solid rgba(240,165,64,0.4);
+  border-radius: var(--radius-sm);
+  background: rgba(240,165,64,0.05);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.interPanelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(240,165,64,0.2);
+  background: rgba(240,165,64,0.08);
+}
+
+.interPanelIcon {
+  font-size: 15px;
+}
+
+.interPanelTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #c87f0a;
+  letter-spacing: 0.2px;
+}
+
+.interPanelLongPause {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Helper panel grid (múltiplos modos lado a lado) ───── */
+.helperPanelGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  align-items: start;
 }
 
 /* ── Progress dots ─────────────────────────────────────── */

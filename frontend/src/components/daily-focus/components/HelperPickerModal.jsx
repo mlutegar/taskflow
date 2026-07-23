@@ -4,21 +4,47 @@ import { MODES, HELPER_GROUPS } from "../../../data/modes";
 import ModalOverlay from "../../shared/ModalOverlay";
 import styles from "../DailyFocus.module.css";
 
-function getGroupsWithCustom(usageMap = {}) {
+function getGroupsWithCustom(usageMap = {}, filterType = null) {
   const customModes = JSON.parse(localStorage.getItem("customModes") || "[]")
     .filter((m) => m.prerequisite?.trim() && m.whyItWorks?.trim() && m.whenToUse?.trim());
   const sortByUsage = (modes) =>
     [...modes].sort((a, b) => (usageMap[b.id] || 0) - (usageMap[a.id] || 0));
+
+  const filterMode = (m) => {
+    if (!filterType) return true;
+    // custom modes sem type: tratar como "durante"
+    const t = m.type ?? "durante";
+    return t === filterType;
+  };
+
+  const groups = HELPER_GROUPS.map((g) => ({
+    label: g.label,
+    modes: sortByUsage(
+      g.ids.map((id) => MODES.find((m) => m.id === id)).filter(Boolean).filter(filterMode)
+    ),
+  })).filter((g) => g.modes.length > 0);
+
+  const filteredCustom = filterType && filterType !== "durante"
+    ? []
+    : sortByUsage(customModes);
+
   return [
-    ...HELPER_GROUPS.map((g) => ({
-      label: g.label,
-      modes: sortByUsage(g.ids.map((id) => MODES.find((m) => m.id === id)).filter(Boolean)),
-    })),
-    ...(customModes.length > 0 ? [{ label: "Personalizados", modes: sortByUsage(customModes) }] : []),
+    ...groups,
+    ...(filteredCustom.length > 0 ? [{ label: "Personalizados", modes: filteredCustom }] : []),
   ];
 }
 
-function HelperPickerModal({ current, currentIds, usedModes = {}, suggestedModeId = null, onSelect, onClose, onRemove }) {
+const FILTER_LABELS = {
+  durante: "🎯 Durante a Tarefa",
+  entre: "☕ Entre Tarefas",
+};
+
+const FILTER_DESCRIPTIONS = {
+  durante: "Ativo enquanto você trabalha — música, gamificação, timer, etc.",
+  entre: "Feito na pausa ou ao passar de uma tarefa pra outra — alongar, meditar, beber água, etc.",
+};
+
+function HelperPickerModal({ current, currentIds, usedModes = {}, suggestedModeId = null, filterType = null, onSelect, onClose, onRemove }) {
   // Suporta tanto o formato antigo (current: string) quanto o novo (currentIds: string[])
   const selectedIds = currentIds ?? (current ? [current] : []);
   const [preview, setPreview] = useState(null);
@@ -27,7 +53,7 @@ function HelperPickerModal({ current, currentIds, usedModes = {}, suggestedModeI
   const [animDir, setAnimDir] = useState("forward");
 
   const usageMap = Object.fromEntries(usageStats(30).map(({ modeId, count }) => [modeId, count]));
-  const allGroups = getGroupsWithCustom(usageMap);
+  const allGroups = getGroupsWithCustom(usageMap, filterType);
 
   // Filtro de busca aplicado sobre todos os grupos
   const groups = search.trim()
@@ -63,7 +89,7 @@ function HelperPickerModal({ current, currentIds, usedModes = {}, suggestedModeI
       <div className={styles.modal}>
         <div className={styles.modalHeader}>
           <span className={styles.modalTitle}>
-            {preview ? `${preview.emoji} ${preview.name}` : "🎯 Adicionar Modo de Apoio"}
+            {preview ? `${preview.emoji} ${preview.name}` : (filterType ? FILTER_LABELS[filterType] : "🎯 Adicionar Modo de Apoio")}
           </span>
           <button className={styles.modalClose} onClick={onClose}>×</button>
         </div>
@@ -105,6 +131,19 @@ function HelperPickerModal({ current, currentIds, usedModes = {}, suggestedModeI
             </div>
           ) : (
             <div key="list" className={`${styles.pickerList} ${previewAnimClass}`}>
+              {/* Descrição do tipo de modo */}
+              {filterType && FILTER_DESCRIPTIONS[filterType] && (
+                <div style={{
+                  padding: "8px 18px",
+                  fontSize: "12px",
+                  color: filterType === "entre" ? "#c87f0a" : "var(--accent)",
+                  background: filterType === "entre" ? "rgba(240,165,64,0.06)" : "rgba(124,110,245,0.06)",
+                  borderBottom: "1px solid var(--border)",
+                }}>
+                  {FILTER_DESCRIPTIONS[filterType]}
+                </div>
+              )}
+
               {/* Busca */}
               <div className={styles.pickerSearch}>
                 <input

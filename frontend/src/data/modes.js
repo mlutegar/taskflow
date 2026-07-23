@@ -4,6 +4,7 @@
 export const MODES = [
   {
     id: "music",
+    type: "durante",
     emoji: "🎵",
     name: "Music Mode",
     tagline: "Encontre a música certa, faça a tarefa certa",
@@ -23,6 +24,7 @@ export const MODES = [
   },
   {
     id: "tiktok",
+    type: "entre",
     emoji: "📱",
     name: "TikTok Mode",
     tagline: "Ciclos progressivos: videos → tarefas",
@@ -42,6 +44,7 @@ export const MODES = [
   },
   {
     id: "splite",
+    type: "entre",
     emoji: "🔪",
     name: "Splite Mode",
     tagline: "Ciclos progressivos com atividade personalizada",
@@ -61,6 +64,7 @@ export const MODES = [
   },
   {
     id: "momentum",
+    type: "durante",
     emoji: "⚡",
     name: "Momentum Mode",
     tagline: "Quebre a inércia com sessões de 5 minutos",
@@ -80,6 +84,7 @@ export const MODES = [
   },
   {
     id: "espresso",
+    type: "durante",
     emoji: "☕",
     name: "Espresso Sprint",
     tagline: "Sprints de 25 minutos com rastreamento de café",
@@ -99,6 +104,7 @@ export const MODES = [
   },
   {
     id: "rpg",
+    type: "durante",
     emoji: "🎮",
     name: "RPG Class Mode",
     tagline: "Produtividade gamificada com classes de personagem",
@@ -123,6 +129,7 @@ export const MODES = [
   },
   {
     id: "lazyfal",
+    type: "entre",
     emoji: "🦅",
     name: "Lazy Falcon Mode",
     tagline: "Ciclos progressivos com tarefas salvas para depois",
@@ -142,6 +149,7 @@ export const MODES = [
   },
   {
     id: "caferitual",
+    type: "entre",
     emoji: "🫖",
     name: "Café Ritual",
     tagline: "Shot de café + a música certa = estado de pico",
@@ -161,6 +169,7 @@ export const MODES = [
   },
   {
     id: "tabhop",
+    type: "durante",
     emoji: "📲",
     name: "Tab Hop",
     tagline: "Rotação entre apps abertos — feito para transporte",
@@ -183,6 +192,7 @@ export const MODES = [
   // ── Cantar pra destravar ──
   {
     id: "cantar",
+    type: "entre",
     emoji: "🎤",
     name: "Cantar pra destravar",
     tagline: "Canta uma música que você gosta pra sair do bloqueio",
@@ -205,6 +215,7 @@ export const MODES = [
   // ── Modos de cantar ──
   {
     id: "sing_one",
+    type: "entre",
     emoji: "🎙️",
     name: "Cantar 1 Música",
     tagline: "Cante uma música inteira, depois faça uma tarefa",
@@ -227,6 +238,7 @@ export const MODES = [
   },
   {
     id: "sing_ten",
+    type: "durante",
     emoji: "🎤",
     name: "10 Músicas Cantáveis",
     tagline: "Monte uma fila de 10 músicas para cantar junto",
@@ -251,6 +263,7 @@ export const MODES = [
   // ── Modos de atividade independentes ──
   {
     id: "agua",
+    type: "entre",
     emoji: "💧",
     name: "Beber Água",
     tagline: "Registre os copos de água ao longo do dia",
@@ -273,6 +286,7 @@ export const MODES = [
   },
   {
     id: "meditar",
+    type: "entre",
     emoji: "🧘",
     name: "Meditar",
     tagline: "Sessões de meditação entre as tarefas",
@@ -295,6 +309,7 @@ export const MODES = [
   },
   {
     id: "ler_diario",
+    type: "entre",
     emoji: "📖",
     name: "Ler Diário",
     tagline: "Releia entradas aleatórias do seu diário",
@@ -317,6 +332,7 @@ export const MODES = [
   },
   {
     id: "diario_falado",
+    type: "entre",
     emoji: "🗣️",
     name: "Diário Falado",
     tagline: "Registre o diário falando em voz alta — sem escrever",
@@ -338,6 +354,7 @@ export const MODES = [
   },
   {
     id: "esticar",
+    type: "entre",
     emoji: "🤸",
     name: "Esticar",
     tagline: "Pausas de alongamento entre as tarefas",
@@ -360,6 +377,7 @@ export const MODES = [
   },
   {
     id: "livro",
+    type: "entre",
     emoji: "📚",
     name: "Ler Livro",
     tagline: "Leia capítulos entre as tarefas",
@@ -382,6 +400,7 @@ export const MODES = [
   },
   {
     id: "exercicio",
+    type: "entre",
     emoji: "🏃",
     name: "Exercício Rápido",
     tagline: "Rounds de exercício entre as tarefas",
@@ -406,6 +425,7 @@ export const MODES = [
   // ── Pomodoro Puro ──
   {
     id: "pomodoro",
+    type: "durante",
     emoji: "🍅",
     name: "Pomodoro",
     tagline: "Timer personalizado — você define a duração",

@@ -29,19 +29,27 @@ function makeTasks(level) {
     durationMin: (level - i) * 15,
     done: false,
     helperModeIds: [],
+    interModeIds: [],
+    onHold: false,
+    savedTimerSecs: null,
   }));
 }
 
 // Migra sessões antigas que usavam helperModeId (string) para helperModeIds (array)
+// e adiciona interModeIds se não existir
 function migrateTasks(tasks) {
   if (!Array.isArray(tasks)) return tasks;
   return tasks.map((t) => {
-    if ("helperModeId" in t && !("helperModeIds" in t)) {
-      const { helperModeId, ...rest } = t;
-      return { ...rest, helperModeIds: helperModeId ? [helperModeId] : [] };
+    let task = t;
+    if ("helperModeId" in task && !("helperModeIds" in task)) {
+      const { helperModeId, ...rest } = task;
+      task = { ...rest, helperModeIds: helperModeId ? [helperModeId] : [] };
     }
-    if (!("helperModeIds" in t)) return { ...t, helperModeIds: [] };
-    return t;
+    if (!("helperModeIds" in task)) task = { ...task, helperModeIds: [] };
+    if (!("interModeIds" in task)) task = { ...task, interModeIds: [] };
+    if (!("onHold" in task)) task = { ...task, onHold: false };
+    if (!("savedTimerSecs" in task)) task = { ...task, savedTimerSecs: null };
+    return task;
   });
 }
 
@@ -99,6 +107,8 @@ export default function DailyFocusPage() {
   const [rushMode, setRushMode]             = useState(saved?.rushMode ?? false);
   const [taskTimings, setTaskTimings]       = useState(saved?.taskTimings ?? []); // [{used, total}]
   const [_taskStartRemaining, setTaskStartRemaining] = useState(null);
+  // índice da próxima tarefa aguardando após a fase "between"
+  const [pendingNextIdx, setPendingNextIdx] = useState(saved?.pendingNextIdx ?? null);
 
   // Modos usados hoje (bloqueados no picker)
   const [usedModes, setUsedModes] = useState(() => getUsedModes());
@@ -144,6 +154,7 @@ export default function DailyFocusPage() {
   const [newRecord, setNewRecord]                 = useState(false);
   const [_notifRequested, _setNotifRequested]       = useState(false);
   const [ladderAnimating, setLadderAnimating]     = useState(false);
+  const [showTaskSwitcher, setShowTaskSwitcher]   = useState(false);
 
   // Recordes por modo
   const maxLevelTimer = getMaxLevelByMode(false);
@@ -169,12 +180,12 @@ export default function DailyFocusPage() {
 
   // Persist on state changes
   useEffect(() => {
-    persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId });
-  }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId]);
+    persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId, pendingNextIdx });
+  }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId, pendingNextIdx]);
 
   // Atualiza document.title conforme a fase
   useEffect(() => {
-    if (phase === "work") {
+    if (phase === "work" || phase === "between") {
       document.title = `⚡ Nível ${level} — TaskFlow`;
     } else if (phase === "celebrate") {
       document.title = `🎉 Nível ${level} completo! — TaskFlow`;
@@ -262,6 +273,9 @@ export default function DailyFocusPage() {
     setTaskTimings([]);
     setPhase("work");
     requestNotifPermission();
+    // Pré-inicializa estados de helpers "durante" e "entre" da primeira tarefa
+    (tasks[0].helperModeIds ?? []).forEach(initHelperIfNeeded);
+    (tasks[0].interModeIds ?? []).forEach(initHelperIfNeeded);
   };
 
   const handleTaskChange = useCallback((i, val) => updateTask(i, val), []);
@@ -340,22 +354,96 @@ export default function DailyFocusPage() {
 
     playBeep(); // som de conclusão de tarefa
 
-    const nextIdx = currentIdx + 1;
-    if (nextIdx >= tasks.length) {
-      // Session complete
+    // Busca a próxima tarefa pendente (não concluída), priorizando a ordem natural
+    // mas considerando que pode haver tarefas em espera fora de ordem sequencial
+    const nextIdx = updated.findIndex((t, i) => i !== currentIdx && !t.done);
+
+    if (nextIdx === -1) {
+      // Todas as tarefas concluídas
       setTimerRunning(false);
       completeSession(updated, newTimings, isEarly);
     } else {
-      setCurrentIdx(nextIdx);
-      setTimerRemaining(updated[nextIdx].durationMin * 60);
-      setTaskStartRemaining(updated[nextIdx].durationMin * 60);
       setTimerRunning(false);
       setTimerDone(false);
       setLongPause(false);
       setPausedSince(null);
-      setActiveHelperTab(null);
-      (updated[nextIdx].helperModeIds ?? []).forEach(initHelperIfNeeded);
+      // Se a tarefa concluída tem modos "entre tarefas", mostra tela de pausa
+      const interIds = updated[currentIdx]?.interModeIds ?? [];
+      if (interIds.length > 0) {
+        interIds.forEach(initHelperIfNeeded);
+        setPendingNextIdx(nextIdx);
+        setPhase("between");
+      } else {
+        const resumeSecs = updated[nextIdx].savedTimerSecs ?? updated[nextIdx].durationMin * 60;
+        setCurrentIdx(nextIdx);
+        setTimerRemaining(resumeSecs);
+        setTaskStartRemaining(resumeSecs);
+        setActiveHelperTab(null);
+        // Se a próxima era "em espera", limpa o hold
+        if (updated[nextIdx].onHold) {
+          setTasks((prev) => prev.map((t, i) =>
+            i === nextIdx ? { ...t, onHold: false, savedTimerSecs: null } : t
+          ));
+        }
+        (updated[nextIdx].helperModeIds ?? []).forEach(initHelperIfNeeded);
+        (updated[nextIdx].interModeIds ?? []).forEach(initHelperIfNeeded);
+      }
     }
+  };
+
+  const handlePutOnHold = () => {
+    setTimerRunning(false);
+    setTasks((prev) => prev.map((t, i) =>
+      i === currentIdx
+        ? { ...t, onHold: true, savedTimerSecs: timerRemaining }
+        : t
+    ));
+    setShowTaskSwitcher(true);
+  };
+
+  const handleSwitchToTask = (idx) => {
+    const target = tasks[idx];
+    const resumeSecs = target.savedTimerSecs ?? target.durationMin * 60;
+    setCurrentIdx(idx);
+    setTimerRemaining(resumeSecs);
+    setTaskStartRemaining(resumeSecs);
+    setTasks((prev) => prev.map((t, i) =>
+      i === idx ? { ...t, onHold: false, savedTimerSecs: null } : t
+    ));
+    setTimerDone(false);
+    setTimerRunning(false);
+    setLongPause(false);
+    setPausedSince(null);
+    setActiveHelperTab(null);
+    (target.helperModeIds ?? []).forEach(initHelperIfNeeded);
+    (target.interModeIds ?? []).forEach(initHelperIfNeeded);
+    setShowTaskSwitcher(false);
+  };
+
+  const handleCancelSwitcher = () => {
+    // Desfaz o hold na tarefa atual e fecha o seletor
+    setTasks((prev) => prev.map((t, i) =>
+      i === currentIdx ? { ...t, onHold: false, savedTimerSecs: null } : t
+    ));
+    setShowTaskSwitcher(false);
+  };
+
+  const handleBetweenComplete = () => {
+    const nextIdx = pendingNextIdx;
+    setPendingNextIdx(null);
+    setCurrentIdx(nextIdx);
+    const resumeSecs = tasks[nextIdx].savedTimerSecs ?? tasks[nextIdx].durationMin * 60;
+    setTimerRemaining(resumeSecs);
+    setTaskStartRemaining(resumeSecs);
+    setActiveHelperTab(null);
+    if (tasks[nextIdx].onHold) {
+      setTasks((prev) => prev.map((t, i) =>
+        i === nextIdx ? { ...t, onHold: false, savedTimerSecs: null } : t
+      ));
+    }
+    (tasks[nextIdx].helperModeIds ?? []).forEach(initHelperIfNeeded);
+    (tasks[nextIdx].interModeIds ?? []).forEach(initHelperIfNeeded);
+    setPhase("work");
   };
 
   const completeSession = (completedTasks, timings, hadEarlyCompletion) => {
@@ -415,6 +503,7 @@ export default function DailyFocusPage() {
     setCheckinModeId(null);
     setCheckinEstadoId(null);
     setSessionFeedback(null);
+    setPendingNextIdx(null);
     setPhase("checkin");
     setLadderAnimating(true);
     setTimeout(() => setLadderAnimating(false), 500);
@@ -459,6 +548,7 @@ export default function DailyFocusPage() {
     setCheckinModeId(null);
     setCheckinEstadoId(null);
     setSessionFeedback(null);
+    setPendingNextIdx(null);
     setPhase("checkin"); // volta para o check-in ao resetar
   };
 
@@ -751,7 +841,7 @@ export default function DailyFocusPage() {
                   </div>
                 )}
 
-                {longPause && !timerDone && (
+                {longPause && !timerDone && (currentTask.interModeIds ?? []).length === 0 && (
                   <div className={styles.longPauseBanner}>
                     ☕ Pausado há mais de 5 min — tudo bem, retome quando quiser
                   </div>
@@ -772,43 +862,126 @@ export default function DailyFocusPage() {
               </div>
             )}
 
-            {/* Helper panel — suporta múltiplos modos com tabs */}
+            {/* Painel "entre tarefas" — aparece automaticamente quando o timer está pausado */}
+            {(() => {
+              const interIds = currentTask.interModeIds ?? [];
+              const isPaused = !timerRunning && !timerDone && timerRemaining != null && timerRemaining < totalSecs;
+              const isRushPaused = rushMode; // no rush mode, sempre disponível para ativar
+              const showInter = interIds.length > 0 && (isPaused || isRushPaused);
+              if (!showInter) return null;
+              return (
+                <div className={styles.interPanel}>
+                  <div className={styles.interPanelHeader}>
+                    <span className={styles.interPanelIcon}>☕</span>
+                    <span className={styles.interPanelTitle}>
+                      {rushMode ? "Modo entre tarefas" : "Pausado — aproveite para:"}
+                    </span>
+                    {longPause && !timerDone && (
+                      <span className={styles.interPanelLongPause}>
+                        ☕ pausado há mais de 5 min
+                      </span>
+                    )}
+                  </div>
+                  {interIds.length === 1 ? (
+                    (() => {
+                      const m = getModeById(interIds[0]);
+                      const entry = getHelper(interIds[0]);
+                      return m && entry ? (
+                        <entry.Component
+                          state={helperStates[interIds[0]] || {}}
+                          onChange={(newState) => setHelperStates((prev) => {
+                            const resolved = typeof newState === "function" ? newState(prev[interIds[0]] || {}) : newState;
+                            return { ...prev, [interIds[0]]: resolved };
+                          })}
+                          modeConfig={m}
+                        />
+                      ) : null;
+                    })()
+                  ) : (
+                    <div className={styles.helperPanelGrid}>
+                      {interIds.map((modeId) => {
+                        const m = getModeById(modeId);
+                        const entry = getHelper(modeId);
+                        if (!m || !entry) return null;
+                        return (
+                          <div key={modeId} className={styles.helperPanel}>
+                            <div className={styles.helperPanelHeader}>
+                              <span className={styles.helperPanelEmoji}>{m.emoji}</span>
+                              <span className={styles.helperPanelName}>{m.name}</span>
+                            </div>
+                            <entry.Component
+                              state={helperStates[modeId] || {}}
+                              onChange={(newState) => setHelperStates((prev) => {
+                                const resolved = typeof newState === "function" ? newState(prev[modeId] || {}) : newState;
+                                return { ...prev, [modeId]: resolved };
+                              })}
+                              modeConfig={m}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Helper panel — cards lado a lado quando há 2+ modos */}
             {activeHelperModeIds.length > 0 && (
-              <div className={styles.helperPanel}>
-                {/* Tab strip: só aparece quando há 2+ modos */}
-                {activeHelperModeIds.length > 1 && (
-                  <div className={styles.helperTabs}>
-                    {activeHelperModeIds.map((modeId) => {
-                      const m = getModeById(modeId);
-                      if (!m) return null;
-                      return (
-                        <button
-                          key={modeId}
-                          className={`${styles.helperTab} ${modeId === activeTabModeId ? styles.helperTabActive : ""}`}
-                          onClick={() => setActiveHelperTab(modeId)}
-                        >
-                          {m.emoji} {m.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                {/* Header simples quando só há 1 modo */}
-                {activeHelperModeIds.length === 1 && helperMode && (
-                  <div className={styles.helperPanelHeader}>
-                    <span className={styles.helperPanelEmoji}>{helperMode.emoji}</span>
-                    <span className={styles.helperPanelName}>{helperMode.name}</span>
-                    <span className={styles.helperPanelBadge}>modo de apoio</span>
-                  </div>
-                )}
-                {helperEntry && helperMode && (
-                  <helperEntry.Component
-                    state={currentHelperState}
-                    onChange={handleHelperChange}
-                    modeConfig={helperMode}
-                  />
-                )}
-              </div>
+              activeHelperModeIds.length === 1 ? (
+                /* Modo único: layout original */
+                <div className={styles.helperPanel}>
+                  {helperMode && (
+                    <div className={styles.helperPanelHeader}>
+                      <span className={styles.helperPanelEmoji}>{helperMode.emoji}</span>
+                      <span className={styles.helperPanelName}>{helperMode.name}</span>
+                      <span className={styles.helperPanelBadge}>modo de apoio</span>
+                      <button
+                        className={styles.helperPanelRemove}
+                        onClick={() => handleRemoveHelperById(activeHelperModeIds[0], currentIdx)}
+                        title="Remover modo"
+                      >×</button>
+                    </div>
+                  )}
+                  {helperEntry && helperMode && (
+                    <helperEntry.Component
+                      state={currentHelperState}
+                      onChange={handleHelperChange}
+                      modeConfig={helperMode}
+                    />
+                  )}
+                </div>
+              ) : (
+                /* Múltiplos modos: grade lado a lado */
+                <div className={styles.helperPanelGrid}>
+                  {activeHelperModeIds.map((modeId) => {
+                    const m = getModeById(modeId);
+                    const entry = getHelper(modeId);
+                    if (!m || !entry) return null;
+                    return (
+                      <div key={modeId} className={styles.helperPanel}>
+                        <div className={styles.helperPanelHeader}>
+                          <span className={styles.helperPanelEmoji}>{m.emoji}</span>
+                          <span className={styles.helperPanelName}>{m.name}</span>
+                          <button
+                            className={styles.helperPanelRemove}
+                            onClick={() => handleRemoveHelperById(modeId, currentIdx)}
+                            title={`Remover ${m.name}`}
+                          >×</button>
+                        </div>
+                        <entry.Component
+                          state={helperStates[modeId] || {}}
+                          onChange={(newState) => setHelperStates((prev) => {
+                            const resolved = typeof newState === "function" ? newState(prev[modeId] || {}) : newState;
+                            return { ...prev, [modeId]: resolved };
+                          })}
+                          modeConfig={m}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )
             )}
 
             {/* Banner: quase batendo recorde */}
@@ -823,11 +996,48 @@ export default function DailyFocusPage() {
               </div>
             )}
 
+            {/* Seletor de troca de tarefa (em espera) */}
+            {showTaskSwitcher && (
+              <div className={styles.taskSwitcher}>
+                <div className={styles.taskSwitcherTitle}>
+                  ⏸ Tarefa em espera — qual você quer fazer agora?
+                </div>
+                <div className={styles.taskSwitcherList}>
+                  {tasks.map((t, i) => {
+                    if (i === currentIdx || t.done) return null;
+                    const remainSecs = t.savedTimerSecs ?? t.durationMin * 60;
+                    const remainMin = Math.ceil(remainSecs / 60);
+                    return (
+                      <button
+                        key={i}
+                        className={styles.taskSwitcherItem}
+                        onClick={() => handleSwitchToTask(i)}
+                      >
+                        <span className={styles.taskSwitcherItemTitle}>{t.title || `Tarefa ${i + 1}`}</span>
+                        <span className={styles.taskSwitcherItemMeta}>
+                          {t.onHold && <span className={styles.holdBadge}>⏸ Em espera</span>}
+                          {!rushMode && <span>{remainMin} min</span>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button className={styles.taskSwitcherCancel} onClick={handleCancelSwitcher}>
+                  Cancelar — continuar na tarefa atual
+                </button>
+              </div>
+            )}
+
             {/* Actions */}
             <div className={styles.workActions}>
               <button className={styles.doneBtn} onClick={handleCompleteTask}>
                 ✅ Concluí esta tarefa
               </button>
+              {!showTaskSwitcher && tasks.length > 1 && tasks.some((t, i) => i !== currentIdx && !t.done) && (
+                <button className={styles.holdBtn} onClick={handlePutOnHold}>
+                  ⏸ Colocar em espera
+                </button>
+              )}
               <button
                 className={styles.changeHelperBtn}
                 onClick={() => { setPickerForTask(null); setShowHelperPicker(true); }}
@@ -839,6 +1049,88 @@ export default function DailyFocusPage() {
             </div>
           </div>
         )}
+
+        {/* ── BETWEEN PHASE ── */}
+        {phase === "between" && (() => {
+          const completedTask = tasks[currentIdx] || {};
+          const interIds = completedTask.interModeIds ?? [];
+          const nextTask = pendingNextIdx != null ? tasks[pendingNextIdx] : null;
+          return (
+            <div className={styles.workLayout}>
+              {/* Header da pausa */}
+              <div style={{
+                textAlign: "center",
+                padding: "16px 0 8px",
+              }}>
+                <div style={{ fontSize: "28px", marginBottom: "6px" }}>☕</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, marginBottom: "4px" }}>
+                  Pausa entre tarefas
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                  ✓ <em>{completedTask.title}</em> concluída
+                  {nextTask && <> · Próxima: <em>{nextTask.title}</em></>}
+                </div>
+              </div>
+
+              {/* Helpers "entre" da tarefa concluída */}
+              {interIds.length === 1 ? (
+                (() => {
+                  const m = getModeById(interIds[0]);
+                  const entry = getHelper(interIds[0]);
+                  return m && entry ? (
+                    <div className={styles.helperPanel}>
+                      <div className={styles.helperPanelHeader}>
+                        <span className={styles.helperPanelEmoji}>{m.emoji}</span>
+                        <span className={styles.helperPanelName}>{m.name}</span>
+                        <span className={styles.helperPanelBadge}>entre tarefas</span>
+                      </div>
+                      <entry.Component
+                        state={helperStates[interIds[0]] || {}}
+                        onChange={(newState) => setHelperStates((prev) => {
+                          const resolved = typeof newState === "function" ? newState(prev[interIds[0]] || {}) : newState;
+                          return { ...prev, [interIds[0]]: resolved };
+                        })}
+                        modeConfig={m}
+                      />
+                    </div>
+                  ) : null;
+                })()
+              ) : (
+                <div className={styles.helperPanelGrid}>
+                  {interIds.map((modeId) => {
+                    const m = getModeById(modeId);
+                    const entry = getHelper(modeId);
+                    if (!m || !entry) return null;
+                    return (
+                      <div key={modeId} className={styles.helperPanel}>
+                        <div className={styles.helperPanelHeader}>
+                          <span className={styles.helperPanelEmoji}>{m.emoji}</span>
+                          <span className={styles.helperPanelName}>{m.name}</span>
+                          <span className={styles.helperPanelBadge}>entre tarefas</span>
+                        </div>
+                        <entry.Component
+                          state={helperStates[modeId] || {}}
+                          onChange={(newState) => setHelperStates((prev) => {
+                            const resolved = typeof newState === "function" ? newState(prev[modeId] || {}) : newState;
+                            return { ...prev, [modeId]: resolved };
+                          })}
+                          modeConfig={m}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Botão para avançar */}
+              <div className={styles.workActions}>
+                <button className={styles.doneBtn} onClick={handleBetweenComplete}>
+                  ▶ Próxima tarefa {nextTask ? `— ${nextTask.title}` : ""}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── CELEBRATE PHASE ── */}
         {phase === "celebrate" && (
@@ -976,6 +1268,7 @@ export default function DailyFocusPage() {
           }
           usedModes={usedModes}
           suggestedModeId={suggestedModeId}
+          filterType="durante"
           onSelect={handleSelectHelper}
           onClose={handleCloseHelperPicker}
         />
