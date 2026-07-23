@@ -144,6 +144,7 @@ export default function DailyFocusPage() {
   // UI state (not persisted)
   const [showHelperPicker, setShowHelperPicker]   = useState(false);
   const [pickerForTask, setPickerForTask]         = useState(null); // index | null (null = work-phase global)
+  const [showInterPicker, setShowInterPicker]     = useState(false); // picker de modos "entre" na fase work
   const [showHistory, setShowHistory]             = useState(false);
   const [newAchievements, setNewAchievements]     = useState([]);
   const [editingTitle, setEditingTitle]           = useState(false);
@@ -329,6 +330,26 @@ export default function DailyFocusPage() {
     initHelperIfNeeded(modeId);
     setPickerForTask(null);
     setShowHelperPicker(false);
+  };
+
+  // Adiciona um modo "entre" à tarefa atual (fase work)
+  const handleSelectInterHelper = (modeId) => {
+    setTasks((prev) => prev.map((t, i) => {
+      if (i !== currentIdx) return t;
+      const ids = t.interModeIds ?? [];
+      if (ids.includes(modeId)) return t;
+      return { ...t, interModeIds: [...ids, modeId] };
+    }));
+    initHelperIfNeeded(modeId);
+    setShowInterPicker(false);
+  };
+
+  // Remove um modo "entre" da tarefa atual (fase work)
+  const handleRemoveInterById = (modeId) => {
+    setTasks((prev) => prev.map((t, i) => {
+      if (i !== currentIdx) return t;
+      return { ...t, interModeIds: (t.interModeIds ?? []).filter((id) => id !== modeId) };
+    }));
   };
 
   // Remove um modo específico de uma tarefa
@@ -841,7 +862,7 @@ export default function DailyFocusPage() {
                   </div>
                 )}
 
-                {longPause && !timerDone && (currentTask.interModeIds ?? []).length === 0 && (
+                {longPause && !timerDone && (
                   <div className={styles.longPauseBanner}>
                     ☕ Pausado há mais de 5 min — tudo bem, retome quando quiser
                   </div>
@@ -866,21 +887,43 @@ export default function DailyFocusPage() {
             {(() => {
               const interIds = currentTask.interModeIds ?? [];
               const isPaused = !timerRunning && !timerDone && timerRemaining != null && timerRemaining < totalSecs;
-              const isRushPaused = rushMode; // no rush mode, sempre disponível para ativar
-              const showInter = interIds.length > 0 && (isPaused || isRushPaused);
+              const isRushMode = rushMode;
+              // Mostra o painel se: timer pausado OU rush mode (sem timer)
+              const showInter = isPaused || isRushMode;
               if (!showInter) return null;
               return (
                 <div className={styles.interPanel}>
                   <div className={styles.interPanelHeader}>
                     <span className={styles.interPanelIcon}>☕</span>
                     <span className={styles.interPanelTitle}>
-                      {rushMode ? "Modo entre tarefas" : "Pausado — aproveite para:"}
+                      {rushMode ? "Entre tarefas" : "Pausado — aproveite para:"}
                     </span>
                     {longPause && !timerDone && (
                       <span className={styles.interPanelLongPause}>
-                        ☕ pausado há mais de 5 min
+                        mais de 5 min
                       </span>
                     )}
+                    {/* Chips dos modos ativos + botão adicionar */}
+                    <div className={styles.interPanelChips}>
+                      {interIds.map((modeId) => {
+                        const m = getModeById(modeId);
+                        return m ? (
+                          <span key={modeId} className={styles.interPanelChip}>
+                            {m.emoji}
+                            <button
+                              className={styles.interPanelChipRemove}
+                              onClick={() => handleRemoveInterById(modeId)}
+                              title={`Remover ${m.name}`}
+                            >×</button>
+                          </span>
+                        ) : null;
+                      })}
+                      <button
+                        className={styles.interPanelAddBtn}
+                        onClick={() => setShowInterPicker(true)}
+                        title="Adicionar modo entre tarefas"
+                      >+</button>
+                    </div>
                   </div>
                   {interIds.length === 1 ? (
                     (() => {
@@ -1271,6 +1314,16 @@ export default function DailyFocusPage() {
           filterType="durante"
           onSelect={handleSelectHelper}
           onClose={handleCloseHelperPicker}
+        />
+      )}
+
+      {showInterPicker && (
+        <HelperPickerModal
+          currentIds={currentTask.interModeIds ?? []}
+          usedModes={usedModes}
+          filterType="entre"
+          onSelect={handleSelectInterHelper}
+          onClose={() => setShowInterPicker(false)}
         />
       )}
 

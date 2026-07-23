@@ -1389,11 +1389,59 @@
 }
 
 .interPanelLongPause {
-  margin-left: auto;
   font-size: 11px;
   color: var(--text-muted);
   font-style: italic;
 }
+
+.interPanelChips {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.interPanelChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+  background: rgba(240,165,64,0.15);
+  border: 1px solid rgba(240,165,64,0.4);
+  border-radius: 20px;
+  padding: 1px 6px 1px 8px;
+}
+
+.interPanelChipRemove {
+  background: none;
+  border: none;
+  color: #c87f0a;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.6;
+  transition: opacity 0.12s;
+}
+.interPanelChipRemove:hover { opacity: 1; }
+
+.interPanelAddBtn {
+  background: rgba(240,165,64,0.12);
+  border: 1px dashed rgba(240,165,64,0.5);
+  color: #c87f0a;
+  border-radius: 20px;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+.interPanelAddBtn:hover { background: rgba(240,165,64,0.25); }
 
 /* ── Helper panel grid (múltiplos modos lado a lado) ───── */
 .helperPanelGrid {
