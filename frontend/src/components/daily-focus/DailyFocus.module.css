@@ -1592,6 +1592,80 @@
 }
 .paperReviewBtn:hover { opacity: 0.88; }
 
+/* Linha de ações do review (confirmar + snooze) */
+.paperReviewActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Botão snooze "mais 5 min" */
+.paperSnoozeBtn {
+  flex: 0 0 auto;
+  padding: 11px 14px;
+  background: transparent;
+  color: #2e7d52;
+  border: 1px solid rgba(74,180,120,0.5);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.paperSnoozeBtn:hover { background: rgba(74,180,120,0.1); }
+
+/* Chip marcado (strikethrough) */
+.paperReminderChecked {
+  text-decoration: line-through;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+/* Chips clicáveis no review */
+.paperReminderChip[role="checkbox"] {
+  cursor: pointer;
+  transition: opacity 0.15s, text-decoration 0.15s;
+  user-select: none;
+}
+.paperReminderChip[role="checkbox"]:hover { opacity: 0.8; }
+
+/* Input para adicionar lembrete personalizado */
+.paperAddReminderWrap {
+  display: inline-flex;
+  align-items: center;
+}
+.paperAddReminderInput {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px dashed rgba(74,180,120,0.5);
+  background: transparent;
+  color: var(--text-muted);
+  width: 100px;
+  outline: none;
+  transition: border-color 0.15s, width 0.2s;
+}
+.paperAddReminderInput:focus {
+  border-color: #2e7d52;
+  width: 140px;
+}
+.paperAddReminderInput::placeholder { color: rgba(46,125,82,0.5); }
+
+/* Botão para remover último lembrete */
+.paperClearRemindersBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-muted);
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.paperClearRemindersBtn:hover { opacity: 1; }
+
 /* ── Helper panel grid (múltiplos modos lado a lado) ───── */
 .helperPanelGrid {
   display: grid;

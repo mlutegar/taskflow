@@ -1,8 +1,18 @@
-import { useState, useEffect, useRef, memo } from "react";
+import { useState, useEffect, useRef, memo, useCallback } from "react";
 import { tasksApi } from "../../../api/tasks";
 import { MODES } from "../../../data/modes";
 import HelperPickerModal from "./HelperPickerModal";
 import styles from "../DailyFocus.module.css";
+
+const PRESETS_KEY = "modeComboPresets";
+const MAX_PRESETS = 6;
+
+function loadPresets() {
+  try { return JSON.parse(localStorage.getItem(PRESETS_KEY) || "[]"); } catch { return []; }
+}
+function savePresets(list) {
+  try { localStorage.setItem(PRESETS_KEY, JSON.stringify(list)); } catch {}
+}
 
 function getModeById(id) {
   if (!id) return null;
@@ -65,6 +75,32 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
   const helperModeIds = slot.helperModeIds ?? [];
   const interModeIds = slot.interModeIds ?? [];
   const showTodaySuggestions = !query.trim() && todayTasks.length > 0;
+
+  // ── Combo Presets ──
+  const [presets, setPresets] = useState(loadPresets);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  const saveCurrentCombo = useCallback(() => {
+    if (helperModeIds.length < 2) return;
+    const label = helperModeIds.map((id) => getModeById(id)?.emoji ?? "").join("") + " " +
+      helperModeIds.map((id) => getModeById(id)?.name ?? id).join(" + ");
+    const next = [{ ids: helperModeIds, label }, ...presets.filter((p) => p.ids.join() !== helperModeIds.join())].slice(0, MAX_PRESETS);
+    savePresets(next);
+    setPresets(next);
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1500);
+  }, [helperModeIds, presets]);
+
+  const applyPreset = (preset) => {
+    onChange({ ...slot, helperModeIds: preset.ids });
+  };
+
+  const deletePreset = (e, idx) => {
+    e.stopPropagation();
+    const next = presets.filter((_, i) => i !== idx);
+    savePresets(next);
+    setPresets(next);
+  };
 
   return (
     <div className={styles.taskSlot}>
@@ -182,8 +218,37 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
           </button>
         </div>
 
-        {/* ── Modos ENTRE tarefas ── */}
-        <div className={styles.slotHelperArea}>
+        {/* ── Combo Presets ── */}
+        {(helperModeIds.length >= 2 || presets.length > 0) && (
+          <div className={styles.comboPresetsRow}>
+            {helperModeIds.length >= 2 && (
+              <button
+                className={`${styles.comboPresetSaveBtn} ${savedFlash ? styles.comboPresetSaveBtnFlash : ""}`}
+                onClick={saveCurrentCombo}
+                title="Salvar este combo como preset"
+              >
+                {savedFlash ? "✓ Salvo!" : "💾 Salvar combo"}
+              </button>
+            )}
+            {presets.map((p, i) => (
+              <span
+                key={i}
+                className={`${styles.comboPresetChip} ${p.ids.join() === helperModeIds.join() ? styles.comboPresetChipActive : ""}`}
+                onClick={() => applyPreset(p)}
+                title={`Aplicar: ${p.label}`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter") applyPreset(p); }}
+              >
+                {p.ids.map((id) => getModeById(id)?.emoji ?? "").join("")}
+                <button className={styles.comboPresetChipDelete} onClick={(e) => deletePreset(e, i)} title="Remover preset">×</button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* ── Modos ENTRE tarefas ── apenas quando há mais de 1 tarefa (level > 1) */}
+        {level > 1 && <div className={styles.slotHelperArea}>
           <span className={styles.slotHelperLabel}>☕ Entre</span>
           {interModeIds.map((modeId) => {
             const m = getModeById(modeId);
@@ -210,7 +275,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
           >
             {interModeIds.length > 0 ? "+" : "+ Adicionar"}
           </button>
-        </div>
+        </div>}
       </div>
 
       {showHelperPicker === "durante" && (

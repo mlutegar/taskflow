@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { playBeep, playTimerDone, playNewRecord } from "../../lib/sounds";
+import { playBeep, playTimerDone, playNewRecord, playPaperReview } from "../../lib/sounds";
 import { tasksApi } from "../../api/tasks";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 import { getHelper } from "./helpers/index";
@@ -82,8 +82,20 @@ function sendNotif(title, body) {
 }
 
 // ── Paper & Pen reminder system ─────────────────────────
-const PAPER_REMINDERS = ["limpar wpp", "beber 4L de água"];
-const PAPER_REVIEW_INTERVAL = 15 * 60; // segundos de trabalho acumulado
+const PAPER_DEFAULT_REMINDERS = ["limpar wpp", "beber 4L de água"];
+const PAPER_REVIEW_INTERVAL   = 15 * 60; // segundos de trabalho acumulado
+const PAPER_REMINDERS_LS_KEY  = "taskflow.paperReminders";
+
+function loadPaperReminders() {
+  try {
+    const raw = localStorage.getItem(PAPER_REMINDERS_LS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return PAPER_DEFAULT_REMINDERS;
+}
+function savePaperReminders(list) {
+  try { localStorage.setItem(PAPER_REMINDERS_LS_KEY, JSON.stringify(list)); } catch {}
+}
 
 // ── Celebrate messages by estado ────────────────────────
 const ESTADO_CELEBRATE_MSG = {
@@ -181,10 +193,15 @@ export default function DailyFocusPage() {
   const [ladderAnimating, setLadderAnimating]     = useState(false);
   const [showTaskSwitcher, setShowTaskSwitcher]   = useState(false);
 
-  // Paper & Pen: acumula segundos de trabalho real (não conta pausa)
+  // Paper & Pen
   const workSecsRef = useRef(0);
-  const [showPaperReview, setShowPaperReview] = useState(false);
-  const [paperCountdown, setPaperCountdown]   = useState(PAPER_REVIEW_INTERVAL);
+  const [showPaperReview, setShowPaperReview]   = useState(false);
+  const [paperCountdown, setPaperCountdown]     = useState(PAPER_REVIEW_INTERVAL);
+  const [paperReminders, setPaperReminders]     = useState(loadPaperReminders);
+  const [checkedReminders, setCheckedReminders] = useState(new Set()); // itens marcados no review
+  const [newReminderText, setNewReminderText]   = useState("");
+  const [reviewCount, setReviewCount]           = useState(0); // total de revisões na sessão
+  const [rushElapsed, setRushElapsed]           = useState(0); // segundos corridos no rush mode
 
   // Recordes por modo
   const maxLevelTimer = getMaxLevelByMode(false);
@@ -266,6 +283,19 @@ export default function DailyFocusPage() {
     return () => clearInterval(interval);
   }, [pausedSince]);
 
+  // Rush mode: stopwatch crescente (conta segundos enquanto running)
+  useEffect(() => {
+    if (!rushMode || phase !== "work") return;
+    if (!timerRunning) return;
+    const id = setInterval(() => setRushElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [rushMode, phase, timerRunning]);
+
+  // Reseta stopwatch ao trocar de tarefa ou sair do rush
+  useEffect(() => {
+    setRushElapsed(0);
+  }, [currentIdx, rushMode]);
+
   const currentTask = tasks[currentIdx] || {};
   const totalSecs = (currentTask.durationMin || 0) * 60;
   const activeHelperModeIds = currentTask.helperModeIds ?? [];
@@ -306,10 +336,12 @@ export default function DailyFocusPage() {
     // Pré-inicializa estados de helpers "durante" e "entre" da primeira tarefa
     (tasks[0].helperModeIds ?? []).forEach((id) => initHelperIfNeeded(id, 0));
     (tasks[0].interModeIds ?? []).forEach((id) => initHelperIfNeeded(id, 0));
-    // Reseta acumulador de trabalho
+    // Reseta acumulador e contagem de revisões
     workSecsRef.current = 0;
     setPaperCountdown(PAPER_REVIEW_INTERVAL);
     setShowPaperReview(false);
+    setReviewCount(0);
+    setRushElapsed(0);
   };
 
   const handleTaskChange = useCallback((i, val) => updateTask(i, val), []);
@@ -332,6 +364,9 @@ export default function DailyFocusPage() {
       setPaperCountdown(PAPER_REVIEW_INTERVAL);
       setTimerRunning(false);
       setShowPaperReview(true);
+      setCheckedReminders(new Set());
+      setReviewCount((n) => n + 1);
+      playPaperReview();
       sendNotif("📋 Hora de revisar!", "5 min para ler suas anotações e escolher o melhor.");
     }
   }, []);
@@ -347,6 +382,16 @@ export default function DailyFocusPage() {
     workSecsRef.current = 0;
     setPaperCountdown(PAPER_REVIEW_INTERVAL);
     setShowPaperReview(false);
+    setCheckedReminders(new Set());
+    setTimerRunning(true);
+  }, []);
+
+  // "Mais 5 min" — retoma o timer e dispara nova revisão em 5 min (sem zerar o intervalo base)
+  const handlePaperSnooze = useCallback(() => {
+    workSecsRef.current = PAPER_REVIEW_INTERVAL - 5 * 60; // faltam 5 min
+    setPaperCountdown(5 * 60);
+    setShowPaperReview(false);
+    setCheckedReminders(new Set());
     setTimerRunning(true);
   }, []);
 
@@ -615,17 +660,39 @@ export default function DailyFocusPage() {
     setTimeout(() => setLadderAnimating(false), 500);
   };
 
+  // Estados de baixa energia → modos "entre" têm prioridade; alta energia → "durante"
+  const ESTADOS_BAIXA_ENERGIA = new Set(["cansado", "travado", "ansioso"]);
+
   const handleCheckinSelect = (modeId, estadoId) => {
     setCheckinModeId(modeId);
     setCheckinEstadoId(estadoId ?? null);
     logCheckinUsage(estadoId, modeId);
-    // Pré-aplica na primeira tarefa se ela ainda não tiver modo selecionado
-    // Se o estado tem combo (modeIds), aplica todos; senão aplica só o modeId
+
     const estado = ESTADOS_DEFAULT.find((e) => e.id === estadoId);
     const comboIds = (estado?.modeIds?.length > 0) ? estado.modeIds : (modeId ? [modeId] : []);
+
+    // Separa combo em "durante" e "entre" com base no type do modo
+    const allModesMap = Object.fromEntries([...MODES, ...JSON.parse(localStorage.getItem("customModes") || "[]")].map((m) => [m.id, m]));
+    const duranteIds = comboIds.filter((id) => (allModesMap[id]?.type ?? "durante") === "durante");
+    const entreIds   = comboIds.filter((id) => (allModesMap[id]?.type ?? "durante") === "entre");
+
+    const isBaixaEnergia = ESTADOS_BAIXA_ENERGIA.has(estadoId);
+
     setTasks((prev) => {
-      if ((prev[0]?.helperModeIds ?? []).length > 0) return prev;
-      return prev.map((t, i) => i === 0 ? { ...t, helperModeIds: comboIds.slice(0, MAX_MODES) } : t);
+      // Só aplica se a primeira tarefa ainda não tiver modos configurados
+      const task0 = prev[0];
+      if ((task0?.helperModeIds ?? []).length > 0 || (task0?.interModeIds ?? []).length > 0) return prev;
+
+      return prev.map((t, i) => {
+        if (i !== 0) return t;
+        if (isBaixaEnergia) {
+          // Baixa energia: modos "entre" vão para interModeIds, "durante" para helperModeIds
+          return { ...t, helperModeIds: duranteIds.slice(0, MAX_MODES), interModeIds: entreIds.slice(0, MAX_MODES) };
+        } else {
+          // Alta energia / bem: tudo "durante"
+          return { ...t, helperModeIds: comboIds.slice(0, MAX_MODES) };
+        }
+      });
     });
     comboIds.forEach((id) => initHelperIfNeeded(id, 0));
     // Conquista "Auto-conhecimento": 5 check-ins
@@ -972,7 +1039,8 @@ export default function DailyFocusPage() {
             )}
 
             {/* ── Widget "Papel, Caneta e Régua" ── */}
-            {showPaperReview ? (
+            {/* Suprimido em tarefas muito curtas (≤15 min) onde a revisão coincidiria com o fim do timer */}
+            {currentTask.durationMin > 15 && (showPaperReview ? (
               /* Prompt de revisão expandido */
               <div className={styles.paperReview}>
                 <div className={styles.paperReviewTitle}>✏️ Hora de revisar suas anotações!</div>
@@ -981,13 +1049,32 @@ export default function DailyFocusPage() {
                 </p>
                 <div className={styles.paperReviewReminders}>
                   <span className={styles.paperReminderLabel}>Lembretes fixos:</span>
-                  {PAPER_REMINDERS.map((r) => (
-                    <span key={r} className={styles.paperReminderChip}>• {r}</span>
+                  {paperReminders.map((r) => (
+                    <span
+                      key={r}
+                      className={`${styles.paperReminderChip} ${checkedReminders.has(r) ? styles.paperReminderChecked : ""}`}
+                      onClick={() => setCheckedReminders((prev) => {
+                        const next = new Set(prev);
+                        next.has(r) ? next.delete(r) : next.add(r);
+                        return next;
+                      })}
+                      role="checkbox"
+                      aria-checked={checkedReminders.has(r)}
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") e.currentTarget.click(); }}
+                    >
+                      {checkedReminders.has(r) ? "✓" : "•"} {r}
+                    </span>
                   ))}
                 </div>
-                <button className={styles.paperReviewBtn} onClick={handlePaperReviewDone}>
-                  ✓ Revisei — continuar
-                </button>
+                <div className={styles.paperReviewActions}>
+                  <button className={styles.paperReviewBtn} onClick={handlePaperReviewDone}>
+                    ✓ Revisei — continuar
+                  </button>
+                  <button className={styles.paperSnoozeBtn} onClick={handlePaperSnooze}>
+                    ⏱ mais 5 min
+                  </button>
+                </div>
               </div>
             ) : (
               /* Widget compacto sempre visível */
@@ -996,21 +1083,53 @@ export default function DailyFocusPage() {
                   <span className={styles.paperWidgetIcon}>📋</span>
                   <span className={styles.paperWidgetTitle}>Papel, caneta e régua na mesa?</span>
                   <span className={styles.paperWidgetCountdown}>
-                    {timerRunning
-                      ? `revisão em ${Math.floor(paperCountdown / 60)}:${String(paperCountdown % 60).padStart(2, "0")}`
-                      : "pausado"}
+                    {rushMode
+                      ? null
+                      : timerRunning
+                        ? `revisão em ${Math.floor(paperCountdown / 60)}:${String(paperCountdown % 60).padStart(2, "0")}`
+                        : "pausado"}
                   </span>
                 </div>
                 <div className={styles.paperWidgetSub}>
                   Jogue todas as ideias nessa folha — a cada 15 min você revisa e escolhe o melhor.
                 </div>
                 <div className={styles.paperWidgetReminders}>
-                  {PAPER_REMINDERS.map((r) => (
+                  {paperReminders.map((r) => (
                     <span key={r} className={styles.paperReminderChip}>• {r}</span>
                   ))}
+                  {/* Adicionar lembrete personalizado */}
+                  <span className={styles.paperAddReminderWrap}>
+                    <input
+                      className={styles.paperAddReminderInput}
+                      placeholder="+ lembrete"
+                      value={newReminderText}
+                      onChange={(e) => setNewReminderText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newReminderText.trim()) {
+                          const updated = [...paperReminders, newReminderText.trim()];
+                          setPaperReminders(updated);
+                          savePaperReminders(updated);
+                          setNewReminderText("");
+                        }
+                      }}
+                      maxLength={40}
+                    />
+                  </span>
+                  {/* Remover lembrete (×) ao passar o mouse — mostramos sempre no widget */}
+                  {paperReminders.length > 0 && (
+                    <button
+                      className={styles.paperClearRemindersBtn}
+                      title="Remover último lembrete"
+                      onClick={() => {
+                        const updated = paperReminders.slice(0, -1);
+                        setPaperReminders(updated);
+                        savePaperReminders(updated);
+                      }}
+                    >×</button>
+                  )}
                 </div>
               </div>
-            )}
+            ))}
 
             {/* Painel "entre tarefas" — aparece automaticamente quando o timer está pausado */}
             {(() => {
@@ -1410,6 +1529,13 @@ export default function DailyFocusPage() {
             {sessionFeedback === "bad" && (
               <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
                 ✓ Anotado. Vamos ajustar as sugestões.
+              </div>
+            )}
+
+            {/* Revisões de anotações */}
+            {reviewCount > 0 && (
+              <div style={{ fontSize: "13px", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "6px" }}>
+                📋 {reviewCount} revisão{reviewCount > 1 ? "ões" : ""} de anotações
               </div>
             )}
 
