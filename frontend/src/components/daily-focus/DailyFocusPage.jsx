@@ -81,6 +81,10 @@ function sendNotif(title, body) {
   }
 }
 
+// ── Paper & Pen reminder system ─────────────────────────
+const PAPER_REMINDERS = ["limpar wpp", "beber 4L de água"];
+const PAPER_REVIEW_INTERVAL = 15 * 60; // segundos de trabalho acumulado
+
 // ── Celebrate messages by estado ────────────────────────
 const ESTADO_CELEBRATE_MSG = {
   travado:    "Conseguiu sair do lugar mesmo travado — isso é o mais difícil. 💪",
@@ -99,7 +103,19 @@ export default function DailyFocusPage() {
   const [level, setLevel]                   = useState(saved?.level ?? getDayLevel());
   const [tasks, setTasks]                   = useState(() => migrateTasks(saved?.tasks ?? makeTasks(1)));
   const [currentIdx, setCurrentIdx]         = useState(saved?.currentIdx ?? 0);
-  const [helperStates, setHelperStates]     = useState(saved?.helperStates ?? {}); // { modeId: state }
+  // helperStates isolado por tarefa: chave = "${taskIdx}:${modeId}"
+  // Migra formato antigo { modeId: state } → { "0:modeId": state }
+  const [helperStates, setHelperStates]     = useState(() => {
+    const raw = saved?.helperStates ?? {};
+    const hasCompound = Object.keys(raw).some((k) => k.includes(":"));
+    if (hasCompound || Object.keys(raw).length === 0) return raw;
+    // Formato antigo — atribui à tarefa 0
+    const migrated = {};
+    for (const [modeId, state] of Object.entries(raw)) {
+      migrated[`0:${modeId}`] = state;
+    }
+    return migrated;
+  });
   const [timerRemaining, setTimerRemaining] = useState(saved?.timerRemaining ?? null);
   const [timerRunning, setTimerRunning]     = useState(false);
   const [phase, setPhase]                   = useState(saved?.phase ?? "checkin");
@@ -140,6 +156,14 @@ export default function DailyFocusPage() {
 
   // Aba ativa no painel de helpers quando há 2+ modos (não persiste)
   const [activeHelperTab, setActiveHelperTab] = useState(null); // modeId | null
+  // Cards colapsados (Set de modeIds) — não persiste
+  const [collapsedHelpers, setCollapsedHelpers] = useState(() => new Set());
+  const toggleHelperCollapse = (modeId) =>
+    setCollapsedHelpers((prev) => {
+      const next = new Set(prev);
+      next.has(modeId) ? next.delete(modeId) : next.add(modeId);
+      return next;
+    });
 
   // UI state (not persisted)
   const [showHelperPicker, setShowHelperPicker]   = useState(false);
@@ -156,6 +180,11 @@ export default function DailyFocusPage() {
   const [_notifRequested, _setNotifRequested]       = useState(false);
   const [ladderAnimating, setLadderAnimating]     = useState(false);
   const [showTaskSwitcher, setShowTaskSwitcher]   = useState(false);
+
+  // Paper & Pen: acumula segundos de trabalho real (não conta pausa)
+  const workSecsRef = useRef(0);
+  const [showPaperReview, setShowPaperReview] = useState(false);
+  const [paperCountdown, setPaperCountdown]   = useState(PAPER_REVIEW_INTERVAL);
 
   // Recordes por modo
   const maxLevelTimer = getMaxLevelByMode(false);
@@ -246,7 +275,7 @@ export default function DailyFocusPage() {
     : activeHelperModeIds[0] ?? null;
   const helperEntry = getHelper(activeTabModeId);
   const helperMode = getModeById(activeTabModeId);
-  const currentHelperState = helperStates[activeTabModeId] || {};
+  const currentHelperState = helperStates[`${currentIdx}:${activeTabModeId}`] || {};
 
   // ── helpers ──────────────────────────────────────────
   const updateTask = (i, val) =>
@@ -275,8 +304,12 @@ export default function DailyFocusPage() {
     setPhase("work");
     requestNotifPermission();
     // Pré-inicializa estados de helpers "durante" e "entre" da primeira tarefa
-    (tasks[0].helperModeIds ?? []).forEach(initHelperIfNeeded);
-    (tasks[0].interModeIds ?? []).forEach(initHelperIfNeeded);
+    (tasks[0].helperModeIds ?? []).forEach((id) => initHelperIfNeeded(id, 0));
+    (tasks[0].interModeIds ?? []).forEach((id) => initHelperIfNeeded(id, 0));
+    // Reseta acumulador de trabalho
+    workSecsRef.current = 0;
+    setPaperCountdown(PAPER_REVIEW_INTERVAL);
+    setShowPaperReview(false);
   };
 
   const handleTaskChange = useCallback((i, val) => updateTask(i, val), []);
@@ -290,6 +323,17 @@ export default function DailyFocusPage() {
 
   const handleTimerTick = useCallback((remaining) => {
     setTimerRemaining(remaining);
+    // Acumula segundos de trabalho real e dispara revisão a cada 15 min
+    workSecsRef.current += 1;
+    const secs = workSecsRef.current;
+    setPaperCountdown(PAPER_REVIEW_INTERVAL - secs);
+    if (secs >= PAPER_REVIEW_INTERVAL) {
+      workSecsRef.current = 0;
+      setPaperCountdown(PAPER_REVIEW_INTERVAL);
+      setTimerRunning(false);
+      setShowPaperReview(true);
+      sendNotif("📋 Hora de revisar!", "5 min para ler suas anotações e escolher o melhor.");
+    }
   }, []);
 
   const handleTimerDone = useCallback(() => {
@@ -299,48 +343,80 @@ export default function DailyFocusPage() {
     sendNotif("⏰ Timer encerrado!", `Tarefa: ${tasks[currentIdx]?.title || ""}`);
   }, [tasks, currentIdx]);
 
+  const handlePaperReviewDone = useCallback(() => {
+    workSecsRef.current = 0;
+    setPaperCountdown(PAPER_REVIEW_INTERVAL);
+    setShowPaperReview(false);
+    setTimerRunning(true);
+  }, []);
+
   const handleHelperChange = useCallback((newState) => {
     setHelperStates((prev) => {
-      const modeId = activeTabModeId;
-      if (!modeId) return prev;
-      const resolved = typeof newState === "function" ? newState(prev[modeId] || {}) : newState;
-      return { ...prev, [modeId]: resolved };
+      if (!activeTabModeId) return prev;
+      const key = `${currentIdx}:${activeTabModeId}`;
+      const resolved = typeof newState === "function" ? newState(prev[key] || {}) : newState;
+      return { ...prev, [key]: resolved };
     });
-  }, [activeTabModeId]);
+  }, [activeTabModeId, currentIdx]);
 
-  // When switching to a new task, init helper state if needed
-  const initHelperIfNeeded = (modeId) => {
+  // Inicializa estado de um helper se ainda não existir para essa tarefa
+  const initHelperIfNeeded = (modeId, taskIdx = currentIdx) => {
     if (!modeId) return;
+    const key = `${taskIdx}:${modeId}`;
     setHelperStates((prev) => {
-      if (prev[modeId]) return prev;
+      if (prev[key]) return prev;
       const entry = getHelper(modeId);
-      return { ...prev, [modeId]: entry?.defaultState ?? {} };
+      return { ...prev, [key]: entry?.defaultState ?? {} };
     });
   };
 
-  // Adiciona um modo à tarefa (não substitui, empurra pro array)
+  // Helper inline para atualizar estado de um modo específico em uma tarefa
+  const makeHelperOnChange = (modeId, taskIdx) => (newState) => {
+    setHelperStates((prev) => {
+      const key = `${taskIdx}:${modeId}`;
+      const resolved = typeof newState === "function" ? newState(prev[key] || {}) : newState;
+      return { ...prev, [key]: resolved };
+    });
+  };
+
+  // Reordena um modo (helperModeIds ou interModeIds) dentro da tarefa
+  const handleReorderHelper = (field, modeId, dir, taskIdx = currentIdx) => {
+    setTasks((prev) => prev.map((t, i) => {
+      if (i !== taskIdx) return t;
+      const ids = [...(t[field] ?? [])];
+      const from = ids.indexOf(modeId);
+      const to = from + dir;
+      if (to < 0 || to >= ids.length) return t;
+      [ids[from], ids[to]] = [ids[to], ids[from]];
+      return { ...t, [field]: ids };
+    }));
+  };
+
+  const MAX_MODES = 3;
+
+  // Adiciona um modo à tarefa (não substitui, empurra pro array — limite: MAX_MODES)
   const handleSelectHelper = (modeId) => {
     const taskIdx = pickerForTask !== null ? pickerForTask : currentIdx;
     setTasks((prev) => prev.map((t, i) => {
       if (i !== taskIdx) return t;
       const ids = t.helperModeIds ?? [];
-      if (ids.includes(modeId)) return t; // já está
+      if (ids.includes(modeId) || ids.length >= MAX_MODES) return t;
       return { ...t, helperModeIds: [...ids, modeId] };
     }));
-    initHelperIfNeeded(modeId);
+    initHelperIfNeeded(modeId, taskIdx);
     setPickerForTask(null);
     setShowHelperPicker(false);
   };
 
-  // Adiciona um modo "entre" à tarefa atual (fase work)
+  // Adiciona um modo "entre" à tarefa atual (fase work) — limite: MAX_MODES
   const handleSelectInterHelper = (modeId) => {
     setTasks((prev) => prev.map((t, i) => {
       if (i !== currentIdx) return t;
       const ids = t.interModeIds ?? [];
-      if (ids.includes(modeId)) return t;
+      if (ids.includes(modeId) || ids.length >= MAX_MODES) return t;
       return { ...t, interModeIds: [...ids, modeId] };
     }));
-    initHelperIfNeeded(modeId);
+    initHelperIfNeeded(modeId, currentIdx);
     setShowInterPicker(false);
   };
 
@@ -389,9 +465,14 @@ export default function DailyFocusPage() {
       setLongPause(false);
       setPausedSince(null);
       // Se a tarefa concluída tem modos "entre tarefas", mostra tela de pausa
+      // Reseta acumulador de trabalho ao trocar de tarefa
+      workSecsRef.current = 0;
+      setPaperCountdown(PAPER_REVIEW_INTERVAL);
+      setShowPaperReview(false);
+
       const interIds = updated[currentIdx]?.interModeIds ?? [];
       if (interIds.length > 0) {
-        interIds.forEach(initHelperIfNeeded);
+        interIds.forEach((id) => initHelperIfNeeded(id, currentIdx));
         setPendingNextIdx(nextIdx);
         setPhase("between");
       } else {
@@ -406,8 +487,8 @@ export default function DailyFocusPage() {
             i === nextIdx ? { ...t, onHold: false, savedTimerSecs: null } : t
           ));
         }
-        (updated[nextIdx].helperModeIds ?? []).forEach(initHelperIfNeeded);
-        (updated[nextIdx].interModeIds ?? []).forEach(initHelperIfNeeded);
+        (updated[nextIdx].helperModeIds ?? []).forEach((id) => initHelperIfNeeded(id, nextIdx));
+        (updated[nextIdx].interModeIds ?? []).forEach((id) => initHelperIfNeeded(id, nextIdx));
       }
     }
   };
@@ -436,8 +517,8 @@ export default function DailyFocusPage() {
     setLongPause(false);
     setPausedSince(null);
     setActiveHelperTab(null);
-    (target.helperModeIds ?? []).forEach(initHelperIfNeeded);
-    (target.interModeIds ?? []).forEach(initHelperIfNeeded);
+    (target.helperModeIds ?? []).forEach((id) => initHelperIfNeeded(id, idx));
+    (target.interModeIds ?? []).forEach((id) => initHelperIfNeeded(id, idx));
     setShowTaskSwitcher(false);
   };
 
@@ -462,8 +543,12 @@ export default function DailyFocusPage() {
         i === nextIdx ? { ...t, onHold: false, savedTimerSecs: null } : t
       ));
     }
-    (tasks[nextIdx].helperModeIds ?? []).forEach(initHelperIfNeeded);
-    (tasks[nextIdx].interModeIds ?? []).forEach(initHelperIfNeeded);
+    (tasks[nextIdx].helperModeIds ?? []).forEach((id) => initHelperIfNeeded(id, nextIdx));
+    (tasks[nextIdx].interModeIds ?? []).forEach((id) => initHelperIfNeeded(id, nextIdx));
+    // Reseta acumulador de trabalho ao retomar da fase between
+    workSecsRef.current = 0;
+    setPaperCountdown(PAPER_REVIEW_INTERVAL);
+    setShowPaperReview(false);
     setPhase("work");
   };
 
@@ -535,11 +620,14 @@ export default function DailyFocusPage() {
     setCheckinEstadoId(estadoId ?? null);
     logCheckinUsage(estadoId, modeId);
     // Pré-aplica na primeira tarefa se ela ainda não tiver modo selecionado
+    // Se o estado tem combo (modeIds), aplica todos; senão aplica só o modeId
+    const estado = ESTADOS_DEFAULT.find((e) => e.id === estadoId);
+    const comboIds = (estado?.modeIds?.length > 0) ? estado.modeIds : (modeId ? [modeId] : []);
     setTasks((prev) => {
       if ((prev[0]?.helperModeIds ?? []).length > 0) return prev;
-      return prev.map((t, i) => i === 0 ? { ...t, helperModeIds: modeId ? [modeId] : [] } : t);
+      return prev.map((t, i) => i === 0 ? { ...t, helperModeIds: comboIds.slice(0, MAX_MODES) } : t);
     });
-    initHelperIfNeeded(modeId);
+    comboIds.forEach((id) => initHelperIfNeeded(id, 0));
     // Conquista "Auto-conhecimento": 5 check-ins
     if (getCheckinCount() >= 5) {
       const newAch = tryUnlock(["self_aware"]);
@@ -883,6 +971,47 @@ export default function DailyFocusPage() {
               </div>
             )}
 
+            {/* ── Widget "Papel, Caneta e Régua" ── */}
+            {showPaperReview ? (
+              /* Prompt de revisão expandido */
+              <div className={styles.paperReview}>
+                <div className={styles.paperReviewTitle}>✏️ Hora de revisar suas anotações!</div>
+                <p className={styles.paperReviewDesc}>
+                  Leia tudo que você anotou na folha e escolha os melhores para fazer agora. Vale 5 minutos.
+                </p>
+                <div className={styles.paperReviewReminders}>
+                  <span className={styles.paperReminderLabel}>Lembretes fixos:</span>
+                  {PAPER_REMINDERS.map((r) => (
+                    <span key={r} className={styles.paperReminderChip}>• {r}</span>
+                  ))}
+                </div>
+                <button className={styles.paperReviewBtn} onClick={handlePaperReviewDone}>
+                  ✓ Revisei — continuar
+                </button>
+              </div>
+            ) : (
+              /* Widget compacto sempre visível */
+              <div className={styles.paperWidget}>
+                <div className={styles.paperWidgetHeader}>
+                  <span className={styles.paperWidgetIcon}>📋</span>
+                  <span className={styles.paperWidgetTitle}>Papel, caneta e régua na mesa?</span>
+                  <span className={styles.paperWidgetCountdown}>
+                    {timerRunning
+                      ? `revisão em ${Math.floor(paperCountdown / 60)}:${String(paperCountdown % 60).padStart(2, "0")}`
+                      : "pausado"}
+                  </span>
+                </div>
+                <div className={styles.paperWidgetSub}>
+                  Jogue todas as ideias nessa folha — a cada 15 min você revisa e escolhe o melhor.
+                </div>
+                <div className={styles.paperWidgetReminders}>
+                  {PAPER_REMINDERS.map((r) => (
+                    <span key={r} className={styles.paperReminderChip}>• {r}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Painel "entre tarefas" — aparece automaticamente quando o timer está pausado */}
             {(() => {
               const interIds = currentTask.interModeIds ?? [];
@@ -931,35 +1060,42 @@ export default function DailyFocusPage() {
                       const entry = getHelper(interIds[0]);
                       return m && entry ? (
                         <entry.Component
-                          state={helperStates[interIds[0]] || {}}
-                          onChange={(newState) => setHelperStates((prev) => {
-                            const resolved = typeof newState === "function" ? newState(prev[interIds[0]] || {}) : newState;
-                            return { ...prev, [interIds[0]]: resolved };
-                          })}
+                          state={helperStates[`${currentIdx}:${interIds[0]}`] || {}}
+                          onChange={makeHelperOnChange(interIds[0], currentIdx)}
                           modeConfig={m}
                         />
                       ) : null;
                     })()
                   ) : (
                     <div className={styles.helperPanelGrid}>
-                      {interIds.map((modeId) => {
+                      {interIds.map((modeId, mIdx) => {
                         const m = getModeById(modeId);
                         const entry = getHelper(modeId);
                         if (!m || !entry) return null;
+                        const isCollapsed = collapsedHelpers.has(`inter:${modeId}`);
                         return (
-                          <div key={modeId} className={styles.helperPanel}>
+                          <div key={modeId} className={styles.helperPanel} style={{ borderTop: `3px solid ${m.color || "var(--accent)"}` }}>
                             <div className={styles.helperPanelHeader}>
                               <span className={styles.helperPanelEmoji}>{m.emoji}</span>
                               <span className={styles.helperPanelName}>{m.name}</span>
+                              <div className={styles.helperPanelActions}>
+                                {interIds.length > 1 && (
+                                  <>
+                                    <button className={styles.helperPanelReorderBtn} disabled={mIdx === 0} onClick={() => handleReorderHelper("interModeIds", modeId, -1)}>‹</button>
+                                    <button className={styles.helperPanelReorderBtn} disabled={mIdx === interIds.length - 1} onClick={() => handleReorderHelper("interModeIds", modeId, 1)}>›</button>
+                                  </>
+                                )}
+                                <button className={styles.helperPanelCollapseBtn} onClick={() => toggleHelperCollapse(`inter:${modeId}`)}>{isCollapsed ? "▼" : "▲"}</button>
+                                <button className={styles.helperPanelRemove} onClick={() => handleRemoveInterById(modeId)}>×</button>
+                              </div>
                             </div>
-                            <entry.Component
-                              state={helperStates[modeId] || {}}
-                              onChange={(newState) => setHelperStates((prev) => {
-                                const resolved = typeof newState === "function" ? newState(prev[modeId] || {}) : newState;
-                                return { ...prev, [modeId]: resolved };
-                              })}
-                              modeConfig={m}
-                            />
+                            {!isCollapsed && (
+                              <entry.Component
+                                state={helperStates[`${currentIdx}:${modeId}`] || {}}
+                                onChange={makeHelperOnChange(modeId, currentIdx)}
+                                modeConfig={m}
+                              />
+                            )}
                           </div>
                         );
                       })}
@@ -973,12 +1109,17 @@ export default function DailyFocusPage() {
             {activeHelperModeIds.length > 0 && (
               activeHelperModeIds.length === 1 ? (
                 /* Modo único: layout original */
-                <div className={styles.helperPanel}>
+                <div className={styles.helperPanel} style={{ borderTop: `3px solid ${helperMode?.color || "var(--accent)"}` }}>
                   {helperMode && (
                     <div className={styles.helperPanelHeader}>
                       <span className={styles.helperPanelEmoji}>{helperMode.emoji}</span>
                       <span className={styles.helperPanelName}>{helperMode.name}</span>
                       <span className={styles.helperPanelBadge}>modo de apoio</span>
+                      <button
+                        className={styles.helperPanelCollapseBtn}
+                        onClick={() => toggleHelperCollapse(activeHelperModeIds[0])}
+                        title={collapsedHelpers.has(activeHelperModeIds[0]) ? "Expandir" : "Recolher"}
+                      >{collapsedHelpers.has(activeHelperModeIds[0]) ? "▼" : "▲"}</button>
                       <button
                         className={styles.helperPanelRemove}
                         onClick={() => handleRemoveHelperById(activeHelperModeIds[0], currentIdx)}
@@ -986,7 +1127,7 @@ export default function DailyFocusPage() {
                       >×</button>
                     </div>
                   )}
-                  {helperEntry && helperMode && (
+                  {!collapsedHelpers.has(activeHelperModeIds[0]) && helperEntry && helperMode && (
                     <helperEntry.Component
                       state={currentHelperState}
                       onChange={handleHelperChange}
@@ -997,29 +1138,34 @@ export default function DailyFocusPage() {
               ) : (
                 /* Múltiplos modos: grade lado a lado */
                 <div className={styles.helperPanelGrid}>
-                  {activeHelperModeIds.map((modeId) => {
+                  {activeHelperModeIds.map((modeId, mIdx) => {
                     const m = getModeById(modeId);
                     const entry = getHelper(modeId);
                     if (!m || !entry) return null;
+                    const isCollapsed = collapsedHelpers.has(modeId);
                     return (
-                      <div key={modeId} className={styles.helperPanel}>
+                      <div key={modeId} className={styles.helperPanel} style={{ borderTop: `3px solid ${m.color || "var(--accent)"}` }}>
                         <div className={styles.helperPanelHeader}>
                           <span className={styles.helperPanelEmoji}>{m.emoji}</span>
                           <span className={styles.helperPanelName}>{m.name}</span>
-                          <button
-                            className={styles.helperPanelRemove}
-                            onClick={() => handleRemoveHelperById(modeId, currentIdx)}
-                            title={`Remover ${m.name}`}
-                          >×</button>
+                          <div className={styles.helperPanelActions}>
+                            {activeHelperModeIds.length > 1 && (
+                              <>
+                                <button className={styles.helperPanelReorderBtn} disabled={mIdx === 0} onClick={() => handleReorderHelper("helperModeIds", modeId, -1)} title="Mover para esquerda">‹</button>
+                                <button className={styles.helperPanelReorderBtn} disabled={mIdx === activeHelperModeIds.length - 1} onClick={() => handleReorderHelper("helperModeIds", modeId, 1)} title="Mover para direita">›</button>
+                              </>
+                            )}
+                            <button className={styles.helperPanelCollapseBtn} onClick={() => toggleHelperCollapse(modeId)} title={isCollapsed ? "Expandir" : "Recolher"}>{isCollapsed ? "▼" : "▲"}</button>
+                            <button className={styles.helperPanelRemove} onClick={() => handleRemoveHelperById(modeId, currentIdx)} title={`Remover ${m.name}`}>×</button>
+                          </div>
                         </div>
-                        <entry.Component
-                          state={helperStates[modeId] || {}}
-                          onChange={(newState) => setHelperStates((prev) => {
-                            const resolved = typeof newState === "function" ? newState(prev[modeId] || {}) : newState;
-                            return { ...prev, [modeId]: resolved };
-                          })}
-                          modeConfig={m}
-                        />
+                        {!isCollapsed && (
+                          <entry.Component
+                            state={helperStates[`${currentIdx}:${modeId}`] || {}}
+                            onChange={makeHelperOnChange(modeId, currentIdx)}
+                            modeConfig={m}
+                          />
+                        )}
                       </div>
                     );
                   })}
@@ -1085,9 +1231,11 @@ export default function DailyFocusPage() {
                 className={styles.changeHelperBtn}
                 onClick={() => { setPickerForTask(null); setShowHelperPicker(true); }}
               >
-                {activeHelperModeIds.length > 0
-                  ? `+ Adicionar modo  ${activeHelperModeIds.map((id) => getModeById(id)?.emoji ?? "").join("")}`
-                  : "🎯 Adicionar modo de apoio"}
+                {activeHelperModeIds.length >= MAX_MODES
+                  ? `✓ ${activeHelperModeIds.map((id) => getModeById(id)?.emoji ?? "").join("")} (máx. ${MAX_MODES})`
+                  : activeHelperModeIds.length > 0
+                    ? `+ Modo  ${activeHelperModeIds.map((id) => getModeById(id)?.emoji ?? "").join("")} (${activeHelperModeIds.length}/${MAX_MODES})`
+                    : "🎯 Adicionar modo de apoio"}
               </button>
             </div>
           </div>
@@ -1121,18 +1269,15 @@ export default function DailyFocusPage() {
                   const m = getModeById(interIds[0]);
                   const entry = getHelper(interIds[0]);
                   return m && entry ? (
-                    <div className={styles.helperPanel}>
+                    <div className={styles.helperPanel} style={{ borderTop: `3px solid ${m.color || "var(--accent)"}` }}>
                       <div className={styles.helperPanelHeader}>
                         <span className={styles.helperPanelEmoji}>{m.emoji}</span>
                         <span className={styles.helperPanelName}>{m.name}</span>
                         <span className={styles.helperPanelBadge}>entre tarefas</span>
                       </div>
                       <entry.Component
-                        state={helperStates[interIds[0]] || {}}
-                        onChange={(newState) => setHelperStates((prev) => {
-                          const resolved = typeof newState === "function" ? newState(prev[interIds[0]] || {}) : newState;
-                          return { ...prev, [interIds[0]]: resolved };
-                        })}
+                        state={helperStates[`${currentIdx}:${interIds[0]}`] || {}}
+                        onChange={makeHelperOnChange(interIds[0], currentIdx)}
                         modeConfig={m}
                       />
                     </div>
@@ -1145,18 +1290,15 @@ export default function DailyFocusPage() {
                     const entry = getHelper(modeId);
                     if (!m || !entry) return null;
                     return (
-                      <div key={modeId} className={styles.helperPanel}>
+                      <div key={modeId} className={styles.helperPanel} style={{ borderTop: `3px solid ${m.color || "var(--accent)"}` }}>
                         <div className={styles.helperPanelHeader}>
                           <span className={styles.helperPanelEmoji}>{m.emoji}</span>
                           <span className={styles.helperPanelName}>{m.name}</span>
                           <span className={styles.helperPanelBadge}>entre tarefas</span>
                         </div>
                         <entry.Component
-                          state={helperStates[modeId] || {}}
-                          onChange={(newState) => setHelperStates((prev) => {
-                            const resolved = typeof newState === "function" ? newState(prev[modeId] || {}) : newState;
-                            return { ...prev, [modeId]: resolved };
-                          })}
+                          state={helperStates[`${currentIdx}:${modeId}`] || {}}
+                          onChange={makeHelperOnChange(modeId, currentIdx)}
                           modeConfig={m}
                         />
                       </div>
