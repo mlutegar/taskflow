@@ -1006,15 +1006,60 @@
 
 /* ── Mobile ───────────────────────────────────────────── */
 @media (max-width: 520px) {
-  .cardToggle { padding: 12px; gap: 10px; }
-  .cardEmoji { font-size: 18px; width: 24px; }
+  /* Cards: mais compactos */
+  .cardToggle { padding: 10px 11px; gap: 9px; }
+  .cardEmoji { font-size: 17px; width: 22px; }
   .cardName { font-size: 13px; }
-  .cardActions { margin: 0 8px; gap: 4px; }
+  .cardTagline { font-size: 11px; }
+  .cardActions { margin: 0 6px; gap: 3px; }
   .startBtn { padding: 6px 10px; font-size: 11px; }
-  .cardBody { padding: 12px 14px 14px; gap: 12px; }
-  .subtitle { font-size: 12px; }
-  .panelHeader { flex-direction: column; gap: 12px; }
-  .createBtn { align-self: flex-start; }
+  .cardBody { padding: 10px 12px 12px; gap: 10px; }
+  .cardNameRow { gap: 5px; flex-wrap: wrap; }
+  .statBadge { font-size: 9px; padding: 1px 5px; }
+  .hourRecommendation { font-size: 10px; }
+
+  /* Panel header: esconde a descrição, só mostra o botão criar */
+  .subtitle { display: none; }
+  .panelHeader { flex-direction: row; justify-content: flex-end; padding: 0; }
+  .createBtn { align-self: flex-start; padding: 6px 12px; font-size: 12px; }
+
+  /* Semana: mais compacto */
+  .weeklyPanel { padding: 10px 11px; gap: 7px; }
+  .weeklyName { width: 80px; font-size: 12px; }
+  .weeklyTitle { font-size: 12px; }
+  .weeklyNote { display: none; }
+
+  /* Filtros: scroll horizontal em vez de quebrar linha */
+  .sortBar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin-top: -4px;
+    padding-bottom: 2px;
+  }
+  .sortBar::-webkit-scrollbar { display: none; }
+  .sortLabel { display: none; }
+  .sortBtn { font-size: 11px; padding: 4px 9px; flex-shrink: 0; }
+
+  /* Categorias: título menor */
+  .categoryTitle { font-size: 10px; }
+  .categoryGroup { gap: 7px; }
+  .grid { gap: 6px; }
+
+  /* Root: menos espaçamento vertical */
+  .root { gap: 12px; }
+
+  /* Daily Focus card: menor */
   .formRow { flex-direction: column; }
   .modal { max-height: 95vh; }
+
+  /* Lembretes: mais compactos */
+  .reminderBanner { padding: 9px 11px; gap: 8px; }
+  .reminderText { font-size: 12px; }
+  .reminderRegisterBtn { font-size: 11px; padding: 4px 9px; }
+
+  /* Esconde pré-requisito e context tags no card fechado — muito ruído */
+  .cardPrereqHint { display: none; }
+  .contextTags { display: none; }
 }

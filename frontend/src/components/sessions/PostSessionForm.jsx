@@ -4,7 +4,7 @@ import styles from "./PostSessionForm.module.css";
 
 const IDLE_REASONS = [
   { id: "distraction",  label: "📱 Distração" },
-  { id: "another_task", label: "📋 Outra tarefa apareceu" },
+  { id: "another_task", label: "📋 Outra tarefa" },
   { id: "planned",      label: "☕ Pausa planejada" },
   { id: "tiredness",    label: "😴 Cansaço" },
   { id: "none",         label: "✅ Não fiquei ocioso" },
@@ -12,7 +12,7 @@ const IDLE_REASONS = [
 
 const FEELINGS = [
   { id: "flow",       label: "⚡ No flow" },
-  { id: "thinking",   label: "💭 Pensando em algo" },
+  { id: "thinking",   label: "💭 Pensando" },
   { id: "tired",      label: "😓 Cansado" },
   { id: "sleepy",     label: "😴 Com sono" },
   { id: "anxious",    label: "😬 Ansioso" },
@@ -32,49 +32,51 @@ function Chip({ label, selected, onClick }) {
   );
 }
 
-function RangeField({ label, value, onChange, min = 0, max, step = 5, unit = "min" }) {
+function MinutesInput({ label, value, onChange, placeholder = "ex: 25" }) {
+  const [raw, setRaw] = useState(value > 0 ? String(value) : "");
+
+  const handleChange = (e) => {
+    const v = e.target.value.replace(/\D/g, "").slice(0, 3);
+    setRaw(v);
+    onChange(v === "" ? 0 : Math.min(999, parseInt(v, 10)));
+  };
+
   return (
-    <div className={styles.rangeField}>
-      <div className={styles.rangeHeader}>
-        <span className={styles.fieldLabel}>{label}</span>
-        <span className={styles.rangeValue}>
-          {value === 0 ? "0" : value} {unit}
-        </span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className={styles.rangeInput}
-      />
-      <div className={styles.rangeTicks}>
-        <span>{min}</span>
-        <span>{Math.round(max / 2)}</span>
-        <span>{max}</span>
+    <div className={styles.minutesField}>
+      <label className={styles.fieldLabel}>{label}</label>
+      <div className={styles.minutesRow}>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          className={styles.minutesInput}
+          value={raw}
+          onChange={handleChange}
+          placeholder={placeholder}
+          maxLength={3}
+        />
+        <span className={styles.minutesUnit}>min</span>
       </div>
     </div>
   );
 }
 
 export default function PostSessionForm({ modeId, modeName, onDone }) {
-  const [worked,         setWorked]         = useState(null);       // true | false | null
-  const [focusedMinutes, setFocusedMinutes] = useState(25);
+  const [worked,         setWorked]         = useState(null);
+  const [focusedMinutes, setFocusedMinutes] = useState(0);
   const [idleMinutes,    setIdleMinutes]    = useState(0);
   const [idleReason,     setIdleReason]     = useState([]);
   const [feeling,        setFeeling]        = useState([]);
   const [saved,          setSaved]          = useState(false);
 
-  const toggleArr = (arr, setArr, id) => {
+  const toggleArr = (setArr, id) => {
     setArr((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   };
 
   const handleSubmit = () => {
     logUsage({ modeId, worked: worked ?? false, focusedMinutes, idleMinutes, idleReason, feeling });
     setSaved(true);
-    setTimeout(onDone, 1000);
+    setTimeout(onDone, 900);
   };
 
   const handleSkip = () => {
@@ -87,7 +89,7 @@ export default function PostSessionForm({ modeId, modeName, onDone }) {
       <div className={styles.root}>
         <div className={styles.savedState}>
           <span className={styles.savedEmoji}>✅</span>
-          <p className={styles.savedText}>Registrado! Obrigado pelo feedback.</p>
+          <p className={styles.savedText}>Registrado!</p>
         </div>
       </div>
     );
@@ -129,27 +131,20 @@ export default function PostSessionForm({ modeId, modeName, onDone }) {
           </div>
         </div>
 
-        {/* 2. Tempo focado */}
-        <div className={styles.section}>
-          <RangeField
-            label="Focou por quanto tempo?"
+        {/* 2 + 3. Tempos — linha única no mobile */}
+        <div className={styles.timesRow}>
+          <MinutesInput
+            label="Tempo focado"
             value={focusedMinutes}
             onChange={setFocusedMinutes}
-            min={0}
-            max={120}
-            step={5}
+            placeholder="ex: 30"
           />
-        </div>
-
-        {/* 3. Tempo ocioso */}
-        <div className={styles.section}>
-          <RangeField
-            label="Ficou ocioso após finalizar?"
+          <div className={styles.timesDivider} />
+          <MinutesInput
+            label="Tempo ocioso depois"
             value={idleMinutes}
             onChange={setIdleMinutes}
-            min={0}
-            max={60}
-            step={5}
+            placeholder="ex: 10"
           />
         </div>
 
@@ -162,7 +157,7 @@ export default function PostSessionForm({ modeId, modeName, onDone }) {
                 key={r.id}
                 label={r.label}
                 selected={idleReason.includes(r.id)}
-                onClick={() => toggleArr(idleReason, setIdleReason, r.id)}
+                onClick={() => toggleArr(setIdleReason, r.id)}
               />
             ))}
           </div>
@@ -177,7 +172,7 @@ export default function PostSessionForm({ modeId, modeName, onDone }) {
                 key={f.id}
                 label={f.label}
                 selected={feeling.includes(f.id)}
-                onClick={() => toggleArr(feeling, setFeeling, f.id)}
+                onClick={() => toggleArr(setFeeling, f.id)}
               />
             ))}
           </div>
