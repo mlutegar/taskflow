@@ -118,6 +118,172 @@ export function getFeelingStats() {
   }).sort((a, b) => b.successRate - a.successRate);
 }
 
+// ── Blocos de horário ─────────────────────────────────────────────────────────
+const HOUR_BLOCKS = [
+  { id: "madrugada", label: "madrugada", emoji: "🌙", range: [0,  5]  },
+  { id: "manha",     label: "manhã",     emoji: "🌅", range: [6,  11] },
+  { id: "tarde",     label: "tarde",     emoji: "☀️", range: [12, 17] },
+  { id: "noite",     label: "noite",     emoji: "🌆", range: [18, 23] },
+];
+
+function blockForHour(hour) {
+  return HOUR_BLOCKS.find((b) => hour >= b.range[0] && hour <= b.range[1]) || HOUR_BLOCKS[3];
+}
+
+/**
+ * Melhor horário para um modo específico (mín. 3 registros para recomendar).
+ * Retorna: { block, successRate, total } | null
+ */
+export function getBestHourForMode(modeId, minSessions = 3) {
+  const logs = getUsageLogs().filter((e) => e.modeId === modeId);
+  if (!logs.length) return null;
+
+  const blockMap = {};
+  for (const e of logs) {
+    const b = blockForHour(e.hour);
+    if (!blockMap[b.id]) blockMap[b.id] = { block: b, total: 0, worked: 0 };
+    blockMap[b.id].total++;
+    if (e.worked) blockMap[b.id].worked++;
+  }
+
+  const candidates = Object.values(blockMap)
+    .filter((s) => s.total >= minSessions)
+    .map((s) => ({ ...s, successRate: Math.round((s.worked / s.total) * 100) }))
+    .sort((a, b) => b.successRate - a.successRate);
+
+  return candidates[0] || null;
+}
+
+/**
+ * Taxa de sucesso de um modo específico.
+ * Retorna: { total, worked, successRate } | null se < minSessions
+ */
+export function getModeSuccessRate(modeId, minSessions = 3) {
+  const logs = getUsageLogs().filter((e) => e.modeId === modeId);
+  if (logs.length < minSessions) return null;
+  const worked = logs.filter((e) => e.worked).length;
+  return { total: logs.length, worked, successRate: Math.round((worked / logs.length) * 100) };
+}
+
+/**
+ * Tendência temporal: compara últimos 14 dias vs 14 dias anteriores por bloco de horário.
+ * Retorna: [{ block, recentRate, prevRate, trend }] onde trend = "up"|"down"|"stable"
+ */
+export function getTemporalTrend() {
+  const now = new Date();
+  const fmt = (d) => [d.getFullYear(), String(d.getMonth()+1).padStart(2,"0"), String(d.getDate()).padStart(2,"0")].join("-");
+
+  const d14 = new Date(now); d14.setDate(d14.getDate() - 14);
+  const d28 = new Date(now); d28.setDate(d28.getDate() - 28);
+  const cutoff14 = fmt(d14);
+  const cutoff28 = fmt(d28);
+
+  const recent = getUsageLogs().filter((e) => e.date >= cutoff14);
+  const prev   = getUsageLogs().filter((e) => e.date >= cutoff28 && e.date < cutoff14);
+
+  if (!recent.length || !prev.length) return null;
+
+  const calcBlockRates = (logs) => {
+    const map = {};
+    for (const e of logs) {
+      const b = blockForHour(e.hour);
+      if (!map[b.id]) map[b.id] = { block: b, total: 0, worked: 0 };
+      map[b.id].total++;
+      if (e.worked) map[b.id].worked++;
+    }
+    return map;
+  };
+
+  const recentMap = calcBlockRates(recent);
+  const prevMap   = calcBlockRates(prev);
+
+  return HOUR_BLOCKS.map((b) => {
+    const r = recentMap[b.id];
+    const p = prevMap[b.id];
+    if (!r || r.total < 2) return null;
+    const recentRate = Math.round((r.worked / r.total) * 100);
+    const prevRate   = p ? Math.round((p.worked / p.total) * 100) : null;
+    const delta = prevRate !== null ? recentRate - prevRate : 0;
+    return {
+      block: b,
+      recentRate,
+      prevRate,
+      total: r.total,
+      trend: delta >= 10 ? "up" : delta <= -10 ? "down" : "stable",
+      delta,
+    };
+  }).filter(Boolean);
+}
+
+/**
+ * Correlação estado emocional × modo: para cada modo, qual estado teve mais/menos sucesso.
+ * Une checkinLog (estadoId + modeId + date) com sessionUsageLog (modeId + date + worked).
+ * Retorna: { [modeId]: [{ estadoId, total, successRate }] }
+ */
+export function getCorrelationByEstado() {
+  const logs = getUsageLogs();
+  if (!logs.length) return {};
+
+  // Mapa rápido: modeId+date → worked (pega o primeiro de cada dia)
+  const usageMap = {};
+  for (const e of logs) {
+    const key = `${e.modeId}|${e.date}`;
+    if (!usageMap[key]) usageMap[key] = e.worked;
+  }
+
+  const checkins = storageGet("checkinLog", []);
+
+  const map = {}; // { modeId: { estadoId: { total, worked } } }
+  for (const c of checkins) {
+    if (!c.estadoId || !c.modeId) continue;
+    const key = `${c.modeId}|${c.date}`;
+    if (!(key in usageMap)) continue; // sem log de uso nesse dia
+
+    if (!map[c.modeId]) map[c.modeId] = {};
+    if (!map[c.modeId][c.estadoId]) map[c.modeId][c.estadoId] = { total: 0, worked: 0 };
+    map[c.modeId][c.estadoId].total++;
+    if (usageMap[key]) map[c.modeId][c.estadoId].worked++;
+  }
+
+  const result = {};
+  for (const [modeId, estados] of Object.entries(map)) {
+    result[modeId] = Object.entries(estados)
+      .filter(([, s]) => s.total >= 2)
+      .map(([estadoId, s]) => ({
+        estadoId,
+        total: s.total,
+        successRate: Math.round((s.worked / s.total) * 100),
+      }))
+      .sort((a, b) => b.successRate - a.successRate);
+  }
+  return result;
+}
+
+// ── Lembretes pendentes ───────────────────────────────────────────────────────
+const REMINDER_KEY = "sessionReminders";
+
+export function addPendingReminder(modeId, modeName) {
+  try {
+    const existing = JSON.parse(localStorage.getItem("taskflow." + REMINDER_KEY) || "[]");
+    const already = existing.some((r) => r.modeId === modeId);
+    if (already) return;
+    existing.push({ modeId, modeName, skippedAt: new Date().toISOString() });
+    localStorage.setItem("taskflow." + REMINDER_KEY, JSON.stringify(existing));
+  } catch {}
+}
+
+export function getPendingReminders() {
+  try { return JSON.parse(localStorage.getItem("taskflow." + REMINDER_KEY) || "[]"); }
+  catch { return []; }
+}
+
+export function clearPendingReminder(modeId) {
+  try {
+    const existing = JSON.parse(localStorage.getItem("taskflow." + REMINDER_KEY) || "[]");
+    localStorage.setItem("taskflow." + REMINDER_KEY, JSON.stringify(existing.filter((r) => r.modeId !== modeId)));
+  } catch {}
+}
+
 /**
  * Carrega registros do Supabase e mescla com localStorage.
  */

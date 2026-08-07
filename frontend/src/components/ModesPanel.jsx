@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import ModeSession from "./ModeSession";
 import ModalOverlay from "./shared/ModalOverlay";
 import styles from "./ModesPanel.module.css";
@@ -9,6 +9,13 @@ import { logCompletion, usageStats } from "../lib/modeLog";
 import { getAllActivations } from "../lib/modeActivations";
 import { useDialog } from "../lib/useDialog";
 import { MODES, CATEGORY_BY_ID, CATEGORY_ORDER } from "../data/modes";
+import {
+  getUsageLogs,
+  getBestHourForMode,
+  getModeSuccessRate,
+  getPendingReminders,
+  clearPendingReminder,
+} from "../lib/sessionUsageLog";
 
 const MODES_INLINE_REMOVED = [
   {
@@ -694,6 +701,17 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     catch { return []; }
   });
 
+  // Registros de uso pós-sessão para insights nos cards
+  const [usageLogs, setUsageLogs] = useState(() => getUsageLogs());
+  // Lembretes pendentes (sessões puladas sem registrar)
+  const [reminders, setReminders] = useState(() => getPendingReminders());
+
+  // Recarrega usage logs e lembretes quando a sessão fecha
+  const refreshInsights = () => {
+    setUsageLogs(getUsageLogs());
+    setReminders(getPendingReminders());
+  };
+
   // Stats: { [modeId]: number }
   // Início: carrega do localStorage como cache otimista, depois sincroniza com o banco
   const [modeStats, setModeStats] = useState(() => {
@@ -786,6 +804,8 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     const open = expanded === mode.id;
     const taskCount = modeStats[mode.id] || 0;
     const activationCount = activations[mode.id] || 0;
+    const successRate = getModeSuccessRate(mode.id);           // null se < 3 sessões
+    const bestHour = getBestHourForMode(mode.id);              // null se < 3 sessões no bloco
     return (
       <div
         key={mode.id}
@@ -807,8 +827,28 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
                     ▶ {activationCount}
                   </span>
                 )}
+                {/* Feature 8: taxa de sucesso baseada nos registros de uso */}
+                {successRate && (
+                  <span
+                    className={styles.statBadge}
+                    style={{
+                      background: successRate.successRate >= 70 ? "rgba(78,204,163,0.15)" : successRate.successRate >= 40 ? "rgba(124,110,245,0.12)" : "rgba(224,82,82,0.12)",
+                      color: successRate.successRate >= 70 ? "var(--success)" : successRate.successRate >= 40 ? "var(--accent)" : "#e05252",
+                      border: "none",
+                    }}
+                    title={`${successRate.worked} de ${successRate.total} sessões funcionaram`}
+                  >
+                    ✅ {successRate.worked}/{successRate.total}
+                  </span>
+                )}
               </div>
               <span className={styles.cardTagline}>{mode.tagline}</span>
+              {/* Feature 1: recomendação proativa de horário */}
+              {bestHour && (
+                <span className={styles.hourRecommendation} title="Baseado no seu histórico de uso">
+                  💡 Melhor na {bestHour.block.emoji} {bestHour.block.label} — {bestHour.successRate}% de sucesso
+                </span>
+              )}
               {!open && mode.prerequisite && (
                 <span className={styles.cardPrereqHint} title="Pré-requisito">
                   ✅ {mode.prerequisite}
@@ -923,6 +963,25 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
 
   return (
     <div className={styles.root}>
+      {/* Feature 3: Lembretes de sessões não registradas */}
+      {reminders.map((r) => (
+        <div key={r.modeId} className={styles.reminderBanner}>
+          <span className={styles.reminderIcon}>📝</span>
+          <span className={styles.reminderText}>
+            Você pulou o registro da sessão de <strong>{r.modeName}</strong>. Que tal registrar agora?
+          </span>
+          <button
+            className={styles.reminderRegisterBtn}
+            onClick={() => setActiveSession(null) || setReminders((prev) => {
+              clearPendingReminder(r.modeId);
+              return prev.filter((x) => x.modeId !== r.modeId);
+            })}
+          >
+            Dispensar
+          </button>
+        </div>
+      ))}
+
       {/* Daily Focus card */}
       <div className={dfStyles.dailyFocusCard} onClick={openDailyFocus} role="button" tabIndex={0}
         onKeyDown={(e) => e.key === "Enter" && openDailyFocus()}>
@@ -1056,6 +1115,8 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
             // Recarrega contagem de ativações ao fechar sessão
             const all = getAllActivations();
             setActivations(Object.fromEntries(all.map(({ modeId, count }) => [modeId, count])));
+            // Recarrega insights de uso pós-sessão
+            refreshInsights();
           }}
         />
       )}

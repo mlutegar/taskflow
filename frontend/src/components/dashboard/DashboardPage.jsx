@@ -7,7 +7,7 @@ import { getHistory, getStats, getStreak, getMaxLevel } from "../../lib/dailyFoc
 import { usageStats } from "../../lib/modeLog";
 import { getCheckinLog, getSessionFeedback } from "../../lib/checkinLog";
 import { getAllWithStatus } from "../../lib/dailyFocusAchievements";
-import { getUsageLogs, getFeelingStats } from "../../lib/sessionUsageLog";
+import { getUsageLogs, getFeelingStats, getTemporalTrend, getCorrelationByEstado } from "../../lib/sessionUsageLog";
 import { MODES } from "../../data/modes";
 import { ESTADOS_DEFAULT } from "../daily-focus/stateToMode";
 import styles from "./Dashboard.module.css";
@@ -490,6 +490,28 @@ function UsageInsights() {
   // ── Sentimentos ───────────────────────────────────────────────────────────
   const feelingStats = getFeelingStats().slice(0, 5);
 
+  // ── Feature 2: Tendência temporal ────────────────────────────────────────
+  const trend = useMemo(() => getTemporalTrend(), []);
+
+  // ── Feature 4: Correlação estado × modo ──────────────────────────────────
+  const correlation = useMemo(() => {
+    const raw = getCorrelationByEstado();
+    // Para cada modo, pega o melhor e pior estado (com ≥2 registros)
+    return Object.entries(raw)
+      .filter(([, estados]) => estados.length >= 2)
+      .map(([modeId, estados]) => {
+        const mode = MODES.find((m) => m.id === modeId);
+        return {
+          modeId,
+          name: mode ? `${mode.emoji} ${mode.name}` : modeId,
+          best: estados[0],
+          worst: estados[estados.length - 1],
+          all: estados,
+        };
+      })
+      .slice(0, 4);
+  }, []);
+
   return (
     <>
       {/* Bloco: taxa de sucesso por modo */}
@@ -566,6 +588,94 @@ function UsageInsights() {
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Feature 2: Tendência temporal — últimos 14d vs 14d anteriores */}
+      {trend && trend.length > 0 && (() => {
+        const ups   = trend.filter((t) => t.trend === "up");
+        const downs = trend.filter((t) => t.trend === "down");
+        const best  = [...trend].sort((a, b) => b.recentRate - a.recentRate)[0];
+        const msg = ups.length && downs.length
+          ? `Você estava funcionando melhor à${downs[0].block.label === "manhã" ? " " : "s "}${downs[0].block.emoji} ${downs[0].block.label}, mas nas últimas 2 semanas rendeu mais à${ups[0].block.label === "manhã" ? " " : "s "}${ups[0].block.emoji} ${ups[0].block.label}.`
+          : ups.length
+          ? `Nas últimas 2 semanas você melhorou à${ups[0].block.label === "manhã" ? " " : "s "}${ups[0].block.emoji} ${ups[0].block.label} (+${ups[0].delta}pp).`
+          : downs.length
+          ? `Seu rendimento à${downs[0].block.label === "manhã" ? " " : "s "}${downs[0].block.emoji} ${downs[0].block.label} caiu nas últimas 2 semanas (${downs[0].delta}pp).`
+          : null;
+        if (!msg) return null;
+        return (
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>📈 Tendência das últimas 2 semanas</div>
+            <div style={{
+              padding: "14px 16px",
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              fontSize: 13,
+              color: "var(--text-muted)",
+              lineHeight: 1.6,
+            }}>
+              {msg}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+              {trend.map((t) => (
+                <div key={t.block.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 12, minWidth: 80 }}>{t.block.emoji} {t.block.label}</span>
+                  <div style={{ flex: 1, display: "flex", gap: 6, alignItems: "center" }}>
+                    {t.prevRate !== null && (
+                      <div style={{ position: "relative", flex: 1, background: "var(--surface-2)", borderRadius: 4, height: 6, overflow: "hidden" }}>
+                        <div style={{ height: "100%", background: "var(--border)", width: `${t.prevRate}%`, borderRadius: 4 }} />
+                      </div>
+                    )}
+                    <div style={{ position: "relative", flex: 1, background: "var(--surface-2)", borderRadius: 4, height: 6, overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: t.trend === "up" ? "var(--success)" : t.trend === "down" ? "#e05252" : "var(--accent)", width: `${t.recentRate}%`, borderRadius: 4 }} />
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, color: t.trend === "up" ? "var(--success)" : t.trend === "down" ? "#e05252" : "var(--text-muted)", minWidth: 40, textAlign: "right", fontWeight: 600 }}>
+                    {t.trend === "up" ? "↑" : t.trend === "down" ? "↓" : "→"} {t.recentRate}%
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+              Barra cinza = período anterior · colorida = últimos 14 dias
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Feature 4: Correlação estado emocional × modo */}
+      {correlation.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>🔗 Estado emocional × modo</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {correlation.map((c) => {
+              const bestEstado  = ESTADOS_DEFAULT.find((e) => e.id === c.best.estadoId);
+              const worstEstado = ESTADOS_DEFAULT.find((e) => e.id === c.worst.estadoId);
+              return (
+                <div key={c.modeId} style={{
+                  padding: "12px 14px",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius)",
+                  display: "flex", flexDirection: "column", gap: 6,
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{c.name}</div>
+                  {bestEstado && c.best.successRate > 0 && (
+                    <div style={{ fontSize: 12, color: "var(--success)" }}>
+                      ✅ Funciona melhor quando <strong>{bestEstado.emoji} {bestEstado.label}</strong> — {c.best.successRate}% ({c.best.total}×)
+                    </div>
+                  )}
+                  {worstEstado && c.worst.estadoId !== c.best.estadoId && c.worst.successRate < c.best.successRate && (
+                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      ⚠️ Menos eficaz quando <strong>{worstEstado.emoji} {worstEstado.label}</strong> — {c.worst.successRate}% ({c.worst.total}×)
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

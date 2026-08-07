@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { logUsage } from "../../lib/sessionUsageLog";
+import { logUsage, addPendingReminder } from "../../lib/sessionUsageLog";
 import styles from "./PostSessionForm.module.css";
 
 const IDLE_REASONS = [
@@ -77,7 +77,10 @@ export default function PostSessionForm({ modeId, modeName, onDone }) {
     setTimeout(onDone, 1000);
   };
 
-  const handleSkip = () => onDone();
+  const handleSkip = () => {
+    addPendingReminder(modeId, modeName || modeId);
+    onDone();
+  };
 
   if (saved) {
     return (
