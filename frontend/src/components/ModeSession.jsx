@@ -3,6 +3,7 @@ import styles from "./ModeSession.module.css";
 import ModalOverlay from "./shared/ModalOverlay";
 import { useDialog } from "../lib/useDialog";
 import { logActivation } from "../lib/modeActivations";
+import PostSessionForm from "./sessions/PostSessionForm";
 import MusicSession from "./sessions/MusicSession";
 import TikTokSession from "./sessions/TikTokSession";
 import SpliteSession from "./sessions/SpliteSession";
@@ -42,8 +43,12 @@ const SESSION_MAP = {
 export default function ModeSession({ modeId, mode, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }) {
   const [quickAdd, setQuickAdd] = useState(false);
   const [confirmingClose, setConfirmingClose] = useState(false);
+  const [showPostForm, setShowPostForm] = useState(false);
 
-  // Intercepta o fechamento para mostrar confirmação
+  // Ao fechar a sessão (seja pelo botão X ou ao concluir): mostra formulário pós-sessão
+  const handleSessionDone = () => { setConfirmingClose(false); setShowPostForm(true); };
+
+  // Intercepta o fechamento para mostrar confirmação (quando o usuário clica X no meio)
   const handleClose = () => setConfirmingClose(true);
 
   // Registra ativação do modo ao abrir a sessão
@@ -139,54 +144,66 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
   return (
     <ModalOverlay onClose={handleClose}>
       <div className={styles.modal} ref={dialogRef} role="dialog" aria-modal="true" aria-label={mode?.name ? `Sessão: ${mode.name}` : "Sessão de modo"} tabIndex={-1}>
-        {/* ── Confirmação de encerramento ─── */}
-        {confirmingClose && (
-          <div style={{
-            position: "sticky", top: 0, zIndex: 10,
-            background: "var(--surface)",
-            borderBottom: "1px solid var(--border)",
-            padding: "14px 18px",
-            display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
-          }}>
-            <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
-              ⚠️ Encerrar a sessão? O progresso será perdido.
-            </span>
-            <button
-              onClick={onClose}
-              style={{
-                padding: "7px 14px", borderRadius: "var(--radius-sm)", border: "none",
-                background: "#e05252", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
-              }}
-            >
-              Encerrar
-            </button>
-            <button
-              onClick={() => setConfirmingClose(false)}
-              style={{
-                padding: "7px 14px", borderRadius: "var(--radius-sm)",
-                border: "1px solid var(--border)", background: "var(--surface-2)",
-                color: "var(--text-muted)", fontWeight: 600, fontSize: 13, cursor: "pointer",
-              }}
-            >
-              Cancelar
-            </button>
-          </div>
-        )}
-        {isCustom ? (
-          <CustomModeSession
-            mode={mode}
-            tasks={items}
-            onCompleteTask={wrappedCompleteTask}
-            onToggleChecklist={wrappedToggleChecklist}
-            onAddChecklist={wrappedAddChecklist}
-            onClose={handleClose}
+        {/* ── Formulário pós-sessão ─────────────────────────── */}
+        {showPostForm ? (
+          <PostSessionForm
+            modeId={modeId}
+            modeName={mode?.name}
+            onDone={onClose}
           />
         ) : (
-          <Session preset={preset} tasks={items} onCompleteTask={wrappedCompleteTask} onToggleChecklist={wrappedToggleChecklist} onAddChecklist={wrappedAddChecklist} onClose={handleClose} />
+          <>
+            {/* ── Confirmação de encerramento ─── */}
+            {confirmingClose && (
+              <div style={{
+                position: "sticky", top: 0, zIndex: 10,
+                background: "var(--surface)",
+                borderBottom: "1px solid var(--border)",
+                padding: "14px 18px",
+                display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+              }}>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                  ⚠️ Encerrar a sessão? O progresso será perdido.
+                </span>
+                <button
+                  onClick={handleSessionDone}
+                  style={{
+                    padding: "7px 14px", borderRadius: "var(--radius-sm)", border: "none",
+                    background: "#e05252", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                  }}
+                >
+                  Encerrar
+                </button>
+                <button
+                  onClick={() => setConfirmingClose(false)}
+                  style={{
+                    padding: "7px 14px", borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--border)", background: "var(--surface-2)",
+                    color: "var(--text-muted)", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+            {isCustom ? (
+              <CustomModeSession
+                mode={mode}
+                tasks={items}
+                onCompleteTask={wrappedCompleteTask}
+                onToggleChecklist={wrappedToggleChecklist}
+                onAddChecklist={wrappedAddChecklist}
+                onClose={handleClose}
+                onComplete={handleSessionDone}
+              />
+            ) : (
+              <Session preset={preset} tasks={items} onCompleteTask={wrappedCompleteTask} onToggleChecklist={wrappedToggleChecklist} onAddChecklist={wrappedAddChecklist} onClose={handleClose} onComplete={handleSessionDone} />
+            )}
+          </>
         )}
 
         {/* ── Quick-Add bar ─────────────────────────────────── */}
-        <div className={styles.quickAddBar}>
+        <div className={styles.quickAddBar} style={showPostForm ? { display: "none" } : {}}>
           {!quickAdd ? (
             <div className={styles.quickAddBtns}>
               <button className={styles.qaShortcut} onClick={() => openQuickAdd("task")}>

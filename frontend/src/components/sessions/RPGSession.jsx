@@ -32,7 +32,7 @@ function nextXP(level) { return level < LEVELS.length ? LEVELS[level][0] : null;
 function loadChar() { try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch { return null; } }
 function saveChar(d) { localStorage.setItem(LS_KEY, JSON.stringify(d)); }
 
-export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const { saved: sessState, persist: persistSess, clearSaved: clearSess } = useSessionPersist("rpg");
 
   const [step,         setStep]         = useState("loading");
@@ -268,7 +268,7 @@ export default function RPGSession({ tasks, onCompleteTask, onToggleChecklist, o
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { setSelectedTask(null); setDifficulty(null); setStep("dashboard"); }}>
               Voltar ao Dashboard
             </button>
-            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { clearSess(); onClose(); }}>Encerrar sessão</button>
+            <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { clearSess(); if (onComplete) onComplete(); else onClose(); }}>📝 Registrar uso</button>
           </>
         )}
       </div>

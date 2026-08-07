@@ -5,7 +5,7 @@ import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 
-export default function CafeRitualSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function CafeRitualSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const { saved, persist, clearSaved } = useSessionPersist("caferitual");
 
   const [step,         setStep]         = useState(saved?.step         ?? "ritual");
@@ -28,7 +28,7 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
   }, [step, completed, cycles, songName, doneIds, selectedTask]); // eslint-disable-line
 
   const handleClose       = () => { clearSaved(); onClose(); };
-  const handleSummaryClose = () => { clearSaved(); onClose(); };
+  const handleSummaryClose = () => { clearSaved(); if (onComplete) onComplete(); else onClose(); };
 
   const finishTask = async () => {
     await onCompleteTask(selectedTask.id);
@@ -286,7 +286,7 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
               </div>
             </div>
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>
-              Fechar
+              📝 Registrar uso
             </button>
           </>
         )}

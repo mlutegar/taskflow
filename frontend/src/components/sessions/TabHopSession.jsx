@@ -5,7 +5,7 @@ import { useSessionPersist } from "../../lib/useSessionPersist";
 const COLOR = "#2d9bf0";
 const COLOR_BG = "rgba(45,155,240,0.08)";
 
-export default function TabHopSession({ onClose }) {
+export default function TabHopSession({ onClose, onComplete }) {
   const { saved, persist, clearSaved } = useSessionPersist("tabhop");
 
   const [step,        setStep]        = useState(saved?.step        ?? "context");
@@ -341,8 +341,8 @@ export default function TabHopSession({ onClose }) {
                 {cycle} ciclo{cycle !== 1 ? "s" : ""} • {tabs.length} aba{tabs.length !== 1 ? "s" : ""} • {totalVisits} visita{totalVisits !== 1 ? "s" : ""} no total
               </div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>
-              Fechar
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onComplete ?? handleClose}>
+              📝 Registrar uso
             </button>
           </>
         )}

@@ -10,7 +10,7 @@ import { useModeSession } from "../../hooks/useModeSession";
  * Sessão genérica para modos personalizados criados pelo usuário.
  * Exibe os passos do modo, permite selecionar e concluir tarefas.
  */
-export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const {
     persist, clearSaved, saved,
     completed, setCompleted,
@@ -157,7 +157,7 @@ export default function CustomModeSession({ mode, tasks, onCompleteTask, onToggl
                   : "Sessão encerrada sem tarefas concluídas."}
               </div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onComplete ?? handleClose}>📝 Registrar uso</button>
           </>
         )}
       </div>

@@ -32,7 +32,7 @@ const APPS = [
   { name: "WhisperMemo", emoji: "🎙️", url: "https://whispermemo.com", note: "iOS/Web" },
 ];
 
-export default function DiarioFaladoSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function DiarioFaladoSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const [step, setStep] = useState("orient"); // "orient" | "select_task" | "working" | "summary"
   const [selectedTask, setSelectedTask] = useState(null);
   const [completed, setCompleted] = useState(0);
@@ -331,7 +331,7 @@ export default function DiarioFaladoSession({ tasks, onCompleteTask, onToggleChe
                 🎙️ {recordings} gravação{recordings !== 1 ? "ões" : ""} feita{recordings !== 1 ? "s" : ""} no total
               </div>
             )}
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { if (onComplete) onComplete(); else onClose(); }}>📝 Registrar uso</button>
           </div>
         )}
       </div>

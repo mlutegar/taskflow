@@ -7,6 +7,7 @@ import { getHistory, getStats, getStreak, getMaxLevel } from "../../lib/dailyFoc
 import { usageStats } from "../../lib/modeLog";
 import { getCheckinLog, getSessionFeedback } from "../../lib/checkinLog";
 import { getAllWithStatus } from "../../lib/dailyFocusAchievements";
+import { getUsageLogs, getFeelingStats } from "../../lib/sessionUsageLog";
 import { MODES } from "../../data/modes";
 import { ESTADOS_DEFAULT } from "../daily-focus/stateToMode";
 import styles from "./Dashboard.module.css";
@@ -418,6 +419,160 @@ function EstadosSection({ days }) {
   );
 }
 
+// ── Usage Insights (post-session logs) ───────────────────────────────────────
+
+const FEELING_LABELS = {
+  flow:       "⚡ No flow",
+  thinking:   "💭 Pensando em algo",
+  tired:      "😓 Cansado",
+  sleepy:     "😴 Com sono",
+  anxious:    "😬 Ansioso",
+  good:       "😊 Bem",
+  distracted: "🌀 Distraído",
+};
+
+const HOUR_BLOCKS = [
+  { label: "Madrugada", range: [0, 5],   emoji: "🌙" },
+  { label: "Manhã",     range: [6, 11],  emoji: "🌅" },
+  { label: "Tarde",     range: [12, 17], emoji: "☀️" },
+  { label: "Noite",     range: [18, 23], emoji: "🌆" },
+];
+
+function UsageInsights() {
+  const logs = useMemo(() => getUsageLogs(), []);
+
+  if (!logs.length) {
+    return (
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>⏰ Melhor momento para cada modo</div>
+        <div className={styles.empty}>
+          Registre suas sessões com "📝 Registrar uso" para ver insights aqui.
+        </div>
+      </div>
+    );
+  }
+
+  // ── Estatísticas por modo ──────────────────────────────────────────────────
+  const byMode = {};
+  for (const log of logs) {
+    if (!byMode[log.modeId]) byMode[log.modeId] = { total: 0, worked: 0, focusSum: 0 };
+    byMode[log.modeId].total++;
+    if (log.worked) byMode[log.modeId].worked++;
+    byMode[log.modeId].focusSum += log.focusedMinutes || 0;
+  }
+  const modeStats = Object.entries(byMode)
+    .map(([modeId, s]) => {
+      const mode = MODES.find((m) => m.id === modeId);
+      return {
+        modeId,
+        name: mode ? `${mode.emoji} ${mode.name}` : modeId,
+        total: s.total,
+        successRate: Math.round((s.worked / s.total) * 100),
+        avgFocus: Math.round(s.focusSum / s.total),
+      };
+    })
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+
+  // ── Melhor horário geral (por bloco de dia) ───────────────────────────────
+  const blockStats = HOUR_BLOCKS.map((block) => {
+    const blockLogs = logs.filter((l) => l.hour >= block.range[0] && l.hour <= block.range[1]);
+    if (!blockLogs.length) return { ...block, total: 0, successRate: 0 };
+    const worked = blockLogs.filter((l) => l.worked).length;
+    return {
+      ...block,
+      total: blockLogs.length,
+      successRate: Math.round((worked / blockLogs.length) * 100),
+    };
+  });
+  const bestBlock = [...blockStats].sort((a, b) => (b.total > 0 ? b.successRate : -1) - (a.total > 0 ? a.successRate : -1))[0];
+
+  // ── Sentimentos ───────────────────────────────────────────────────────────
+  const feelingStats = getFeelingStats().slice(0, 5);
+
+  return (
+    <>
+      {/* Bloco: taxa de sucesso por modo */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>📝 Registros de uso dos modos</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {modeStats.map((m) => (
+            <div key={m.modeId} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 12, color: "var(--text)", minWidth: 120, flex: 1 }}>{m.name}</span>
+              <div style={{ flex: 2, background: "var(--surface-2)", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                <div style={{ height: "100%", background: m.successRate >= 70 ? "var(--success)" : m.successRate >= 40 ? "var(--accent)" : "#e05252", width: `${m.successRate}%`, borderRadius: 4, transition: "width 0.4s" }} />
+              </div>
+              <span style={{ fontSize: 11, color: "var(--text-muted)", minWidth: 60, textAlign: "right" }}>
+                {m.successRate}% · {m.total}x
+              </span>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+          Verde ≥ 70% sucesso · Roxo ≥ 40% · Vermelho &lt; 40%
+        </div>
+      </div>
+
+      {/* Bloco: melhor horário */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>⏰ Melhor momento do dia</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+          {blockStats.map((b) => (
+            <div
+              key={b.label}
+              style={{
+                padding: "12px 14px",
+                background: bestBlock?.label === b.label && b.total > 0 ? "rgba(78,204,163,0.10)" : "var(--surface-2)",
+                border: `1px solid ${bestBlock?.label === b.label && b.total > 0 ? "rgba(78,204,163,0.35)" : "var(--border)"}`,
+                borderRadius: "var(--radius)",
+                display: "flex", flexDirection: "column", gap: 4,
+              }}
+            >
+              <div style={{ fontSize: 18 }}>{b.emoji}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{b.label}</div>
+              {b.total > 0 ? (
+                <>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: b.successRate >= 70 ? "var(--success)" : "var(--accent)" }}>
+                    {b.successRate}%
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{b.total} sessão(ões)</div>
+                </>
+              ) : (
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Sem dados</div>
+              )}
+              {bestBlock?.label === b.label && b.total > 0 && (
+                <div style={{ fontSize: 11, color: "var(--success)", fontWeight: 600 }}>✨ Seu melhor horário</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bloco: sentimentos que funcionam */}
+      {feelingStats.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>💆 Como você estava quando funcionou</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {feelingStats.map((f) => (
+              <div key={f.feeling} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, color: "var(--text)", flex: 1 }}>
+                  {FEELING_LABELS[f.feeling] || f.feeling}
+                </span>
+                <div style={{ flex: 2, background: "var(--surface-2)", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                  <div style={{ height: "100%", background: f.successRate >= 70 ? "var(--success)" : "var(--accent)", width: `${f.successRate}%`, borderRadius: 4 }} />
+                </div>
+                <span style={{ fontSize: 11, color: "var(--text-muted)", minWidth: 60, textAlign: "right" }}>
+                  {f.successRate}% · {f.workedCount + f.notWorkedCount}x
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function Achievements() {
   const all = useMemo(() => getAllWithStatus(), []);
   const unlocked = all.filter((a) => a.unlocked).length;
@@ -538,6 +693,7 @@ export default function DashboardPage() {
       <LevelLineChart history={history} days={days} allHistory={allHistory} />
       <TopModes days={days} />
       <EstadosSection days={days} />
+      <UsageInsights />
       <Achievements />
       <AvgTime history={history} />
       <SessionHistory history={history} />

@@ -7,7 +7,7 @@ import BaseSession from "./BaseSession";
 import styles from "./session.module.css";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 
-export default function MomentumSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function MomentumSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const { saved, persist, clearSaved } = useSessionPersist("momentum");
 
   const [step,        setStep]        = useState(saved?.step      ?? "phone_check");
@@ -28,7 +28,7 @@ export default function MomentumSession({ tasks, onCompleteTask, onToggleCheckli
   }, [step, completed, doneIds, selectedTask]); // eslint-disable-line
 
   const handleClose       = () => { clearSaved(); onClose(); };
-  const handleSummaryClose = () => { clearSaved(); onClose(); };
+  const handleSummaryClose = () => { clearSaved(); if (onComplete) onComplete(); else onClose(); };
 
   const completeTask = async () => {
     await onCompleteTask(selectedTask.id);
@@ -132,7 +132,7 @@ export default function MomentumSession({ tasks, onCompleteTask, onToggleCheckli
               <div className={styles.summaryTitle}>Momentum gerado!</div>
               <div className={styles.summaryText}>{completed > 0 ? `${completed} tarefa(s) concluída(s).` : "Você apareceu. Isso importa."}</div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>📝 Registrar uso</button>
           </>
         )}
     </BaseSession>

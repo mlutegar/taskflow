@@ -14,7 +14,7 @@ const DURATIONS = [
   { label: "60 min", value: 60 },
 ];
 
-export default function PomodoroSession({ preset, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function PomodoroSession({ preset, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const {
     persist, clearSaved, saved,
     completed, setCompleted,
@@ -138,7 +138,7 @@ export default function PomodoroSession({ preset, tasks, onCompleteTask, onToggl
                 {rounds} round{rounds !== 1 ? "s" : ""} de {duration} min — {completed} tarefa(s) concluída(s).
               </div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onComplete ?? handleClose}>📝 Registrar uso</button>
           </>
         )}
     </BaseSession>

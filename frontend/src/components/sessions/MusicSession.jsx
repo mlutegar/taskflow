@@ -14,7 +14,7 @@ const MUSIC_MODES = [
 
 const PLAYLIST_SIZE = 10;
 
-export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const {
     persist, clearSaved, saved,
     completed, setCompleted,
@@ -294,7 +294,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
                 <div key={i} className={styles.savedTask}><span className={styles.savedTaskTitle}>{i + 1}. {s}</span></div>
               ))}
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>🎵 Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onComplete ?? handleClose}>📝 Registrar uso</button>
           </>
         )}
 
@@ -316,7 +316,7 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
             {mode === "album" && albumName && (
               <div className={styles.infoPill} style={{ marginBottom: 8 }}>💿 Álbum da sessão: {albumName}</div>
             )}
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onComplete ?? handleClose}>📝 Registrar uso</button>
           </>
         )}
       </div>

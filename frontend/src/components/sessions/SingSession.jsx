@@ -50,7 +50,7 @@ function SongManager({ songs, onAdd, onRemove }) {
   );
 }
 
-export default function SingSession({ preset, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function SingSession({ preset, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const variant = preset?.variant === "ten" ? "ten" : "one";
   const {
     persist, clearSaved, saved,
@@ -244,7 +244,7 @@ export default function SingSession({ preset, tasks, onCompleteTask, onToggleChe
                 <div key={i} className={styles.savedTask}><span className={styles.savedTaskTitle}>{i + 1}. {s}</span></div>
               ))}
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>🎤 Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onComplete ?? handleClose}>📝 Registrar uso</button>
           </>
         )}
 
@@ -264,7 +264,7 @@ export default function SingSession({ preset, tasks, onCompleteTask, onToggleChe
                 ))}
               </div>
             )}
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onComplete ?? handleClose}>📝 Registrar uso</button>
           </>
         )}
       </div>

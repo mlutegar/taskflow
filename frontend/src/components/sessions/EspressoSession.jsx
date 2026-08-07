@@ -7,7 +7,7 @@ import BaseSession from "./BaseSession";
 import styles from "./session.module.css";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 
-export default function EspressoSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function EspressoSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const { saved, persist, clearSaved } = useSessionPersist("espresso");
 
   const [step,        setStep]        = useState(saved?.step      ?? "coffee_check");
@@ -29,7 +29,7 @@ export default function EspressoSession({ tasks, onCompleteTask, onToggleCheckli
   }, [step, completed, coffees, sprints, doneIds, selectedTask]); // eslint-disable-line
 
   const handleClose        = () => { clearSaved(); onClose(); };
-  const handleSummaryClose  = () => { clearSaved(); onClose(); };
+  const handleSummaryClose  = () => { clearSaved(); if (onComplete) onComplete(); else onClose(); };
 
   const completeTask = async () => {
     await onCompleteTask(selectedTask.id);
@@ -144,7 +144,7 @@ export default function EspressoSession({ tasks, onCompleteTask, onToggleCheckli
               <div className={styles.summaryTitle}>Sessão encerrada!</div>
               <div className={styles.summaryText}>{sprints} sprint(s) • {coffees} café(s) • {completed} tarefa(s)</div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>📝 Registrar uso</button>
           </>
         )}
     </BaseSession>

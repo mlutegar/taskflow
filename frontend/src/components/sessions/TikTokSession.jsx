@@ -4,7 +4,7 @@ import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 
-export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const { saved, persist, clearSaved } = useSessionPersist("tiktok");
 
   // ── Estado — inicializa do localStorage se houver sessão salva ──────────
@@ -127,6 +127,7 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
   };
 
   const handleSummaryClose = () => {
+    if (onComplete) { clearSaved(); onComplete(); return; }
     clearSaved();
     onClose();
   };
@@ -281,7 +282,7 @@ export default function TikTokSession({ tasks, onCompleteTask, onToggleChecklist
               <div className={styles.summaryTitle}>Sessão encerrada!</div>
               <div className={styles.summaryText}>{completed} tarefa(s)/subtarefa(s) em {cycle} ciclo(s).</div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleSummaryClose}>📝 Registrar uso</button>
           </>
         )}
       </div>

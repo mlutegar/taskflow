@@ -20,7 +20,7 @@ function randomDiaryDate() {
   return d.toLocaleDateString("pt-BR");      // dd/mm/aaaa
 }
 
-export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const {
     persist, clearSaved, saved,
     completed, setCompleted,
@@ -312,7 +312,7 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
                 : <div className={styles.summaryText}>{completed} tarefa(s) em {cycle} ciclo(s) com "{activity}".</div>
               }
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onComplete ?? handleClose}>📝 Registrar uso</button>
           </>
         )}
       </div>

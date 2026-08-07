@@ -12,7 +12,7 @@ const LS_KEY = "taskflow_lazyfal_saved";
 function loadSaved() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; } }
 function persistSaved(d) { localStorage.setItem(LS_KEY, JSON.stringify(d)); }
 
-export default function LazyFalconSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose }) {
+export default function LazyFalconSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }) {
   const {
     persist: persistSess, clearSaved: clearSess, saved: sessState,
     completed, setCompleted,
@@ -249,7 +249,7 @@ export default function LazyFalconSession({ tasks, onCompleteTask, onToggleCheck
               <div className={styles.summaryTitle}>Sessão encerrada!</div>
               <div className={styles.summaryText}>{completed} concluída(s) • {saved.length} salva(s) • {cycle} ciclo(s)</div>
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleClose}>Fechar</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onComplete ?? handleClose}>📝 Registrar uso</button>
           </>
         )}
       </div>
