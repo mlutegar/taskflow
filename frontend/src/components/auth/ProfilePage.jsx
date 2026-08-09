@@ -1,15 +1,26 @@
 import { supabase } from "../../lib/supabase";
 import { useState, useEffect } from "react";
 import { formatBuildDate } from "../../version.js";
+import { useConfirm } from "../ConfirmDialog";
 
 export default function ProfilePage({ onSignOut }) {
   const [email, setEmail] = useState("");
+  const { confirm, ConfirmUI } = useConfirm();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setEmail(data?.user?.email ?? "");
     });
   }, []);
+
+  const handleSignOut = async () => {
+    const ok = await confirm({
+      title: "Sair da conta?",
+      message: "Você será redirecionado para a tela de login.",
+      confirmLabel: "Sair",
+    });
+    if (ok) onSignOut();
+  };
 
   return (
     <div style={{
@@ -46,9 +57,7 @@ export default function ProfilePage({ onSignOut }) {
         padding: "4px",
       }}>
         <button
-          onClick={() => {
-            if (window.confirm("Sair da sua conta?")) onSignOut();
-          }}
+          onClick={handleSignOut}
           style={{
             width: "100%",
             padding: "12px 16px",
@@ -75,6 +84,8 @@ export default function ProfilePage({ onSignOut }) {
       <div style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", opacity: 0.4 }}>
         {formatBuildDate()}
       </div>
+
+      {ConfirmUI}
     </div>
   );
 }

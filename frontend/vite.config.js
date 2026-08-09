@@ -12,6 +12,17 @@ export default defineConfig({
     port: 5175,
     strictPort: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react":    ["react", "react-dom"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-recharts": ["recharts"],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -34,6 +45,24 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,woff2}"],
         navigateFallback: "index.html",
+        // ── Cache de rotas de API (NetworkFirst: tenta rede, cai no cache) ──
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith("/api/") ||
+              url.href.includes("/api/"),
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "taskflow-api-cache",
+              networkTimeoutSeconds: 5,
+              expiration: {
+                maxEntries: 150,
+                maxAgeSeconds: 24 * 60 * 60, // 24h
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],

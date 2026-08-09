@@ -5,6 +5,7 @@ import { getDayLevel } from "./lib/dailyFocusDay";
 import { useTasks } from "./hooks/useTasks";
 import { useRoutines } from "./hooks/useRoutines";
 import { useUndoDelete } from "./hooks/useUndoDelete";
+import { useConfirm } from "./components/ConfirmDialog";
 import TaskList from "./components/TaskList";
 import AddTaskForm from "./components/AddTaskForm";
 import RoutineList from "./components/RoutineList";
@@ -106,6 +107,18 @@ export default function App() {
 
   const undoHook = useUndoDelete((id) => tasksApi.delete(id).catch(() => {}));
   const { undoTask, handleDismiss } = undoHook;
+
+  const { confirm, ConfirmUI } = useConfirm();
+
+  // Confirmação antes de deletar rotina
+  const handleDeleteRoutineConfirmed = async (id) => {
+    const ok = await confirm({
+      title: "Excluir rotina?",
+      message: "Essa ação não pode ser desfeita.",
+      confirmLabel: "Excluir",
+    });
+    if (ok) handleDeleteRoutine(id);
+  };
 
   // Wrappers that also manage UI state
   const handleCreateTask = async (data) => {
@@ -384,7 +397,7 @@ export default function App() {
                 onComplete={handleCompleteRoutine}
                 onUncomplete={handleUncompleteRoutine}
                 onCompleteForDate={handleCompleteRoutineForDate}
-                onDelete={handleDeleteRoutine}
+                onDelete={handleDeleteRoutineConfirmed}
                 onUpdate={handleUpdateRoutine}
                 onAddProgress={handleAddProgress}
                 onAddChecklist={handleAddRoutineChecklist}
@@ -433,6 +446,8 @@ export default function App() {
           onDismiss={handleDismiss}
         />
       )}
+
+      {ConfirmUI}
     </div>
   );
 }

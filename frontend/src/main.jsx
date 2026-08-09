@@ -1,12 +1,8 @@
-import { StrictMode, useState, useEffect, useRef } from "react";
+import { StrictMode, useState, useEffect, useRef, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import App from "./App.jsx";
-import DailyFocusApp from "./DailyFocusApp.jsx";
-import DashboardPage from "./components/dashboard/DashboardPage.jsx";
 import AppShell from "./components/layout/AppShell.jsx";
 import LoginPage from "./components/auth/LoginPage.jsx";
-import ProfilePage from "./components/auth/ProfilePage.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 import { loadRemoteSessions } from "./lib/dailyFocusHistory.js";
 import { loadRemoteTodayState } from "./lib/dailyFocusDay.js";
@@ -15,6 +11,12 @@ import { loadRemoteCheckins } from "./lib/checkinLog.js";
 import { loadRemotePreferences } from "./lib/userPreferences.js";
 import { loadRemoteModeActivations } from "./lib/modeActivations.js";
 import { loadRemoteUsageLogs } from "./lib/sessionUsageLog.js";
+
+// ── Lazy loading de rotas (reduz chunk inicial) ───────────────────────────────
+const App          = lazy(() => import("./App.jsx"));
+const DailyFocusApp = lazy(() => import("./DailyFocusApp.jsx"));
+const DashboardPage = lazy(() => import("./components/dashboard/DashboardPage.jsx"));
+const ProfilePage   = lazy(() => import("./components/auth/ProfilePage.jsx"));
 
 // ── 404 page ─────────────────────────────────────────────────────────────────
 function NotFoundPage() {
@@ -43,7 +45,44 @@ function LoadingScreen() {
   );
 }
 
-// ── Roteador reativo (fix #5 — sem reload) ────────────────────────────────────
+// ── Banner offline ────────────────────────────────────────────────────────────
+function OfflineBanner() {
+  const [offline, setOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const goOffline = () => setOffline(true);
+    const goOnline  = () => setOffline(false);
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online",  goOnline);
+    return () => {
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online",  goOnline);
+    };
+  }, []);
+
+  if (!offline) return null;
+
+  return (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 9999,
+      background: "#b45309",
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: 600,
+      textAlign: "center",
+      padding: "6px 12px",
+      letterSpacing: "0.3px",
+    }}>
+      📡 Sem conexão — dados salvos localmente e sincronizados ao voltar online
+    </div>
+  );
+}
+
+// ── Roteador reativo ──────────────────────────────────────────────────────────
 function Root() {
   const [hash, setHash] = useState(window.location.hash || "#/");
   const { user, loading, signIn, signUp, signOut } = useAuth();
@@ -55,7 +94,7 @@ function Root() {
     return () => window.removeEventListener("hashchange", handler);
   }, []);
 
-  // Sincroniza dados do Daily Focus com Supabase após login
+  // Sincroniza dados com backend após login
   useEffect(() => {
     if (!user || syncedRef.current) return;
     syncedRef.current = true;
@@ -70,20 +109,26 @@ function Root() {
     ]).catch(() => {});
   }, [user]);
 
-  // Aguarda verificação de sessão
   if (loading) return <LoadingScreen />;
-
-  // Não autenticado → tela de login
-  if (!user) return <LoginPage signIn={signIn} signUp={signUp} />;
+  if (!user)   return <LoginPage signIn={signIn} signUp={signUp} />;
 
   let Page;
   if (hash === "#/daily-focus") Page = <DailyFocusApp />;
   else if (hash === "#/dashboard") Page = <DashboardPage />;
-  else if (hash === "#/profile") Page = <ProfilePage onSignOut={signOut} />;
+  else if (hash === "#/profile")   Page = <ProfilePage onSignOut={signOut} />;
   else if (hash === "#/" || hash === "#") Page = <App />;
   else Page = <NotFoundPage />;
 
-  return <AppShell currentHash={hash} onSignOut={signOut}>{Page}</AppShell>;
+  return (
+    <>
+      <OfflineBanner />
+      <AppShell currentHash={hash} onSignOut={signOut}>
+        <Suspense fallback={<LoadingScreen />}>
+          {Page}
+        </Suspense>
+      </AppShell>
+    </>
+  );
 }
 
 createRoot(document.getElementById("root")).render(

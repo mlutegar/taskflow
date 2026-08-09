@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useConfirm } from "./ConfirmDialog";
 import ModeSession from "./ModeSession";
 import ModalOverlay from "./shared/ModalOverlay";
 import styles from "./ModesPanel.module.css";
@@ -699,6 +700,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   });
 
   const [customModes, setCustomModes] = useState(() => getCustomModes());
+  const { confirm, ConfirmUI } = useConfirm();
 
   // Registros de uso pós-sessão para insights nos cards
   const [usageLogs, setUsageLogs] = useState(() => getUsageLogs());
@@ -763,7 +765,14 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     setShowCreate(false);
   };
 
-  const handleDeleteMode = (id) => {
+  const handleDeleteMode = async (id) => {
+    const mode = customModes.find((m) => m.id === id);
+    const ok = await confirm({
+      title: `Excluir modo "${mode?.name ?? ""}"?`,
+      message: "Esse modo customizado será removido permanentemente.",
+      confirmLabel: "Excluir",
+    });
+    if (!ok) return;
     const updated = deleteCustomMode(id);
     setCustomModes(updated ?? getCustomModes());
   };
@@ -787,47 +796,77 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   // Categorias presentes (na ordem canônica, só as que têm modos)
   const presentCategories = CATEGORY_ORDER.filter((c) => allModes.some((m) => categoryOf(m) === c));
 
-  // Pontuação inteligente: horário ideal + taxa de sucesso + evitar repetição + tempo parado
-  const computeSmartScore = (mode) => {
-    let score = 0;
+  // ── Scores inteligentes pré-computados (evita recalcular por comparação no sort) ──
+  const smartScores = useMemo(() => {
     const currentBlock = getCurrentHourBlock();
-
-    // +3 se o melhor horário histórico coincide com o bloco atual
-    const bestHour = getBestHourForMode(mode.id);
-    if (bestHour && bestHour.block.id === currentBlock.id) score += 3;
-
-    // +2 / +1 por taxa de sucesso
-    const sr = getModeSuccessRate(mode.id);
-    if (sr && sr.successRate >= 70) score += 2;
-    else if (sr && sr.successRate >= 50) score += 1;
-
-    // -2 se foi o último modo usado (evita repetição imediata)
     const lastLog = usageLogs[usageLogs.length - 1];
-    if (lastLog && lastLog.modeId === mode.id) score -= 2;
-
-    // +1 se muito utilizado (tarefas concluídas)
-    if ((modeStats[mode.id] || 0) >= 5) score += 1;
-
-    // +2 para modos de entrada se usuário parado > 45 min
     const IDLE_BOOST_IDS = ["momentum", "espresso", "music", "cafe-ritual"];
-    if (IDLE_BOOST_IDS.includes(mode.id) && lastLog) {
+
+    // Pré-calcula idle time uma vez
+    let minutesIdle = 0;
+    if (lastLog) {
       const lastDate = new Date(
         lastLog.date + "T" + String(lastLog.hour).padStart(2, "0") + ":00"
       );
-      const minutesIdle = (Date.now() - lastDate.getTime()) / 60000;
-      if (minutesIdle > 45) score += 2;
+      minutesIdle = (Date.now() - lastDate.getTime()) / 60000;
     }
 
-    return score;
+    const scores = {};
+    for (const mode of allModes) {
+      let score = 0;
+
+      // +3 se o melhor horário histórico coincide com o bloco atual
+      const bestHour = getBestHourForMode(mode.id);
+      if (bestHour && bestHour.block.id === currentBlock.id) score += 3;
+
+      // +2 / +1 por taxa de sucesso
+      const sr = getModeSuccessRate(mode.id);
+      if (sr && sr.successRate >= 70) score += 2;
+      else if (sr && sr.successRate >= 50) score += 1;
+
+      // -2 se foi o último modo usado (evita repetição imediata)
+      if (lastLog && lastLog.modeId === mode.id) score -= 2;
+
+      // +1 se muito utilizado (tarefas concluídas)
+      if ((modeStats[mode.id] || 0) >= 5) score += 1;
+
+      // +2 para modos de entrada se usuário parado > 45 min
+      if (IDLE_BOOST_IDS.includes(mode.id) && minutesIdle > 45) score += 2;
+
+      scores[mode.id] = score;
+    }
+    return scores;
+  }, [allModes, usageLogs, modeStats]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Ordem aleatória estável: só reembaralha quando o usuário clica em "Aleatório" ──
+  const [randomSeed, setRandomSeed] = useState(0);
+  const randomOrder = useMemo(() => {
+    const ids = allModes.map((m) => m.id);
+    // Fisher-Yates com seed baseado no randomSeed
+    const arr = [...ids];
+    let rng = randomSeed || 1;
+    const next = () => { rng = (rng * 1664525 + 1013904223) & 0xffffffff; return (rng >>> 0) / 0x100000000; };
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(next() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [allModes, randomSeed]);
+
+  const handleSetRandom = () => {
+    setRandomSeed((s) => (s || 1) * 1103515245 + 12345); // novo seed = novo embaralhamento
+    setSortBy("random");
   };
 
   const applySort = (list) => {
     if (sortBy === "tasks")
       return [...list].sort((a, b) => (modeStats[b.id] || 0) - (modeStats[a.id] || 0));
-    if (sortBy === "random")
-      return [...list].sort(() => Math.random() - 0.5);
+    if (sortBy === "random") {
+      const pos = Object.fromEntries(randomOrder.map((id, i) => [id, i]));
+      return [...list].sort((a, b) => (pos[a.id] ?? 999) - (pos[b.id] ?? 999));
+    }
     if (sortBy === "smart")
-      return [...list].sort((a, b) => computeSmartScore(b) - computeSmartScore(a));
+      return [...list].sort((a, b) => (smartScores[b.id] ?? 0) - (smartScores[a.id] ?? 0));
     return list; // "default"
   };
 
@@ -842,12 +881,15 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     ? [{ name: category, modes: applySort(allModes.filter((m) => categoryOf(m) === category)) }]
     : presentCategories.map((c) => ({ name: c, modes: applySort(allModes.filter((m) => categoryOf(m) === c)) }));
 
-  const renderCard = (mode) => {
+  const renderCard = (mode, index) => {
     const open = expanded === mode.id;
     const taskCount = modeStats[mode.id] || 0;
     const activationCount = activations[mode.id] || 0;
     const successRate = getModeSuccessRate(mode.id);           // null se < 3 sessões
     const bestHour = getBestHourForMode(mode.id);              // null se < 3 sessões no bloco
+    // Badge "ideal agora" para os top-3 no smart sort
+    const score = smartScores[mode.id] ?? 0;
+    const showSmartBadge = sortBy === "smart" && score >= 2 && index < 3;
     return (
       <div
         key={mode.id}
@@ -860,6 +902,11 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
             <div className={styles.cardMeta}>
               <div className={styles.cardNameRow}>
                 <span className={styles.cardName}>{mode.name}</span>
+                {showSmartBadge && (
+                  <span className={styles.smartBadge} title={`Pontuação smart: ${score}`}>
+                    ✨ ideal agora
+                  </span>
+                )}
                 {mode.isCustom && <span className={styles.customBadge}>Personalizado</span>}
                 {taskCount > 0 && (
                   <span className={styles.statBadge}>✓ {taskCount}</span>
@@ -1121,7 +1168,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         </button>
         <button
           className={`${styles.sortBtn} ${sortBy === "random" ? styles.sortBtnActive : ""}`}
-          onClick={() => setSortBy("random")}
+          onClick={handleSetRandom}
         >
           🎲 Aleatório
         </button>
@@ -1141,7 +1188,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
 
       {flatSortedModes ? (
         <div className={styles.grid}>
-          {flatSortedModes.map(renderCard)}
+          {flatSortedModes.map((mode, i) => renderCard(mode, i))}
         </div>
       ) : (
         groups.map((group) => (
@@ -1151,7 +1198,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
               <span className={styles.categoryCount}>{group.modes.length}</span>
             </div>
             <div className={styles.grid}>
-              {group.modes.map(renderCard)}
+              {group.modes.map((mode, i) => renderCard(mode, i))}
             </div>
           </div>
         ))
@@ -1186,6 +1233,8 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
           }}
         />
       )}
+
+      {ConfirmUI}
     </div>
   );
 }
