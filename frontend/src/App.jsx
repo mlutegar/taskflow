@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { tasksApi } from "./api/tasks";
 import { getStreak } from "./lib/dailyFocusHistory";
 import { getDayLevel } from "./lib/dailyFocusDay";
@@ -41,6 +41,31 @@ export default function App() {
   const [taskFilter, setTaskFilter] = useState("");
   const [taskSort, setTaskSort] = useState("due_date_asc");
   const [taskSearch, setTaskSearch] = useState("");
+  const [grouped, setGrouped] = useState(false);
+
+  // Pull-to-refresh
+  const pullStartY = useRef(0);
+  const [pullPct, setPullPct] = useState(0);
+  const PULL_THRESHOLD = 72;
+
+  const handleTouchStart = useCallback((e) => {
+    if (window.scrollY === 0) pullStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    if (window.scrollY > 0) return;
+    const dy = e.touches[0].clientY - pullStartY.current;
+    if (dy > 0) setPullPct(Math.min(dy / PULL_THRESHOLD, 1));
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (pullPct >= 1) {
+      setPullPct(0);
+      window.location.reload();
+    } else {
+      setPullPct(0);
+    }
+  }, [pullPct]);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [routineFilter, setRoutineFilter] = useState("");
   const [showRoutineForm, setShowRoutineForm] = useState(false);
@@ -122,11 +147,22 @@ export default function App() {
 
   // Stats
   const activeTaskCnt = tasks.filter((t) => !t.completed).length;
+  const criticalTaskCnt = tasks.filter((t) => !t.completed && t.priority === 1).length;
+  const isFiltered = !!(taskFilter || taskSearch.trim());
   const doneTodayCnt = routines.filter((r) => r.is_completed_today).length;
   const totalRoutineCnt = routines.length;
 
   return (
-    <div className={styles.app}>
+    <div
+      className={styles.app}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Indicador pull-to-refresh */}
+      {pullPct > 0 && (
+        <div className={styles.pullIndicator} style={{ opacity: pullPct, transform: `scaleX(${pullPct})` }} />
+      )}
       <header className={styles.header}>
         <div className={styles.headerInner}>
           {/* Logo */}
@@ -143,6 +179,11 @@ export default function App() {
             >
               Tarefas
               {activeTaskCnt > 0 && <span className={styles.tabBadge}>{activeTaskCnt}</span>}
+              {criticalTaskCnt > 0 && (
+                <span className={styles.tabBadgeCritical} title={`${criticalTaskCnt} tarefa${criticalTaskCnt !== 1 ? "s" : ""} crítica${criticalTaskCnt !== 1 ? "s" : ""}`}>
+                  🔴 {criticalTaskCnt}
+                </span>
+              )}
             </button>
             <button
               className={`${styles.tab} ${tab === "routines" ? styles.tabActive : ""}`}
@@ -171,7 +212,8 @@ export default function App() {
               onClick={() => window.location.reload()}
               title="Recarregar a página"
             >
-              🔄 Atualizar
+              <span>🔄</span>
+              <span className={styles.reloadText}>Atualizar</span>
             </button>
             {tab === "tasks" && (
               <button
@@ -254,14 +296,32 @@ export default function App() {
                     <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
                 </select>
+                <button
+                  className={`${styles.groupBtn} ${grouped ? styles.groupBtnActive : ""}`}
+                  onClick={() => setGrouped((v) => !v)}
+                  title={grouped ? "Desagrupar" : "Agrupar por prioridade"}
+                  aria-label={grouped ? "Desagrupar tarefas" : "Agrupar por prioridade"}
+                >
+                  ⊞
+                </button>
               </div>
             </div>
 
+            {/* Contador de tarefas filtradas */}
+            {isFiltered && !tasksLoading && (
+              <div className={styles.filterCount}>
+                Exibindo <strong>{visibleTasks.length}</strong> de {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""}
+                {visibleTasks.length === 0 && <span> — tente outro filtro</span>}
+              </div>
+            )}
+
             {tasksLoading && <div className={styles.loading}>Carregando...</div>}
             {tasksError && <div className={styles.error}>Erro: {tasksError}</div>}
-            {!tasksLoading && !tasksError && (
+            {!tasksError && (
               <TaskList
                 tasks={visibleTasks}
+                loading={tasksLoading}
+                grouped={grouped}
                 onComplete={handleCompleteTask}
                 onReopen={handleReopenTask}
                 onDelete={handleDeleteTask}
@@ -352,6 +412,18 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* FAB mobile — Nova tarefa */}
+      {tab === "tasks" && !showTaskForm && (
+        <button
+          className={styles.fab}
+          onClick={() => { setShowTaskForm(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+          aria-label="Nova tarefa"
+          title="Nova tarefa"
+        >
+          +
+        </button>
+      )}
 
       {undoTask && (
         <UndoToast

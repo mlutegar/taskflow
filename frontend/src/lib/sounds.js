@@ -40,3 +40,8 @@ export function playBeep() {
 export function playNewRecord() {
   beep(523, 784, 1047);
 }
+
+/** Gentle double-tone — paper review reminder */
+export function playPaperReview() {
+  beep(659, 659, 784, 0.15);
+}

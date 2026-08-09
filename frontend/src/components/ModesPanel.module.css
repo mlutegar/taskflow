@@ -88,6 +88,7 @@
   align-items: center;
   gap: 7px;
   margin-top: -8px;
+  flex-wrap: wrap;
 }
 
 .sortLabel {
@@ -98,9 +99,9 @@
 }
 
 .sortBtn {
-  padding: 4px 11px;
+  padding: 7px 14px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   border: 1px solid var(--border);
@@ -109,6 +110,7 @@
   font-family: inherit;
   transition: all 0.12s;
   white-space: nowrap;
+  min-height: 38px;
 }
 
 .sortBtn:hover { border-color: var(--accent); color: var(--text); }
@@ -120,11 +122,20 @@
   font-weight: 600;
 }
 
+/* ── Smart sort hint ──────────────────────────────────── */
+.smartSortHint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: -8px 0 0;
+  padding: 0;
+}
+
 /* ── Stat badge (on card name row) ───────────────────── */
 .statBadge {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: 20px;
   background: rgba(78, 204, 163, 0.12);
   color: #4ecca3;
@@ -238,6 +249,31 @@
 
 @media (max-width: 520px) {
   .weeklyName { width: 88px; }
+
+  /* Acessibilidade mobile: tamanhos maiores */
+  .cardToggle { padding: 14px 12px; gap: 11px; }
+  .cardEmoji { font-size: 26px; width: 32px; }
+  .cardName { font-size: 16px; }
+  .cardTagline { font-size: 13.5px; }
+  .hourRecommendation { font-size: 13px; }
+
+  .startBtn {
+    padding: 11px 18px;
+    font-size: 14px;
+    min-height: 44px;
+  }
+
+  .cardActions { margin: 0 8px; gap: 6px; }
+
+  .sortBar { gap: 8px; }
+  .sortBtn {
+    padding: 9px 14px;
+    font-size: 13px;
+    min-height: 42px;
+  }
+
+  .statBadge { font-size: 11.5px; padding: 3px 9px; }
+  .categoryTitle { font-size: 14px; }
 }
 
 /* ── Grupo de categoria ───────────────────────────────── */
@@ -254,7 +290,7 @@
 }
 
 .categoryTitle {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -329,10 +365,10 @@
 }
 
 .cardEmoji {
-  font-size: 20px;
+  font-size: 23px;
   line-height: 1;
   flex-shrink: 0;
-  width: 28px;
+  width: 30px;
   text-align: center;
 }
 
@@ -351,7 +387,7 @@
 }
 
 .cardName {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text);
   display: block;
@@ -371,7 +407,7 @@
 }
 
 .cardTagline {
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -393,7 +429,7 @@
 
 /* ── Recomendação de horário (Feature 1) ──────────────── */
 .hourRecommendation {
-  font-size: 11px;
+  font-size: 12.5px;
   color: #f0a540;
   font-weight: 600;
   display: block;
@@ -451,9 +487,9 @@
 }
 
 .contextTag {
-  font-size: 10px;
+  font-size: 11.5px;
   font-weight: 500;
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: 99px;
   background: var(--surface-2);
   color: var(--text-muted);
@@ -463,9 +499,9 @@
 }
 
 .contextTagWarning {
-  font-size: 10px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: 99px;
   background: rgba(240, 165, 64, 0.12);
   color: #c8842a;
@@ -500,10 +536,10 @@
 .startBtn {
   flex-shrink: 0;
   align-self: center;
-  padding: 6px 14px;
+  padding: 9px 16px;
   background: var(--mode-color);
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -511,6 +547,7 @@
   font-family: inherit;
   transition: opacity 0.14s, transform 0.1s;
   white-space: nowrap;
+  min-height: 40px;
 }
 
 .startBtn:hover { opacity: 0.88; }

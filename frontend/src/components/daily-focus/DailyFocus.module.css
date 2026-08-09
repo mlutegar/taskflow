@@ -2502,3 +2502,253 @@
   60%  { transform: scale(1.08); opacity: 1; }
   100% { transform: scale(1); }
 }
+
+/* ── Tab Mode ──────────────────────────────────────────── */
+
+/* Hint na fase select */
+.tabModeHint {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: rgba(124, 110, 245, 0.08);
+  border: 1px solid rgba(124, 110, 245, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+/* Badge na work phase */
+.tabModeBadge {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(124, 110, 245, 0.15);
+  color: #a090f0;
+  border-radius: 20px;
+  padding: 2px 8px;
+  margin-left: 6px;
+}
+
+/* TabModeBar container */
+.tabModeBar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Linha de abas (tabs) */
+.tabModeTabsRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tabModeTab {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 36px;
+  justify-content: center;
+}
+
+.tabModeTab:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.tabModeTabActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(124, 110, 245, 0.35);
+}
+
+.tabModeTabDone {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.tabModeTabNum {
+  font-size: 13px;
+}
+
+.tabModeTabDoneIcon {
+  font-size: 10px;
+  margin-left: 2px;
+}
+
+/* Botão + Abrir aba */
+.tabModeAddTab {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.tabModeAddTab:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Título da aba atual */
+.tabModeCurrentTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Linha de stats (ciclo + cronômetro) */
+.tabModeStats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.tabModeCycle {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.tabModeElapsed {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Botão Próxima aba */
+.tabModeNextBtn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: rgba(124, 110, 245, 0.1);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.tabModeNextBtn:hover {
+  background: rgba(124, 110, 245, 0.2);
+}
+
+/* Formulário inline de adicionar aba */
+.addTabForm {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.addTabInput {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.addTabInput:focus {
+  border-color: var(--accent);
+}
+
+.addTabActions {
+  display: flex;
+  gap: 8px;
+}
+
+.addTabConfirm {
+  flex: 1;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addTabCancel {
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Botão Finalizar sessão (tab mode) */
+.finishTabBtn {
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.finishTabBtn:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+/* Celebrate: resumo do Tab Mode */
+.tabModeSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.tabModeSummaryItem {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tabModeSummaryRecord {
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}

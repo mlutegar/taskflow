@@ -1,12 +1,28 @@
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-left-width: 3px;
   border-radius: var(--radius);
   overflow: hidden;
   transition: border-color 0.15s;
 }
 
 .card:hover { border-color: #3a3a50; }
+
+/* Barra lateral colorida por prioridade */
+.bar_critical { border-left-color: var(--critical); }
+.bar_high     { border-left-color: var(--high); }
+.bar_medium   { border-left-color: var(--medium); }
+.bar_low      { border-left-color: var(--low); }
+
+/* Flash verde ao concluir */
+.doneFlash { animation: flashGreen 0.55s ease; }
+
+@keyframes flashGreen {
+  0%   { background: transparent; }
+  25%  { background: rgba(78, 204, 163, 0.18); }
+  100% { background: transparent; }
+}
 
 .completed { opacity: 0.55; }
 
@@ -123,6 +139,14 @@
   color: var(--danger);
   background: rgba(224, 82, 82, 0.12);
   border-color: rgba(224, 82, 82, 0.25);
+}
+
+/* Atraso muito longo (>30 dias) — mais intenso */
+.countdownVeryLate {
+  color: #fff !important;
+  background: rgba(224, 82, 82, 0.75) !important;
+  border-color: var(--danger) !important;
+  font-weight: 700;
 }
 
 /* Banner de ritmo das subtarefas */
@@ -425,33 +449,49 @@
   .actions { opacity: 1; }
   .checklistDelete { opacity: 1; }
 
-  .main { padding: 12px 12px; gap: 10px; }
-
-  .checkbox {
-    width: 44px;
-    height: 44px;
-    flex-shrink: 0;
+  /* Card com sombra para diferenciar do fundo */
+  .card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
   }
 
-  .actionBtn { width: 44px; height: 44px; font-size: 15px; }
+  /* Row principal mais respirada, checkbox proporcional */
+  .main { padding: 11px 12px; gap: 10px; min-height: 56px; }
+
+  .checkbox {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+
+  /* Título levemente menor para caber mais conteúdo */
+  .title { white-space: normal; font-size: 14px; line-height: 1.35; }
+
+  /* Meta badges com wrap — cada badge fica na linha se não couber */
+  .meta {
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    margin-top: 5px;
+  }
+
+  /* Botões de ação com área de toque confortável */
+  .actionBtn { width: 40px; height: 40px; font-size: 15px; }
 
   .checklistCheck {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     border-radius: 5px;
     font-size: 12px;
     flex-shrink: 0;
   }
 
   .checklistDelete {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     font-size: 13px;
   }
 
   .editRow { flex-direction: column; }
-
-  .title { white-space: normal; }
 
   .detail { padding: 12px; }
 }

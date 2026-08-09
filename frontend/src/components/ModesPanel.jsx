@@ -7,6 +7,7 @@ import { modeStatsApi } from "../api/modeStats";
 import { getPinned, metaFor } from "../lib/splitePinned";
 import { logCompletion, usageStats } from "../lib/modeLog";
 import { getAllActivations } from "../lib/modeActivations";
+import { getCustomModes, saveCustomMode, deleteCustomMode } from "../lib/customModes";
 import { useDialog } from "../lib/useDialog";
 import { MODES, CATEGORY_BY_ID, CATEGORY_ORDER } from "../data/modes";
 import {
@@ -15,6 +16,7 @@ import {
   getModeSuccessRate,
   getPendingReminders,
   clearPendingReminder,
+  getCurrentHourBlock,
 } from "../lib/sessionUsageLog";
 
 const MODES_INLINE_REMOVED = [
@@ -687,7 +689,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const [expanded, setExpanded] = useState(null);
   const [activeSession, setActiveSession] = useState(null); // objeto completo do modo
   const [showCreate, setShowCreate] = useState(false);
-  const [sortBy, setSortBy] = useState("default"); // "default" | "tasks"
+  const [sortBy, setSortBy] = useState("default"); // "default" | "tasks" | "random" | "smart"
   const [category, setCategory] = useState(""); // "" = todas
   const [pinnedSplite, setPinnedSplite] = useState(() => getPinned());
   const [weekly, setWeekly] = useState(() => usageStats(7));
@@ -696,10 +698,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     return Object.fromEntries(all.map(({ modeId, count }) => [modeId, count]));
   });
 
-  const [customModes, setCustomModes] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("customModes") || "[]"); }
-    catch { return []; }
-  });
+  const [customModes, setCustomModes] = useState(() => getCustomModes());
 
   // Registros de uso pós-sessão para insights nos cards
   const [usageLogs, setUsageLogs] = useState(() => getUsageLogs());
@@ -759,16 +758,14 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const toggle = (id) => setExpanded((p) => (p === id ? null : id));
 
   const handleSaveMode = (newMode) => {
-    const updated = [...customModes, newMode];
-    setCustomModes(updated);
-    localStorage.setItem("customModes", JSON.stringify(updated));
+    const updated = saveCustomMode(newMode);
+    setCustomModes(updated ?? getCustomModes());
     setShowCreate(false);
   };
 
   const handleDeleteMode = (id) => {
-    const updated = customModes.filter((m) => m.id !== id);
-    setCustomModes(updated);
-    localStorage.setItem("customModes", JSON.stringify(updated));
+    const updated = deleteCustomMode(id);
+    setCustomModes(updated ?? getCustomModes());
   };
 
   const hasRequiredFields = (m) =>
@@ -790,10 +787,55 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   // Categorias presentes (na ordem canônica, só as que têm modos)
   const presentCategories = CATEGORY_ORDER.filter((c) => allModes.some((m) => categoryOf(m) === c));
 
-  const applySort = (list) =>
-    sortBy === "tasks"
-      ? [...list].sort((a, b) => (modeStats[b.id] || 0) - (modeStats[a.id] || 0))
-      : list;
+  // Pontuação inteligente: horário ideal + taxa de sucesso + evitar repetição + tempo parado
+  const computeSmartScore = (mode) => {
+    let score = 0;
+    const currentBlock = getCurrentHourBlock();
+
+    // +3 se o melhor horário histórico coincide com o bloco atual
+    const bestHour = getBestHourForMode(mode.id);
+    if (bestHour && bestHour.block.id === currentBlock.id) score += 3;
+
+    // +2 / +1 por taxa de sucesso
+    const sr = getModeSuccessRate(mode.id);
+    if (sr && sr.successRate >= 70) score += 2;
+    else if (sr && sr.successRate >= 50) score += 1;
+
+    // -2 se foi o último modo usado (evita repetição imediata)
+    const lastLog = usageLogs[usageLogs.length - 1];
+    if (lastLog && lastLog.modeId === mode.id) score -= 2;
+
+    // +1 se muito utilizado (tarefas concluídas)
+    if ((modeStats[mode.id] || 0) >= 5) score += 1;
+
+    // +2 para modos de entrada se usuário parado > 45 min
+    const IDLE_BOOST_IDS = ["momentum", "espresso", "music", "cafe-ritual"];
+    if (IDLE_BOOST_IDS.includes(mode.id) && lastLog) {
+      const lastDate = new Date(
+        lastLog.date + "T" + String(lastLog.hour).padStart(2, "0") + ":00"
+      );
+      const minutesIdle = (Date.now() - lastDate.getTime()) / 60000;
+      if (minutesIdle > 45) score += 2;
+    }
+
+    return score;
+  };
+
+  const applySort = (list) => {
+    if (sortBy === "tasks")
+      return [...list].sort((a, b) => (modeStats[b.id] || 0) - (modeStats[a.id] || 0));
+    if (sortBy === "random")
+      return [...list].sort(() => Math.random() - 0.5);
+    if (sortBy === "smart")
+      return [...list].sort((a, b) => computeSmartScore(b) - computeSmartScore(a));
+    return list; // "default"
+  };
+
+  // Quando sort é smart/random → lista plana (sem agrupamento por categoria)
+  const flatSortedModes =
+    sortBy === "random" || sortBy === "smart"
+      ? applySort(category ? allModes.filter((m) => categoryOf(m) === category) : allModes)
+      : null;
 
   // Sem filtro → agrupa por categoria; com filtro → um único grupo
   const groups = category
@@ -1077,19 +1119,43 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         >
           ⚡ Mais usados
         </button>
+        <button
+          className={`${styles.sortBtn} ${sortBy === "random" ? styles.sortBtnActive : ""}`}
+          onClick={() => setSortBy("random")}
+        >
+          🎲 Aleatório
+        </button>
+        <button
+          className={`${styles.sortBtn} ${sortBy === "smart" ? styles.sortBtnActive : ""}`}
+          onClick={() => setSortBy("smart")}
+        >
+          ✨ Para mim agora
+        </button>
       </div>
 
-      {groups.map((group) => (
-        <div key={group.name} className={styles.categoryGroup}>
-          <div className={styles.categoryHeader}>
-            <span className={styles.categoryTitle}>{group.name}</span>
-            <span className={styles.categoryCount}>{group.modes.length}</span>
-          </div>
-          <div className={styles.grid}>
-            {group.modes.map(renderCard)}
-          </div>
+      {sortBy === "smart" && (
+        <p className={styles.smartSortHint}>
+          ✨ Ordenado por: horário ideal · taxa de sucesso · tempo parado · histórico
+        </p>
+      )}
+
+      {flatSortedModes ? (
+        <div className={styles.grid}>
+          {flatSortedModes.map(renderCard)}
         </div>
-      ))}
+      ) : (
+        groups.map((group) => (
+          <div key={group.name} className={styles.categoryGroup}>
+            <div className={styles.categoryHeader}>
+              <span className={styles.categoryTitle}>{group.name}</span>
+              <span className={styles.categoryCount}>{group.modes.length}</span>
+            </div>
+            <div className={styles.grid}>
+              {group.modes.map(renderCard)}
+            </div>
+          </div>
+        ))
+      )}
 
       {showCreate && (
         <CreateModeModal onSave={handleSaveMode} onClose={() => setShowCreate(false)} />

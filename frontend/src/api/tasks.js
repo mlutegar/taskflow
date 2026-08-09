@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/apiClient";
 
 const RECURRENCE_DAYS = { daily: 1, weekly: 7, biweekly: 14 };
 
@@ -14,165 +14,42 @@ function computeNextDueDate(currentDueDate, recurrence) {
   return base.toISOString().split("T")[0];
 }
 
-function shapeTask(task) {
-  const checklist = (task.checklist ?? []).sort((a, b) => a.order - b.order || a.id - b.id);
-  return {
-    ...task,
-    checklist,
-    checklist_count: checklist.length,
-    checklist_completed_count: checklist.filter((c) => c.completed).length,
-  };
-}
-
-function throwIfError(error) {
-  if (error) throw new Error(error.message);
-}
-
 export const tasksApi = {
-  list: async (params = {}) => {
-    let query = supabase.from("tasks").select("*, checklist:checklist_items(*)");
-
-    if (params.status === "active") query = query.eq("completed", false);
-    else if (params.status === "completed") query = query.eq("completed", true);
-
-    if (params.sort === "due_date_asc" || params.sort === "due_date") {
-      query = query.order("due_date", { ascending: true, nullsFirst: false }).order("priority");
-    } else if (params.sort === "due_date_desc") {
-      query = query.order("due_date", { ascending: false, nullsFirst: false }).order("priority");
-    } else if (params.sort === "overdue") {
-      // busca tudo e ordena no client: vencidas primeiro, depois por proximidade
-      query = query.order("due_date", { nullsFirst: false }).order("priority");
-    } else if (params.sort === "created") {
-      query = query.order("created_at", { ascending: false });
-    } else {
-      query = query.order("priority").order("created_at", { ascending: false });
-    }
-
-    const { data, error } = await query;
-    throwIfError(error);
-    return data.map(shapeTask);
+  list: (params = {}) => {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set("status", params.status);
+    if (params.sort) qs.set("sort", params.sort);
+    return api.get(`/tasks?${qs}`);
   },
 
-  create: async (data) => {
-    const { data: task, error } = await supabase
-      .from("tasks")
-      .insert(data)
-      .select("*, checklist:checklist_items(*)")
-      .single();
-    throwIfError(error);
-    return shapeTask(task);
-  },
+  create: (data) => api.post("/tasks", data),
 
-  update: async (id, data) => {
-    const { data: task, error } = await supabase
-      .from("tasks")
-      .update(data)
-      .eq("id", id)
-      .select("*, checklist:checklist_items(*)")
-      .single();
-    throwIfError(error);
-    return shapeTask(task);
-  },
+  update: (id, data) => api.patch(`/tasks/${id}`, data),
 
-  delete: async (id) => {
-    const { error } = await supabase.from("tasks").delete().eq("id", id);
-    throwIfError(error);
-    return null;
-  },
+  delete: (id) => api.delete(`/tasks/${id}`),
 
-  complete: (id, currentTask) => {
-    const completedAt = new Date().toISOString();
-    if (currentTask?.recurrence) {
-      const nextDate = computeNextDueDate(currentTask.due_date, currentTask.recurrence);
-      return tasksApi.update(id, { due_date: nextDate, completed: false, completed_at: completedAt });
-    }
-    return tasksApi.update(id, { completed: true, completed_at: completedAt });
-  },
+  complete: (id, currentTask) => api.post(`/tasks/${id}/complete`),
 
-  reopen: (id) => tasksApi.update(id, { completed: false, completed_at: null }),
+  reopen: (id) => api.post(`/tasks/${id}/reopen`),
 
-  /** Tarefas ativas com vencimento hoje — para sugestão rápida no Daily Focus. */
-  listDueToday: async () => {
-    const today = new Date().toISOString().split("T")[0];
-    const { data, error } = await supabase
-      .from("tasks")
-      .select("id, title, priority, due_date")
-      .eq("completed", false)
-      .eq("due_date", today)
-      .order("priority")
-      .limit(10);
-    if (error) return [];
-    return data ?? [];
-  },
+  listDueToday: () => api.get("/tasks/due-today"),
 
-  // Quantas tarefas foram concluídas hoje (independente de já terem sido reabertas
-  // ou reagendadas como recorrentes — conta pelo carimbo de conclusão).
   countCompletedToday: async () => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const { count, error } = await supabase
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .gte("completed_at", start.toISOString());
-    throwIfError(error);
-    return count ?? 0;
+    const data = await api.get("/tasks/completed-today-count");
+    return data?.count ?? 0;
   },
 
-  addChecklistItem: async (taskId, description, parentId = null) => {
-    // ordem é calculada entre os irmãos (mesmo task_id e mesmo parent_id)
-    let countQuery = supabase
-      .from("checklist_items")
-      .select("id")
-      .eq("task_id", taskId);
-    countQuery = parentId == null
-      ? countQuery.is("parent_id", null)
-      : countQuery.eq("parent_id", parentId);
-    const { data: existing } = await countQuery;
-    const order = existing?.length ?? 0;
+  addChecklistItem: (taskId, description, parentId = null) =>
+    api.post(`/tasks/${taskId}/checklist`, { description, parent_id: parentId }),
 
-    const { data, error } = await supabase
-      .from("checklist_items")
-      .insert({ task_id: taskId, parent_id: parentId, description, order })
-      .select()
-      .single();
-    throwIfError(error);
-    return data;
-  },
-
-  updateChecklistItem: async (_taskId, itemId, fields) => {
-    // Aceita string (legado = só descrição) ou objeto { description?, note? }
+  updateChecklistItem: (_taskId, itemId, fields) => {
     const updates = typeof fields === "string" ? { description: fields } : fields;
-    const { data, error } = await supabase
-      .from("checklist_items")
-      .update(updates)
-      .eq("id", itemId)
-      .select()
-      .single();
-    throwIfError(error);
-    return data;
+    return api.patch(`/tasks/${_taskId}/checklist/${itemId}`, updates);
   },
 
-  toggleChecklistItem: async (_taskId, itemId) => {
-    const { data: current, error: fetchError } = await supabase
-      .from("checklist_items")
-      .select("completed")
-      .eq("id", itemId)
-      .single();
-    throwIfError(fetchError);
+  toggleChecklistItem: (_taskId, itemId) =>
+    api.patch(`/tasks/${_taskId}/checklist/${itemId}/toggle`),
 
-    const { data, error } = await supabase
-      .from("checklist_items")
-      .update({ completed: !current.completed })
-      .eq("id", itemId)
-      .select()
-      .single();
-    throwIfError(error);
-    return data;
-  },
-
-  deleteChecklistItem: async (_taskId, itemId) => {
-    const { error } = await supabase.from("checklist_items").delete().eq("id", itemId);
-    throwIfError(error);
-    return null;
-  },
+  deleteChecklistItem: (_taskId, itemId) =>
+    api.delete(`/tasks/${_taskId}/checklist/${itemId}`),
 };

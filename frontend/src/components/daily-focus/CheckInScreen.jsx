@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { withOfflineFallback } from "../../lib/syncQueue";
 import { getEstados } from "./stateToMode";
 import { getTopModesForEstado, getCheckinStreak, getCheckinLog } from "../../lib/checkinLog";
 import CheckInConfigPanel from "./CheckInConfigPanel";
@@ -72,6 +73,7 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
     if (estado.modeId === null) {
       // Estado neutro: pula direto para a seleção de tarefas
       try { localStorage.setItem("taskflow.checkin.lastEstado", estado.id); } catch {}
+      withOfflineFallback("PUT", "/preferences", { lastEstadoId: estado.id });
       setLeaving(true);
       setTimeout(() => onSkip(), 220);
       return;
@@ -83,6 +85,7 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
       setSelectedEstado(estado);
       setShowAlt(false);
       try { localStorage.setItem("taskflow.checkin.lastEstado", estado.id); } catch {}
+      withOfflineFallback("PUT", "/preferences", { lastEstadoId: estado.id });
     }
   }
 
@@ -123,6 +126,7 @@ export default function CheckInScreen({ allModes = [], onSelect, onSkip }) {
             onClick={() => {
               setShowOnboarding(false);
               try { localStorage.setItem("taskflow.checkin.onboarded", "1"); } catch {}
+              withOfflineFallback("PUT", "/preferences", { onboarded: true });
             }}
           >✕</button>
         </div>

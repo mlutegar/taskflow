@@ -1,10 +1,12 @@
 import { getStreak } from "../../lib/dailyFocusHistory";
 import styles from "./Sidebar.module.css";
+import { formatBuildDate } from "../../version.js";
 
 const NAV_ITEMS = [
   { icon: "🏠", label: "Início", hash: "#/" },
   { icon: "🎯", label: "Daily Focus", hash: "#/daily-focus" },
   { icon: "📊", label: "Dashboard", hash: "#/dashboard" },
+  { icon: "👤", label: "Perfil", hash: "#/profile" },
 ];
 
 // Fix #5: navegação sem reload via hashchange
@@ -12,7 +14,7 @@ function navigate(hash) {
   window.location.hash = hash.slice(1); // remove leading #
 }
 
-export default function Sidebar({ currentHash }) {
+export default function Sidebar({ currentHash, onSignOut }) {
   // Fix #6: badge de streak ao lado do Daily Focus
   const streak = getStreak();
 
@@ -44,6 +46,10 @@ export default function Sidebar({ currentHash }) {
           );
         })}
       </nav>
+
+      <div className={styles.buildDate} title={formatBuildDate()}>
+        <span className={styles.buildDateText}>{formatBuildDate()}</span>
+      </div>
     </aside>
   );
 }

@@ -1,0 +1,154 @@
+Nome;Camada;Estimativa;Descrição;Prompt Sugerido;Critérios de Aceite;Produto Entregável (Visual)
+Sincronização de Sessões Daily Focus;Full Stack;6h;Hoje todo o histórico de sessões (level, tarefas, modos, horários) fica só no localStorage — se o usuário trocar de dispositivo, perde tudo. Este card cria a tabela `daily_focus_sessions` no Supabase e faz a função `addSession()` salvar lá também. Na carga do app, o histórico é mesclado entre localStorage e Supabase, priorizando o Supabase. O Dashboard passa a usar esse histórico unificado.;"Contexto: o projeto é TaskFlow (React + Vite + Supabase). Arquivo de histórico: `frontend/src/lib/dailyFocusHistory.js`. A função `addSession(session)` salva no localStorage com a chave `daily_focus_history`. A função `getSessions()` lê do localStorage. O Supabase client está em `frontend/src/lib/supabase.js`. Auth usa `supabase.auth.getUser()`.
+
+Tarefas:
+1. Criar migration SQL em `supabase/daily_focus_sessions_migration.sql`:
+```sql
+CREATE TABLE daily_focus_sessions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  completed_at TIME,
+  level INTEGER NOT NULL DEFAULT 1,
+  tasks TEXT[] NOT NULL DEFAULT '{}',
+  timings JSONB NOT NULL DEFAULT '[]',
+  rush_mode BOOLEAN NOT NULL DEFAULT false,
+  estado_id TEXT,
+  tab_mode BOOLEAN NOT NULL DEFAULT false,
+  cycle_count INTEGER NOT NULL DEFAULT 0,
+  tabs_opened INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE daily_focus_sessions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY 'user_own_sessions' ON daily_focus_sessions FOR ALL USING (auth.uid() = user_id);
+```
+
+2. Em `frontend/src/api/dailyFocusSessions.js` (novo arquivo), criar:
+- `saveSession(session)`: insere no Supabase (converte date de 'DD/MM/YYYY' para ISO 'YYYY-MM-DD' antes de inserir)
+- `fetchSessions()`: busca todas as sessões do usuário logado, ordenadas por created_at DESC, mapeia de volta para o formato do app
+
+3. Em `frontend/src/lib/dailyFocusHistory.js`, modificar:
+- `addSession(session)`: após salvar no localStorage, chamar `saveSession(session)` da API (sem await — fire and forget para não bloquear UI)
+- `getSessions()`: manter leitura do localStorage como fallback; criar nova função `loadRemoteSessions()` que faz fetch do Supabase e mescla com localStorage (deduplicar por `date + completedAt`)
+
+4. Em `frontend/src/main.jsx` ou no componente de boot da app (onde auth é verificado), após login chamar `loadRemoteSessions()` e popular o localStorage com os dados do Supabase para que todo o resto do app continue funcionando sem mudança.
+
+5. No `frontend/src/components/dashboard/DashboardPage.jsx`, o hook que lê sessões já usa `getSessions()` — vai funcionar automaticamente após a mesclagem no boot.
+
+Preservar formato de data local (DD/MM/YYYY) no localStorage. Não quebrar fluxo offline.";☐ Ao completar uma sessão no celular, ela aparece no Supabase (verificar via Supabase Studio)|☐ Ao abrir o app no computador após login, o histórico do celular está visível no Dashboard|☐ O Dashboard mostra o streak correto considerando sessões de ambos os dispositivos|☐ Se o Supabase estiver offline, o app continua funcionando com localStorage|☐ Não há duplicatas no histórico após mesclagem;Dashboard com histórico real de todos os dispositivos: streak, heatmap de 90 dias, gráfico de barras e histórico recente refletindo sessões feitas no celular e no computador.
+
+Sincronização de Check-ins e Feedbacks;Full Stack;4h;Os check-ins emocionais (estado escolhido, modo recomendado, horário) e os feedbacks pós-sessão (👍/👎) ficam só no localStorage. Com isso, o Dashboard não consegue calcular quais modos são mais eficazes de verdade nem mostrar padrões de humor entre dispositivos. Este card persiste esses dados no Supabase e enriquece as seções 'Estados Emocionais' e 'Mais Eficazes' do Dashboard.;"Contexto: `frontend/src/lib/checkinLog.js` gerencia dois arrays no localStorage: `checkinLog` (entradas: {estadoId, modeId, date, hour}) e `checkinFeedback` (entradas: {estadoId, modeId, rating, date}). As funções são `logCheckinUsage(estadoId, modeId)` e `logSessionFeedback(estadoId, modeId, rating)`. O Dashboard lê via `getCheckinLog()` e `getSessionFeedback()`.
+
+Tarefas:
+1. Criar migration SQL `supabase/daily_focus_checkins_migration.sql`:
+```sql
+CREATE TABLE daily_focus_checkins (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  estado_id TEXT NOT NULL,
+  mode_id TEXT NOT NULL,
+  date DATE NOT NULL,
+  hour INTEGER NOT NULL,
+  rating SMALLINT DEFAULT NULL CHECK (rating IN (-1, 1)),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE daily_focus_checkins ENABLE ROW LEVEL SECURITY;
+CREATE POLICY 'user_own_checkins' ON daily_focus_checkins FOR ALL USING (auth.uid() = user_id);
+```
+
+2. Em `frontend/src/api/dailyFocusCheckins.js` (novo arquivo):
+- `saveCheckin(estadoId, modeId, date, hour)`: INSERT no Supabase
+- `updateCheckinFeedback(estadoId, modeId, date, rating)`: UPDATE no registro mais recente com aquele estadoId+modeId+date
+- `fetchCheckins()`: busca todos os registros do usuário
+
+3. Em `frontend/src/lib/checkinLog.js`:
+- `logCheckinUsage(estadoId, modeId)`: após localStorage, chamar `saveCheckin(...)` fire-and-forget
+- `logSessionFeedback(estadoId, modeId, rating)`: após localStorage, chamar `updateCheckinFeedback(...)` fire-and-forget
+- Criar `loadRemoteCheckins()`: faz fetch e mescla com localStorage (deduplica por date+estadoId+hour)
+
+4. No boot do app (após login), chamar `loadRemoteCheckins()` para popular localStorage.
+
+5. Não mudar nada no DashboardPage.jsx — ele já lê via `getCheckinLog()` e `getSessionFeedback()`, que agora terão dados de todos os dispositivos.";☐ Ao fazer check-in no celular, o registro aparece na tabela `daily_focus_checkins` no Supabase|☐ O feedback (👍/👎) ao fim da sessão é salvo no campo `rating` do registro|☐ O Dashboard no computador mostra os estados emocionais corretos incluindo sessões do celular|☐ A seção 'Mais Eficazes' reflete feedbacks dados em ambos os dispositivos|☐ Sem usuário logado, continua funcionando só com localStorage;Dashboard com seção 'Estados Emocionais' e 'Mais Eficazes' alimentadas por dados reais de todos os dispositivos. Usuário vê qual modo funcionou melhor para cada humor com base no histórico completo.
+
+Estado Diário Cross-Device (Nível e Modos Usados Hoje);Full Stack;3h;O nível alcançado hoje e quais modos já foram usados no dia ficam só no localStorage (`taskflow.dailyFocus.day`). Se o usuário começar uma sessão no celular e tentar continuar no computador, o sistema não sabe que ele já usou o modo 'music' e está no nível 2. Este card sincroniza o estado do dia atual com o Supabase para que ambos os dispositivos estejam alinhados.;"Contexto: `frontend/src/lib/dailyFocusDay.js` mantém no localStorage a chave `taskflow.dailyFocus.day` com shape: `{date: 'YYYY-MM-DD', level: number, usedModes: {[modeId]: count}}`. Funções: `getTodayRecord()`, `setTodayRecord(record)`, `incrementTodayMode(modeId)`, `getTodayLevel()`.
+
+Tarefas:
+1. Criar migration SQL `supabase/daily_focus_day_state_migration.sql`:
+```sql
+CREATE TABLE daily_focus_day_state (
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  level INTEGER NOT NULL DEFAULT 0,
+  used_modes JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (user_id, date)
+);
+ALTER TABLE daily_focus_day_state ENABLE ROW LEVEL SECURITY;
+CREATE POLICY 'user_own_day_state' ON daily_focus_day_state FOR ALL USING (auth.uid() = user_id);
+```
+
+2. Em `frontend/src/api/dailyFocusDayState.js` (novo arquivo):
+- `fetchTodayState()`: SELECT onde date = today e user_id = auth.uid()
+- `upsertTodayState(level, usedModes)`: UPSERT com ON CONFLICT (user_id, date) DO UPDATE
+
+3. Em `frontend/src/lib/dailyFocusDay.js`:
+- `setTodayRecord(record)`: após salvar no localStorage, chamar `upsertTodayState(...)` fire-and-forget
+- `loadRemoteTodayState()`: fetch do Supabase; se existir e for de hoje, mesclar com localStorage (pegar o maior level entre os dois, unir usedModes somando contagens)
+
+4. No boot do app (após login e após verificar data), chamar `loadRemoteTodayState()`.
+
+5. Em `DailyFocusPage.jsx`, o botão de iniciar sessão já usa `getTodayRecord()` para saber quais modos estão bloqueados — vai funcionar automaticamente.";☐ Ao completar uma sessão nível 2 no celular, abrir o app no computador e ver que o nível atual já começa em 2|☐ O modo usado no celular aparece como já utilizado hoje no computador (não pode ser repetido)|☐ O estado do dia reseta corretamente à meia-noite em ambos os dispositivos|☐ Se dois dispositivos atualizarem ao mesmo tempo, o level maior e a união dos modos é preservada;Na tela do Daily Focus, o nível atual e os modos disponíveis refletem o progresso feito em qualquer dispositivo. O usuário vê corretamente 'Você já está no nível 2 hoje' mesmo que tenha feito a sessão anterior no celular.
+
+Achievements Cross-Device;Full Stack;2h;As conquistas desbloqueadas (ex: 'primeira sessão', 'nível 5', 'streak de 7 dias') ficam só no localStorage. Se o usuário usar outro dispositivo, começa do zero em conquistas. Este card persiste o array de achievements no Supabase e sincroniza no login.;"Contexto: `frontend/src/lib/dailyFocusAchievements.js` salva no localStorage com chave `daily_focus_achievements` um array de strings com IDs das conquistas desbloqueadas (ex: ['first_session', 'level_3', 'rush_master']). Funções: `getAchievements()`, `addAchievement(id)`, `hasAchievement(id)`.
+
+Tarefas:
+1. Criar migration SQL `supabase/daily_focus_achievements_migration.sql`:
+```sql
+CREATE TABLE daily_focus_achievements (
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  achievement_ids TEXT[] NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (user_id)
+);
+ALTER TABLE daily_focus_achievements ENABLE ROW LEVEL SECURITY;
+CREATE POLICY 'user_own_achievements' ON daily_focus_achievements FOR ALL USING (auth.uid() = user_id);
+```
+
+2. Em `frontend/src/api/dailyFocusAchievements.js` (novo arquivo):
+- `fetchAchievements()`: SELECT achievement_ids WHERE user_id = auth.uid()
+- `upsertAchievement(id)`: UPSERT fazendo array_append no achievement_ids existente (usar função SQL ou RPC)
+
+3. Em `frontend/src/lib/dailyFocusAchievements.js`:
+- `addAchievement(id)`: após localStorage, chamar `upsertAchievement(id)` fire-and-forget
+- `loadRemoteAchievements()`: fetch do Supabase; fazer union com localStorage (Set para deduplicar) e salvar no localStorage
+
+4. No boot do app, chamar `loadRemoteAchievements()`.
+
+5. O DashboardPage.jsx e o toast de conquista em DailyFocusPage.jsx já usam `getAchievements()` — funcionarão automaticamente.";☐ Ao desbloquear 'nível 3' no celular, a conquista aparece no grid de achievements do Dashboard no computador|☐ Não há conquistas duplicadas no grid após sincronização|☐ Sem login, achievements continuam funcionando só com localStorage;Grid de Achievements no Dashboard mostrando conquistas desbloqueadas em todos os dispositivos. Usuário vê seus troféus corretamente independente de qual dispositivo usou.
+
+Dashboard Analítico Avançado — Daily Focus;Frontend;5h;Com os dados agora no Supabase, é possível enriquecer o Dashboard com análises que hoje ou não existem ou são imprecisas por ficarem locais. Este card adiciona: (1) gráfico de eficácia por modo ao longo do tempo, (2) padrão de humor por dia da semana, (3) comparativo de nível médio por estado emocional, (4) card de insight personalizado ('Você rende mais às terças com o modo Espresso').;"Contexto: `frontend/src/components/dashboard/DashboardPage.jsx` (547 linhas) já usa Recharts para gráficos. Dados de sessões via `getSessions()` (dailyFocusHistory.js) e check-ins via `getCheckinLog()` + `getSessionFeedback()` (checkinLog.js). Após os cards anteriores, esses dados já estarão sincronizados com Supabase.
+
+Tarefas:
+1. Criar novo componente `frontend/src/components/dashboard/MoodPatternChart.jsx`:
+- Radar chart (Recharts RadarChart) mostrando level médio por dia da semana (Seg-Dom)
+- Dados calculados a partir de `getSessions()` agrupando por `new Date(session.date).getDay()`
+- Exibir como seção 'Seus melhores dias' no Dashboard
+
+2. Criar novo componente `frontend/src/components/dashboard/ModeEffectivenessChart.jsx`:
+- BarChart horizontal com % de feedbacks positivos por modo (só modos com 2+ feedbacks)
+- Dados de `getSessionFeedback()` agrupados por modeId
+- Mostrar nome do modo (buscar de `modes.js` em `frontend/src/data/modes.js`) + emoji + barra colorida
+- Substituir a lista 'Mais Eficazes' atual por este gráfico mais rico
+
+3. Criar componente `frontend/src/components/dashboard/InsightCard.jsx`:
+- Card de insight personalizado gerado localmente (sem IA)
+- Lógica: achar o (dayOfWeek, modeId) com mais sessões completadas no último mês
+- Template: 'Você tende a ter sessões de nível mais alto às {dia} usando {modo emoji} {modo nome}'
+- Se dados insuficientes (<5 sessões), mostrar mensagem encorajadora
+
+4. Criar componente `frontend/src/components/dashboard/MoodLevelChart.jsx`:
+- BarChart mostrando level médio por estado emocional (apenas estados com 3+ sessões)
+- Dados cruzando `getSessions()` (campo estadoId + level) agrupados por estadoId
+- Usar emojis dos estados (travado 😶, cansado 😪, ansioso 😬, sem_foco 🌀, disperso 🍃, bem 😊, energizado ⚡)
+
+5. Em `DashboardPage.jsx`, adicionar nova seção 'Insights Pessoais' após o bloco de achievements, importando e renderizando os 4 novos componentes. Manter layout responsivo existente (CSS Modules ou inline style seguindo padrão do arquivo).";☐ Seção 'Seus melhores dias' exibe radar chart com os dias da semana e nível médio de cada um|☐ Gráfico 'Eficácia por Modo' mostra barras horizontais com % de feedbacks positivos|☐ Card de Insight exibe frase personalizada baseada no histórico real do usuário|☐ Gráfico 'Nível por Humor' mostra quais estados emocionais levam a sessões melhores|☐ Seção não aparece (ou mostra mensagem de encorajamento) se dados forem insuficientes|☐ Layout responsivo e visual consistente com o Dashboard existente;Nova seção 'Insights Pessoais' no Dashboard com 4 blocos: radar de melhores dias da semana, gráfico de eficácia por modo, card de insight personalizado em texto, e gráfico de nível médio por estado emocional. Tudo calculado a partir do histórico real sincronizado.

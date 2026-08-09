@@ -1,3 +1,5 @@
+import { saveSession, fetchSessions } from "../api/dailyFocusSessions";
+
 const LS_KEY = "daily_focus_history";
 const MAX_ENTRIES = 100;
 
@@ -20,7 +22,45 @@ export function addSession(entry) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(updated));
   } catch {}
+  // Sincroniza com Supabase (fire-and-forget)
+  saveSession(entry).catch(() => {});
   return updated;
+}
+
+/**
+ * Carrega sessões do Supabase e mescla com localStorage.
+ * Deduplicação por date + completedAt.
+ * Deve ser chamado no boot do app após login.
+ */
+export async function loadRemoteSessions() {
+  try {
+    const remote = await fetchSessions();
+    if (!remote.length) return;
+
+    const local = getHistory();
+    const seen = new Set(local.map((e) => `${e.date}|${e.completedAt || ""}`));
+    const fresh = remote.filter((e) => !seen.has(`${e.date}|${e.completedAt || ""}`));
+    if (!fresh.length) return;
+
+    const merged = [...fresh, ...local].slice(0, MAX_ENTRIES);
+    // Re-ordena do mais recente para o mais antigo
+    merged.sort((a, b) => {
+      const parse = (s) => { const [d, m, y] = s.split("/"); return new Date(+y, +m - 1, +d); };
+      return parse(b.date) - parse(a.date);
+    });
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(merged));
+    } catch {}
+
+    // Atualiza recordes baseado nos dados remotos
+    for (const s of remote) {
+      updateMaxLevel(s.level);
+      updateMaxLevelByMode(s.level, s.rushMode);
+      if (s.tabMode && s.cycleCount) updateMaxCycles(s.cycleCount);
+    }
+  } catch {
+    // Falha silenciosa — não bloqueia o app
+  }
 }
 
 export function getMaxLevel() {
@@ -100,6 +140,20 @@ export function updateMaxLevelByMode(level, isRush) {
   if (level > current) {
     const key = isRush ? "daily_focus_max_level_rush" : "daily_focus_max_level_timer";
     try { localStorage.setItem(key, String(level)); } catch {}
+    return true;
+  }
+  return false;
+}
+
+/** Recorde de ciclos no Modo Abas. */
+export function getMaxCycles() {
+  try { return parseInt(localStorage.getItem("daily_focus_max_cycles") || "0", 10); } catch { return 0; }
+}
+
+export function updateMaxCycles(cycles) {
+  const current = getMaxCycles();
+  if (cycles > current) {
+    try { localStorage.setItem("daily_focus_max_cycles", String(cycles)); } catch {}
     return true;
   }
   return false;

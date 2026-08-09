@@ -4,6 +4,94 @@
   gap: 10px;
 }
 
+/* ── Agrupamento por prioridade ── */
+.groupedList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.groupCount {
+  font-size: 11px;
+  background: rgba(0,0,0,0.2);
+  padding: 1px 7px;
+  border-radius: 99px;
+  font-weight: 700;
+}
+
+.groupCritical { background: rgba(224,82,82,0.15);  color: var(--critical); }
+.groupHigh     { background: rgba(240,165,64,0.15); color: var(--high); }
+.groupMedium   { background: rgba(124,110,245,0.15);color: var(--medium); }
+.groupLow      { background: rgba(78,204,163,0.15); color: var(--low); }
+
+/* ── Skeleton loading ── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.skeletonCheck {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(90deg, var(--border) 25%, var(--surface-2) 50%, var(--border) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+.skeletonBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeletonTitle {
+  height: 14px;
+  width: 60%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--border) 25%, var(--surface-2) 50%, var(--border) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+.skeletonMeta {
+  height: 11px;
+  width: 40%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--border) 25%, var(--surface-2) 50%, var(--border) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s 0.2s infinite linear;
+}
+
 .empty {
   text-align: center;
   padding: 64px 20px;

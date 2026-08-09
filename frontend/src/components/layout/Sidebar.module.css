@@ -36,7 +36,6 @@
   flex-direction: column;
   gap: 2px;
   width: 100%;
-  flex: 1;
 }
 
 .navItem {
@@ -124,6 +123,32 @@
   opacity: 1;
 }
 
+/* ── Botão Sair ─────────────────────────────────────── */
+.signOutBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background 0.15s, color 0.15s;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.signOutBtn:hover {
+  background: rgba(224, 82, 82, 0.1);
+  color: var(--danger);
+}
+
 /* ── Shell (layout wrapper) ────────────────────────── */
 .shell {
   display: flex;
@@ -136,6 +161,29 @@
   min-height: 100vh;
 }
 
+/* ── Build date (versão) ─────────────────────────────── */
+.buildDate {
+  margin-top: auto;
+  padding: 12px 0 4px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.buildDateText {
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.sidebar:hover .buildDateText {
+  opacity: 0.4;
+}
+
 /* ── Mobile: bottom tab bar ────────────────────────── */
 @media (max-width: 640px) {
   .sidebar {
@@ -144,13 +192,15 @@
     left: 0;
     right: 0;
     width: 100% !important;
-    height: 56px;
+    height: 64px;
     flex-direction: row;
     border-right: none;
     border-top: 1px solid var(--border);
-    padding: 0;
+    padding: 0 0 env(safe-area-inset-bottom);
     justify-content: space-around;
     overflow: visible;
+    /* Sombra sutil para separar do conteúdo */
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);
   }
 
   .logo {
@@ -161,23 +211,42 @@
     flex-direction: row;
     justify-content: space-around;
     align-items: center;
-    width: 100%;
+    flex: 1;
     height: 100%;
     gap: 0;
   }
 
   .navItem {
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
     padding: 6px 8px;
     align-items: center;
     flex: 1;
     justify-content: center;
+    position: relative;
+    border-radius: 0;
   }
+
+
+  /* Indicador ativo: barra no topo do item */
+  .navItem.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 0 0 3px 3px;
+  }
+
+  .navIcon { font-size: 22px; }
 
   .navLabel {
     opacity: 1;
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 500;
   }
 
   .sidebar:hover .navLabel {
@@ -195,10 +264,15 @@
   .streakBadge {
     top: -4px;
     right: -6px;
+    font-size: 9px;
   }
 
   .pageArea {
     margin-left: 0;
-    padding-bottom: 56px;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .buildDate {
+    display: none;
   }
 }

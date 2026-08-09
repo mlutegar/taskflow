@@ -1,3 +1,5 @@
+import { fetchTodayState, upsertTodayState } from "../api/dailyFocusDayState";
+
 // Estado diário do Daily Focus.
 // Persiste: nível alcançado hoje + contagem de usos por modo hoje.
 // Reseta automaticamente quando a data muda.
@@ -30,6 +32,8 @@ function write(obj) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify({ ...obj, date: todayIso() }));
   } catch {}
+  // Sincroniza com Supabase (fire-and-forget)
+  upsertTodayState(obj.level, obj.usedModes || {}).catch(() => {});
 }
 
 /** Retorna o estado completo de hoje: { date, level, usedModes } */
@@ -73,4 +77,34 @@ export function addUsedModes(modeIds) {
     counts[id] = (counts[id] ?? 0) + 1;
   }
   write({ ...state, usedModes: counts });
+}
+
+/**
+ * Carrega o estado do dia do Supabase e mescla com localStorage.
+ * Pega o maior level entre os dois e soma as contagens de modos.
+ * Deve ser chamado no boot do app após login.
+ */
+export async function loadRemoteTodayState() {
+  try {
+    const remote = await fetchTodayState();
+    if (!remote) return;
+
+    const local = getDayState();
+    const today = todayIso();
+
+    // Só mescla se o remoto for de hoje
+    if (remote.date !== today) return;
+
+    const mergedLevel = Math.max(local.level, remote.level);
+    const mergedModes = { ...remote.usedModes };
+    for (const [id, count] of Object.entries(local.usedModes || {})) {
+      mergedModes[id] = Math.max(mergedModes[id] || 0, count);
+    }
+
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ date: today, level: mergedLevel, usedModes: mergedModes }));
+    } catch {}
+  } catch {
+    // Falha silenciosa
+  }
 }

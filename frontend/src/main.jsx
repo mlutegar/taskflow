@@ -1,10 +1,20 @@
-import { StrictMode, useState, useEffect } from "react";
+import { StrictMode, useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.jsx";
 import DailyFocusApp from "./DailyFocusApp.jsx";
 import DashboardPage from "./components/dashboard/DashboardPage.jsx";
 import AppShell from "./components/layout/AppShell.jsx";
+import LoginPage from "./components/auth/LoginPage.jsx";
+import ProfilePage from "./components/auth/ProfilePage.jsx";
+import { useAuth } from "./hooks/useAuth.js";
+import { loadRemoteSessions } from "./lib/dailyFocusHistory.js";
+import { loadRemoteTodayState } from "./lib/dailyFocusDay.js";
+import { loadRemoteAchievements } from "./lib/dailyFocusAchievements.js";
+import { loadRemoteCheckins } from "./lib/checkinLog.js";
+import { loadRemotePreferences } from "./lib/userPreferences.js";
+import { loadRemoteModeActivations } from "./lib/modeActivations.js";
+import { loadRemoteUsageLogs } from "./lib/sessionUsageLog.js";
 
 // ── 404 page ─────────────────────────────────────────────────────────────────
 function NotFoundPage() {
@@ -23,9 +33,21 @@ function NotFoundPage() {
   );
 }
 
+// ── Loading splash ────────────────────────────────────────────────────────────
+function LoadingScreen() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--bg)", flexDirection: "column", gap: "16px" }}>
+      <div style={{ fontSize: "36px" }}>⚡</div>
+      <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Carregando…</div>
+    </div>
+  );
+}
+
 // ── Roteador reativo (fix #5 — sem reload) ────────────────────────────────────
 function Root() {
   const [hash, setHash] = useState(window.location.hash || "#/");
+  const { user, loading, signIn, signUp, signOut } = useAuth();
+  const syncedRef = useRef(false);
 
   useEffect(() => {
     const handler = () => setHash(window.location.hash || "#/");
@@ -33,13 +55,34 @@ function Root() {
     return () => window.removeEventListener("hashchange", handler);
   }, []);
 
+  // Sincroniza dados do Daily Focus com Supabase após login
+  useEffect(() => {
+    if (!user || syncedRef.current) return;
+    syncedRef.current = true;
+    Promise.all([
+      loadRemoteSessions(),
+      loadRemoteTodayState(),
+      loadRemoteAchievements(),
+      loadRemoteCheckins(),
+      loadRemotePreferences(),
+      loadRemoteModeActivations(),
+    ]).catch(() => {});
+  }, [user]);
+
+  // Aguarda verificação de sessão
+  if (loading) return <LoadingScreen />;
+
+  // Não autenticado → tela de login
+  if (!user) return <LoginPage signIn={signIn} signUp={signUp} />;
+
   let Page;
   if (hash === "#/daily-focus") Page = <DailyFocusApp />;
   else if (hash === "#/dashboard") Page = <DashboardPage />;
+  else if (hash === "#/profile") Page = <ProfilePage onSignOut={signOut} />;
   else if (hash === "#/" || hash === "#") Page = <App />;
   else Page = <NotFoundPage />;
 
-  return <AppShell currentHash={hash}>{Page}</AppShell>;
+  return <AppShell currentHash={hash} onSignOut={signOut}>{Page}</AppShell>;
 }
 
 createRoot(document.getElementById("root")).render(

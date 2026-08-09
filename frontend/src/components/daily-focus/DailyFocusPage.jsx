@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { withOfflineFallback } from "../../lib/syncQueue";
+import { getCustomModes } from "../../lib/customModes";
 import { playBeep, playTimerDone, playNewRecord, playPaperReview } from "../../lib/sounds";
 import { tasksApi } from "../../api/tasks";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 import { getHelper } from "./helpers/index";
-import { addSession, getHistory, getMaxLevel, updateMaxLevel, getStreak, getWeeklyStats, getMaxLevelByMode, updateMaxLevelByMode, getLastDateByLevel } from "../../lib/dailyFocusHistory";
+import { addSession, getHistory, getMaxLevel, updateMaxLevel, getStreak, getWeeklyStats, getMaxLevelByMode, updateMaxLevelByMode, getLastDateByLevel, getMaxCycles, updateMaxCycles } from "../../lib/dailyFocusHistory";
 import { tryUnlock } from "../../lib/dailyFocusAchievements";
 import { getDayLevel, setDayLevel, getUsedModes, addUsedModes } from "../../lib/dailyFocusDay";
 import { usageStats } from "../../lib/modeLog";
@@ -19,6 +21,7 @@ import StepsLadder, { getStageTheme } from "./components/StepsLadder";
 import WeekHeatmap from "./components/WeekHeatmap";
 import ProgressDots from "./components/ProgressDots";
 import DailyTimer from "./components/DailyTimer";
+import TabModeBar from "./components/TabModeBar";
 import TaskSlot from "./components/TaskSlot";
 
 // ── utils ────────────────────────────────────────────────
@@ -64,8 +67,7 @@ function nowTimeStr() {
 // ── Mode helpers ─────────────────────────────────────────
 function getModeById(id) {
   if (!id) return null;
-  const custom = JSON.parse(localStorage.getItem("customModes") || "[]");
-  return [...MODES, ...custom].find((m) => m.id === id) || null;
+  return [...MODES, ...getCustomModes()].find((m) => m.id === id) || null;
 }
 
 // ── Notifications ────────────────────────────────────────
@@ -94,7 +96,10 @@ function loadPaperReminders() {
   return PAPER_DEFAULT_REMINDERS;
 }
 function savePaperReminders(list) {
-  try { localStorage.setItem(PAPER_REMINDERS_LS_KEY, JSON.stringify(list)); } catch {}
+  try {
+    localStorage.setItem(PAPER_REMINDERS_LS_KEY, JSON.stringify(list));
+    withOfflineFallback("PUT", "/preferences", { paperReminders: list });
+  } catch {}
 }
 
 // ── Celebrate messages by estado ────────────────────────
@@ -133,6 +138,11 @@ export default function DailyFocusPage() {
   const [phase, setPhase]                   = useState(saved?.phase ?? "checkin");
   const [timerDone, setTimerDone]           = useState(false);
   const [rushMode, setRushMode]             = useState(saved?.rushMode ?? false);
+  const [tabMode, setTabMode]               = useState(saved?.tabMode ?? false);
+  const [tabCycleCount, setTabCycleCount]   = useState(saved?.tabCycleCount ?? 0);
+  const [tabElapsed, setTabElapsed]         = useState(saved?.tabElapsed ?? 0);
+  const [showAddTabForm, setShowAddTabForm] = useState(false);
+  const [newTabTitle, setNewTabTitle]       = useState("");
   const [taskTimings, setTaskTimings]       = useState(saved?.taskTimings ?? []); // [{used, total}]
   const [_taskStartRemaining, setTaskStartRemaining] = useState(null);
   // índice da próxima tarefa aguardando após a fase "between"
@@ -147,8 +157,7 @@ export default function DailyFocusPage() {
 
   // All modes (built-in + custom)
   const ALL_MODES = useMemo(() => {
-    const custom = JSON.parse(localStorage.getItem("customModes") || "[]");
-    return [...MODES, ...custom];
+    return [...MODES, ...getCustomModes()];
   }, []);
 
   // Streak e modo sugerido (calculados uma vez ao montar)
@@ -218,6 +227,7 @@ export default function DailyFocusPage() {
     const next = WEEKLY_GOAL_OPTIONS[(WEEKLY_GOAL_OPTIONS.indexOf(weeklyGoal) + 1) % WEEKLY_GOAL_OPTIONS.length];
     setWeeklyGoal(next);
     localStorage.setItem("taskflow.weeklyGoal", String(next));
+    withOfflineFallback("PUT", "/preferences", { weeklyGoal: next });
   };
 
   // Meta semanal
@@ -227,8 +237,8 @@ export default function DailyFocusPage() {
 
   // Persist on state changes
   useEffect(() => {
-    persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId, pendingNextIdx });
-  }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId, pendingNextIdx]);
+    persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId, pendingNextIdx, tabMode, tabCycleCount, tabElapsed });
+  }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId, pendingNextIdx, tabMode, tabCycleCount, tabElapsed]);
 
   // Atualiza document.title conforme a fase
   useEffect(() => {
@@ -242,18 +252,18 @@ export default function DailyFocusPage() {
     return () => { document.title = "TaskFlow"; };
   }, [phase, level]);
 
-  // Space bar → pause/resume
+  // Space bar → pause/resume (only in timer mode)
   useEffect(() => {
     const handler = (e) => {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-      if (e.code === "Space" && phase === "work" && !rushMode && !timerDone) {
+      if (e.code === "Space" && phase === "work" && !rushMode && !tabMode && !timerDone) {
         e.preventDefault();
         setTimerRunning((v) => !v);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [phase, rushMode, timerDone]);
+  }, [phase, rushMode, tabMode, timerDone]);
 
   // Avisa ao fechar aba com sessão em andamento
   useEffect(() => {
@@ -291,6 +301,13 @@ export default function DailyFocusPage() {
     return () => clearInterval(id);
   }, [rushMode, phase, timerRunning]);
 
+  // Tab mode: stopwatch sempre correndo durante a sessão
+  useEffect(() => {
+    if (!tabMode || phase !== "work") return;
+    const id = setInterval(() => setTabElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [tabMode, phase]);
+
   // Reseta stopwatch ao trocar de tarefa ou sair do rush
   useEffect(() => {
     setRushElapsed(0);
@@ -325,12 +342,19 @@ export default function DailyFocusPage() {
   const allFilled = tasks.every((t) => t.title.trim());
 
   const startSession = () => {
-    setTimerRemaining(tasks[0].durationMin * 60);
-    setTaskStartRemaining(tasks[0].durationMin * 60);
+    if (!tabMode) {
+      setTimerRemaining(tasks[0].durationMin * 60);
+      setTaskStartRemaining(tasks[0].durationMin * 60);
+    } else {
+      setTimerRemaining(null);
+      setTaskStartRemaining(null);
+    }
     setCurrentIdx(0);
     setTimerRunning(false);
     setTimerDone(false);
     setTaskTimings([]);
+    setTabCycleCount(0);
+    setTabElapsed(0);
     setPhase("work");
     requestNotifPermission();
     // Pré-inicializa estados de helpers "durante" e "entre" da primeira tarefa
@@ -575,6 +599,47 @@ export default function DailyFocusPage() {
     setShowTaskSwitcher(false);
   };
 
+  // ── Tab Mode handlers ────────────────────────────────────
+  const handleNextTab = () => {
+    const isLast = currentIdx === tasks.length - 1;
+    const nextIdx = (currentIdx + 1) % tasks.length;
+    if (isLast) {
+      // Completou um ciclo completo (percorreu todas as abas)
+      setTabCycleCount((prev) => prev + 1);
+    }
+    setCurrentIdx(nextIdx);
+    setActiveHelperTab(null);
+    (tasks[nextIdx].helperModeIds ?? []).forEach((id) => initHelperIfNeeded(id, nextIdx));
+  };
+
+  const handleSwitchTab = (idx) => {
+    if (idx === currentIdx) return;
+    setCurrentIdx(idx);
+    setActiveHelperTab(null);
+    (tasks[idx].helperModeIds ?? []).forEach((id) => initHelperIfNeeded(id, idx));
+  };
+
+  const handleAddTabConfirm = () => {
+    if (!newTabTitle.trim()) return;
+    const newTask = {
+      title: newTabTitle.trim(),
+      supabaseId: null,
+      durationMin: 15,
+      done: false,
+      helperModeIds: [],
+      interModeIds: [],
+      onHold: false,
+      savedTimerSecs: null,
+    };
+    setTasks((prev) => [...prev, newTask]);
+    setNewTabTitle("");
+    setShowAddTabForm(false);
+  };
+
+  const handleFinishTabSession = () => {
+    completeSession(tasks, [], false);
+  };
+
   const handleBetweenComplete = () => {
     const nextIdx = pendingNextIdx;
     setPendingNextIdx(null);
@@ -600,8 +665,9 @@ export default function DailyFocusPage() {
   const completeSession = (completedTasks, timings, hadEarlyCompletion) => {
     const isNewRecord = updateMaxLevel(level);
     updateMaxLevelByMode(level, rushMode);
-    setNewRecord(isNewRecord);
-    if (isNewRecord) playNewRecord();
+    const isNewCycleRecord = tabMode ? updateMaxCycles(tabCycleCount) : false;
+    setNewRecord(isNewRecord || isNewCycleRecord);
+    if (isNewRecord || isNewCycleRecord) playNewRecord();
 
     // Save history
     addSession({
@@ -612,6 +678,9 @@ export default function DailyFocusPage() {
       timings,
       rushMode,
       estadoId: checkinEstadoId ?? null,
+      tabMode,
+      cycleCount: tabMode ? tabCycleCount : undefined,
+      tabsOpened: tabMode ? completedTasks.length : undefined,
     });
 
     // Check achievements
@@ -624,6 +693,7 @@ export default function DailyFocusPage() {
     if (level >= 3) toUnlock.push("level_3");
     if (level >= 5) toUnlock.push("level_5");
     if (rushMode) toUnlock.push("rush_master");
+    if (tabMode && tabCycleCount >= 3) toUnlock.push("cycle_master");
     if (completedTasks.some((t) => (t.helperModeIds ?? []).length > 0)) toUnlock.push("helper_user");
     if (hadEarlyCompletion || timings.some((t) => t.early)) toUnlock.push("early_bird");
 
@@ -651,6 +721,9 @@ export default function DailyFocusPage() {
     setTimerDone(false);
     setTaskTimings([]);
     setRushMode(false);
+    setTabMode(false);
+    setTabCycleCount(0);
+    setTabElapsed(0);
     setCheckinModeId(null);
     setCheckinEstadoId(null);
     setSessionFeedback(null);
@@ -721,6 +794,9 @@ export default function DailyFocusPage() {
     setTimerDone(false);
     setTaskTimings([]);
     setRushMode(false);
+    setTabMode(false);
+    setTabCycleCount(0);
+    setTabElapsed(0);
     setCheckinModeId(null);
     setCheckinEstadoId(null);
     setSessionFeedback(null);
@@ -890,10 +966,11 @@ export default function DailyFocusPage() {
             )}
 
             {/* Recordes separados por modo */}
-            {(maxLevelTimer > 0 || maxLevelRush > 0) && (
+            {(maxLevelTimer > 0 || maxLevelRush > 0 || getMaxCycles() > 0) && (
               <div className={styles.typedRecordsRow}>
                 {maxLevelTimer > 0 && <span className={styles.typedRecordBadge}>⏱️ Timer: Etapa {maxLevelTimer}</span>}
                 {maxLevelRush > 0 && <span className={styles.typedRecordBadge}>🚀 Rush: Etapa {maxLevelRush}</span>}
+                {getMaxCycles() > 0 && <span className={styles.typedRecordBadge}>🪟 Abas: {getMaxCycles()} ciclos</span>}
               </div>
             )}
 
@@ -917,21 +994,35 @@ export default function DailyFocusPage() {
               {" "}Timers: {tasks.map((t) => `${t.durationMin}min`).join(" → ")}.
             </div>
 
-            {/* Rush mode toggle */}
+            {/* Modo de sessão toggle (Timer / Rush / Abas) */}
             <div className={styles.rushToggle}>
               <button
-                className={`${styles.rushBtn} ${!rushMode ? styles.rushBtnActive : ""}`}
-                onClick={() => setRushMode(false)}
+                className={`${styles.rushBtn} ${!rushMode && !tabMode ? styles.rushBtnActive : ""}`}
+                onClick={() => { setRushMode(false); setTabMode(false); }}
               >
                 ⏱️ Com timer
               </button>
               <button
                 className={`${styles.rushBtn} ${rushMode ? styles.rushBtnActive : ""}`}
-                onClick={() => setRushMode(true)}
+                onClick={() => { setRushMode(true); setTabMode(false); }}
               >
                 🚀 Modo Rush
               </button>
+              <button
+                className={`${styles.rushBtn} ${tabMode ? styles.rushBtnActive : ""}`}
+                onClick={() => { setTabMode(true); setRushMode(false); }}
+              >
+                🪟 Abas
+              </button>
             </div>
+
+            {/* Dica do modo Abas */}
+            {tabMode && (
+              <div className={styles.tabModeHint}>
+                Sem timer — você alterna entre as tarefas como abas de navegador.
+                Faz um pouco de cada e vai abrindo novas abas conforme avança.
+              </div>
+            )}
 
             {/* Task slots */}
             <div className={styles.taskSlots}>
@@ -948,19 +1039,26 @@ export default function DailyFocusPage() {
                   canMoveDown={i < tasks.length - 1}
                   usedModes={usedModes}
                   suggestedModeId={checkinModeId ?? suggestedModeId}
+                  hideDuration={tabMode}
                 />
               ))}
             </div>
 
             {/* Fix #7: estimativa total de tempo */}
-            {!rushMode && (
+            {!rushMode && !tabMode && (
               <div style={{ textAlign: "center", fontSize: "12px", color: "var(--text-muted)", marginBottom: "10px" }}>
                 ⏱️ ~{tasks.reduce((s, t) => s + (t.durationMin || 0), 0)}min de foco no total
               </div>
             )}
 
             <button className={styles.startBtn} disabled={!allFilled} onClick={startSession}>
-              {allFilled ? (rushMode ? "🚀 Começar no Modo Rush" : "▶ Começar sessão") : "Preencha todas as tarefas"}
+              {allFilled
+                ? tabMode
+                  ? "🪟 Começar no Modo Abas"
+                  : rushMode
+                    ? "🚀 Começar no Modo Rush"
+                    : "▶ Começar sessão"
+                : "Preencha todas as tarefas"}
             </button>
           </div>
         )}
@@ -973,11 +1071,52 @@ export default function DailyFocusPage() {
               <ProgressDots total={tasks.length} current={currentIdx} done={currentIdx} />
             )}
 
+            {/* Tab Mode Bar (substitui DailyTimer no tab mode) */}
+            {tabMode && (
+              <>
+                <TabModeBar
+                  tasks={tasks}
+                  currentIdx={currentIdx}
+                  onSwitch={handleSwitchTab}
+                  onNextTab={handleNextTab}
+                  onAddTab={() => setShowAddTabForm(true)}
+                  cycleCount={tabCycleCount}
+                  elapsedSecs={tabElapsed}
+                />
+                {showAddTabForm && (
+                  <div className={styles.addTabForm}>
+                    <input
+                      className={styles.addTabInput}
+                      placeholder="Nome da nova aba..."
+                      value={newTabTitle}
+                      onChange={(e) => setNewTabTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddTabConfirm();
+                        if (e.key === "Escape") { setShowAddTabForm(false); setNewTabTitle(""); }
+                      }}
+                      autoFocus
+                    />
+                    <div className={styles.addTabActions}>
+                      <button className={styles.addTabConfirm} onClick={handleAddTabConfirm}>
+                        + Abrir aba
+                      </button>
+                      <button className={styles.addTabCancel} onClick={() => { setShowAddTabForm(false); setNewTabTitle(""); }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             {/* Task card */}
             <div className={styles.taskCard}>
               <div className={styles.taskCardLabel}>
-                Tarefa {currentIdx + 1} / {tasks.length}
+                {tabMode
+                  ? `Aba ${currentIdx + 1} / ${tasks.length}`
+                  : `Tarefa ${currentIdx + 1} / ${tasks.length}`}
                 {rushMode && <span className={styles.rushBadge}>🚀 Rush</span>}
+                {tabMode && <span className={styles.tabModeBadge}>🪟 Abas</span>}
               </div>
               {editingTitle ? (
                 <div className={styles.editTitleWrap}>
@@ -996,11 +1135,11 @@ export default function DailyFocusPage() {
                   <button className={styles.editTitleBtn} onClick={startEditTitle} title="Editar título">✏️</button>
                 </div>
               )}
-              {!rushMode && <div className={styles.taskCardTime}>{currentTask.durationMin} min</div>}
+              {!rushMode && !tabMode && <div className={styles.taskCardTime}>{currentTask.durationMin} min</div>}
             </div>
 
-            {/* Timer (only in timer mode) */}
-            {!rushMode && (
+            {/* Timer (only in timer mode, not rush, not tab) */}
+            {!rushMode && !tabMode && (
               <div className={styles.timerWrap}>
                 <DailyTimer
                   key={`${currentIdx}-${totalSecs}`}
@@ -1338,13 +1477,30 @@ export default function DailyFocusPage() {
 
             {/* Actions */}
             <div className={styles.workActions}>
-              <button className={styles.doneBtn} onClick={handleCompleteTask}>
-                ✅ Concluí esta tarefa
-              </button>
-              {!showTaskSwitcher && tasks.length > 1 && tasks.some((t, i) => i !== currentIdx && !t.done) && (
-                <button className={styles.holdBtn} onClick={handlePutOnHold}>
-                  ⏸ Colocar em espera
-                </button>
+              {tabMode ? (
+                // Tab mode: marcar aba como feita (opcional) + finalizar sessão
+                <>
+                  {!currentTask.done && (
+                    <button className={styles.doneBtn} onClick={handleCompleteTask}>
+                      ✅ Marcar aba como feita
+                    </button>
+                  )}
+                  <button className={styles.finishTabBtn} onClick={handleFinishTabSession}>
+                    🏁 Finalizar sessão
+                  </button>
+                </>
+              ) : (
+                // Timer / Rush mode: comportamento original
+                <>
+                  <button className={styles.doneBtn} onClick={handleCompleteTask}>
+                    ✅ Concluí esta tarefa
+                  </button>
+                  {!showTaskSwitcher && tasks.length > 1 && tasks.some((t, i) => i !== currentIdx && !t.done) && (
+                    <button className={styles.holdBtn} onClick={handlePutOnHold}>
+                      ⏸ Colocar em espera
+                    </button>
+                  )}
+                </>
               )}
               <button
                 className={styles.changeHelperBtn}
@@ -1439,13 +1595,41 @@ export default function DailyFocusPage() {
         {/* ── CELEBRATE PHASE ── */}
         {phase === "celebrate" && (
           <div className={styles.celebration}>
-            <div className={styles.celebrationEmoji}>{newRecord ? "🏆" : "🎉"}</div>
+            <div className={styles.celebrationEmoji}>{newRecord ? "🏆" : tabMode ? "🪟" : "🎉"}</div>
             <div className={styles.celebrationTitle}>
-              {newRecord ? `🏆 Novo recorde! Etapa ${level}` : `Nível ${level} completo!`}
+              {tabMode
+                ? newRecord
+                  ? `🏆 Novo recorde! ${tabCycleCount} ciclos`
+                  : `Sessão de Abas concluída!`
+                : newRecord
+                  ? `🏆 Novo recorde! Etapa ${level}`
+                  : `Nível ${level} completo!`}
             </div>
             {newRecord && (
               <div className={styles.newRecordHighlight}>
                 Você superou seu recorde anterior!
+              </div>
+            )}
+
+            {/* Métricas exclusivas do Tab Mode */}
+            {tabMode && (
+              <div className={styles.tabModeSummary}>
+                <span className={styles.tabModeSummaryItem}>🔄 {tabCycleCount} ciclo{tabCycleCount !== 1 ? "s" : ""} completo{tabCycleCount !== 1 ? "s" : ""}</span>
+                <span className={styles.tabModeSummaryItem}>🪟 {tasks.length} aba{tasks.length !== 1 ? "s" : ""}</span>
+                <span className={styles.tabModeSummaryItem}>⏱ {(() => {
+                  const h = Math.floor(tabElapsed / 3600);
+                  const m = Math.floor((tabElapsed % 3600) / 60);
+                  const s = tabElapsed % 60;
+                  return h > 0
+                    ? `${h}h${String(m).padStart(2, "0")}min`
+                    : `${m}min${s > 0 ? ` ${s}s` : ""}`;
+                })()}</span>
+                {(() => {
+                  const maxCycles = getMaxCycles();
+                  return maxCycles > 0 && !newRecord ? (
+                    <span className={styles.tabModeSummaryRecord}>Recorde: {maxCycles} ciclos</span>
+                  ) : null;
+                })()}
               </div>
             )}
             <div className={styles.celebrationSub}>

@@ -3,6 +3,11 @@ import TaskSelector from "./TaskSelector";
 import { dailyTasksApi } from "../api/dailyTasks";
 import styles from "./TodayPanel.module.css";
 
+/* Vibração tátil curta (ignorada se browser não suportar) */
+function haptic(ms = 10) {
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch { /* noop */ }
+}
+
 const DAILY_LIMIT = 5;
 
 function todayKey() {
@@ -222,7 +227,10 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
               color: done ? "#fff" : "transparent",
               background: done ? dotColor : "transparent",
             }}
-            onClick={() => (done ? onReopen(task.id) : onComplete(task.id))}
+            onClick={() => {
+              haptic(done ? 5 : 12);
+              done ? onReopen(task.id) : onComplete(task.id);
+            }}
             title={done ? "Reabrir" : "Concluir"}
             aria-label={done ? "Reabrir tarefa" : "Concluir tarefa"}
           >
@@ -296,6 +304,9 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
   // Inicia com o cache local para evitar flash, depois sincroniza com o BD
   const [todayIds, setTodayIds] = useState(loadCachedIds);
   const [showPicker, setShowPicker] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem("todayPanel_collapsed") === "true"; } catch { return false; }
+  });
   const [_syncing, _setSyncing] = useState(false);
 
   // ── Carrega do BD ao montar ──────────────────────────────────────────────
@@ -372,77 +383,99 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
       {/* Cabeçalho */}
       <div className={styles.header}>
         <div className={styles.titleRow}>
+          {/* Botão colapsar */}
+          <button
+            className={`${styles.collapseBtn} ${collapsed ? styles.collapseBtnClosed : ""}`}
+            onClick={() => {
+              const next = !collapsed;
+              setCollapsed(next);
+              try { localStorage.setItem("todayPanel_collapsed", String(next)); } catch {}
+            }}
+            aria-label={collapsed ? "Expandir painel" : "Recolher painel"}
+            title={collapsed ? "Expandir" : "Recolher"}
+          >
+            ‹
+          </button>
           <span className={styles.title}>Tarefas de Hoje</span>
           <span className={`${styles.slot} ${count >= DAILY_LIMIT ? styles.slotFull : ""}`}>
             {count}/{DAILY_LIMIT}
           </span>
-          <span
-            className={styles.doneToday}
-            title="Total de tarefas concluídas hoje"
-          >
-            ✓ {completedToday} feita{completedToday !== 1 ? "s" : ""} hoje
-          </span>
+          {completedToday > 0 && (
+            <span
+              className={styles.doneToday}
+              title="Total de tarefas concluídas hoje"
+            >
+              ✓ {completedToday} feita{completedToday !== 1 ? "s" : ""} hoje
+            </span>
+          )}
         </div>
-        {canAdd && (
+        {canAdd && !collapsed && (
           <button className={styles.addBtn} onClick={() => setShowPicker((v) => !v)}>
             {showPicker ? "✕ Fechar" : "+ Selecionar"}
           </button>
         )}
       </div>
 
-      {/* Barra de progresso */}
-      {count > 0 && (
-        <div className={styles.progressWrap}>
-          <div className={styles.progressBar}>
-            <div className={styles.progressFill} style={{ width: `${pct}%` }} />
-          </div>
-          <span className={styles.progressLabel}>
-            {completedCount} de {count} concluída{count !== 1 ? "s" : ""}
-          </span>
-        </div>
-      )}
-
-      {/* Picker */}
-      {showPicker && (
-        <div className={styles.pickerWrap}>
-          <TaskSelector
-            tasks={pickerTasks}
-            onSelect={handleSelect}
-            onCancel={() => setShowPicker(false)}
-          />
-        </div>
-      )}
-
-      {/* Lista vazia */}
-      {todayTasks.length === 0 && !showPicker && (
-        <div className={styles.empty}>
-          <span>Nenhuma tarefa selecionada para hoje.</span>
-          <button className={styles.emptyLink} onClick={() => setShowPicker(true)}>
-            Selecionar agora →
-          </button>
-        </div>
-      )}
-
-      {/* Tarefas selecionadas */}
-      {todayTasks.length > 0 && (
-        <div className={styles.list}>
-          {todayTasks.map((t) => (
-            <TodayTaskItem
-              key={t.id}
-              task={t}
-              onComplete={onComplete}
-              onReopen={onReopen}
-              onRemove={handleRemove}
-              onToggleChecklist={onToggleChecklist}
-              onUpdate={onUpdate}
-            />
-          ))}
-          {count >= DAILY_LIMIT && (
-            <div className={styles.limitMsg}>
-              Limite diário de {DAILY_LIMIT} tarefas atingido
+      {/* Corpo colapsável */}
+      {!collapsed && (
+        <>
+          {/* Barra de progresso */}
+          {count > 0 && (
+            <div className={styles.progressWrap}>
+              <div className={styles.progressBar}>
+                <div className={styles.progressFill} style={{ width: `${pct}%` }} />
+              </div>
+              <span className={styles.progressLabel}>
+                {completedCount} de {count} concluída{count !== 1 ? "s" : ""}
+              </span>
             </div>
           )}
-        </div>
+
+          {/* Picker */}
+          {showPicker && (
+            <div className={styles.pickerWrap}>
+              <TaskSelector
+                tasks={pickerTasks}
+                onSelect={handleSelect}
+                onCancel={() => setShowPicker(false)}
+              />
+            </div>
+          )}
+
+          {/* Empty state ilustrado */}
+          {todayTasks.length === 0 && !showPicker && (
+            <div className={styles.emptyState}>
+              <span className={styles.emptyIcon}>📋</span>
+              <span className={styles.emptyTitle}>Nenhuma tarefa para hoje</span>
+              <span className={styles.emptyDesc}>Escolha até {DAILY_LIMIT} tarefas para focar agora</span>
+              <button className={styles.emptyBtn} onClick={() => setShowPicker(true)}>
+                + Selecionar tarefas
+              </button>
+            </div>
+          )}
+
+          {/* Tarefas selecionadas */}
+          {todayTasks.length > 0 && (
+            <div className={styles.list}>
+              {todayTasks.map((t) => (
+                <TodayTaskItem
+                  key={t.id}
+                  task={t}
+                  onComplete={onComplete}
+                  onReopen={onReopen}
+                  onRemove={handleRemove}
+                  onToggleChecklist={onToggleChecklist}
+                  onUpdate={onUpdate}
+                />
+              ))}
+              {count >= DAILY_LIMIT && (
+                <div className={styles.limitMsg}>
+                  Limite diário de {DAILY_LIMIT} tarefas atingido
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

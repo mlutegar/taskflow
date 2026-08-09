@@ -130,6 +130,11 @@ function blockForHour(hour) {
   return HOUR_BLOCKS.find((b) => hour >= b.range[0] && hour <= b.range[1]) || HOUR_BLOCKS[3];
 }
 
+/** Retorna o bloco de horário atual. */
+export function getCurrentHourBlock() {
+  return blockForHour(new Date().getHours());
+}
+
 /**
  * Melhor horário para um modo específico (mín. 3 registros para recomendar).
  * Retorna: { block, successRate, total } | null

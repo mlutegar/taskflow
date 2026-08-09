@@ -227,7 +227,14 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
   const [checklistInput, setChecklistInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [rescheduleFlash, setRescheduleFlash] = useState(null);
+  const [doneFlash, setDoneFlash] = useState(false);
   const prevDueDateRef = useRef(task.due_date);
+
+  const handleComplete = () => {
+    setDoneFlash(true);
+    setTimeout(() => setDoneFlash(false), 600);
+    onComplete(task.id);
+  };
 
   useEffect(() => {
     if (task.recurrence && task.due_date !== prevDueDateRef.current) {
@@ -345,11 +352,11 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
   }
 
   return (
-    <div className={`${styles.card} ${task.completed ? styles.completed : ""}`}>
+    <div className={`${styles.card} ${task.completed ? styles.completed : ""} ${styles[`bar_${priority.cls}`]} ${doneFlash ? styles.doneFlash : ""}`}>
       <div className={styles.main}>
         <button
           className={`${styles.checkbox} ${task.completed ? styles.checkboxDone : ""}`}
-          onClick={() => task.completed ? onReopen(task.id) : onComplete(task.id)}
+          onClick={() => task.completed ? onReopen(task.id) : handleComplete()}
           title={task.completed ? "Reabrir" : "Concluir"}
           aria-label={task.completed ? "Reabrir tarefa" : "Concluir tarefa"}
         >
@@ -373,11 +380,11 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
           <div className={styles.meta}>
             {task.due_date && (
               <span className={`${styles.metaItem} ${overdue ? styles.overdue : ""}`}>
-                📅 {formatDate(task.due_date)}{overdue && " · Atrasada"}
+                📅 {formatDate(task.due_date)}
               </span>
             )}
             {countdown && (
-              <span className={`${styles.countdownBadge} ${daysLeft < 0 ? styles.countdownLate : daysLeft === 0 ? styles.countdownToday : ""}`}>
+              <span className={`${styles.countdownBadge} ${daysLeft < 0 ? styles.countdownLate : daysLeft === 0 ? styles.countdownToday : ""} ${daysLeft !== null && daysLeft < -30 ? styles.countdownVeryLate : ""}`}>
                 {countdown}
               </span>
             )}

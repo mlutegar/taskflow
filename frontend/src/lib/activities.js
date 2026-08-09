@@ -2,6 +2,8 @@
 // Editável e persistida em localStorage (paridade com o antigo "Manage Activities"
 // do CLI, que guardava a lista em data/activities.json).
 
+import { withOfflineFallback } from "./syncQueue";
+
 const LS_KEY = "taskflow.activities";
 
 // Seed inicial (equivalente ao antigo data/activities.json do CLI)
@@ -41,6 +43,8 @@ export function getActivities() {
 
 function persist(list) {
   localStorage.setItem(LS_KEY, JSON.stringify(list));
+  // Sync com backend (fire-and-forget com retry offline)
+  withOfflineFallback("PUT", "/preferences", { activities: list });
   return list;
 }
 

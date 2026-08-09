@@ -1,0 +1,15 @@
+dbs:
+  - path: /data/taskflow.db
+    replicas:
+      # ── Backup local no VPS (sempre ativo) ───────────────────────────────
+      - type: file
+        path: /data/backups
+
+      # ── Cloudflare R2 (ativar quando criar a conta) ───────────────────────
+      # Descomente as linhas abaixo e preencha as variáveis no .env do VPS:
+      # - type: s3
+      #   bucket: ${LITESTREAM_BUCKET}
+      #   path: taskflow/taskflow.db
+      #   endpoint: ${LITESTREAM_ENDPOINT}
+      #   access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+      #   secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}

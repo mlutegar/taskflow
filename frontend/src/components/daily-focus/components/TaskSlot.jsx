@@ -20,7 +20,7 @@ function getModeById(id) {
   return [...MODES, ...custom].find((m) => m.id === id) || null;
 }
 
-function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes: _allModes, usedModes = [], suggestedModeId = null }) {
+function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes: _allModes, usedModes = [], suggestedModeId = null, hideDuration = false }) {
   const [query, setQuery] = useState(slot.title);
   const [results, setResults] = useState([]);
   const [todayTasks, setTodayTasks] = useState([]);
@@ -107,7 +107,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
       <div className={styles.slotHeader}>
         <span className={styles.slotLabel}>Tarefa {index + 1}</span>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          {editingDuration ? (
+          {!hideDuration && (editingDuration ? (
             <input
               className={styles.durationInput}
               type="number"
@@ -129,7 +129,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
               aria-label="Editar tempo"
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditingDuration(true); } }}
             >{slot.durationMin} min ✏️</span>
-          )}
+          ))}
           {level > 1 && (
             <>
               <button className={styles.slotMoveBtn} onClick={onMoveUp} disabled={!canMoveUp} title="Subir">↑</button>

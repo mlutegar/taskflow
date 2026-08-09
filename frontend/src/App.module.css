@@ -121,6 +121,28 @@
   color: var(--bg) !important;
 }
 
+/* Badge de tarefas críticas */
+.tabBadgeCritical {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  background: rgba(224, 82, 82, 0.18);
+  color: var(--critical);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 9px;
+  line-height: 1;
+  gap: 2px;
+}
+
+.tabActive .tabBadgeCritical {
+  background: var(--critical);
+  color: #fff;
+}
+
 /* Add button */
 .addBtnWrap {
   display: flex;
@@ -291,6 +313,72 @@
   font-weight: 500;
 }
 
+/* ── Group toggle button ──────────────────────────────── */
+.groupBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.groupBtn:hover { color: var(--text); border-color: var(--accent); }
+.groupBtnActive { color: var(--accent); border-color: var(--accent); background: rgba(124, 110, 245, 0.12); }
+
+/* ── Contador de filtro ───────────────────────────────── */
+.filterCount {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  padding: 6px 2px;
+}
+.filterCount strong { color: var(--text); }
+
+/* ── FAB (Floating Action Button) ─────────────────────── */
+.fab {
+  display: none; /* só aparece no mobile via media query */
+  position: fixed;
+  bottom: calc(64px + 16px + env(safe-area-inset-bottom));
+  right: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 1;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(124, 110, 245, 0.45);
+  z-index: 50;
+  border: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.fab:active { transform: scale(0.93); box-shadow: 0 2px 10px rgba(124, 110, 245, 0.35); }
+
+/* ── Pull-to-refresh indicator ────────────────────────── */
+.pullIndicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent);
+  z-index: 200;
+  transform-origin: left;
+  border-radius: 0 2px 2px 0;
+  transition: opacity 0.2s;
+}
+
 /* ── States ───────────────────────────────────────────── */
 .loading, .error {
   text-align: center;
@@ -408,15 +496,39 @@
 
   .main { padding: 14px 12px; }
 
-  .controls { gap: 8px; margin-bottom: 14px; }
-  .filterBtn { padding: 4px 9px; font-size: 11px; }
+  .controls { gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 
+  /* Search sempre em cima, linha inteira */
   .searchWrapper { flex: 1 1 100%; order: -1; }
-  .searchInput { font-size: 12px; padding: 6px 28px; }
+  .searchInput { font-size: 13px; padding: 8px 30px; }
 
-  .sortWrapper { gap: 5px; }
-  .sortSelect { font-size: 11px; padding: 4px 8px; }
-  .sortLabel { font-size: 11px; }
+  /* Filtros e sort na mesma linha, scrollável horizontalmente */
+  .filters {
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+    flex: 1 1 auto;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .filterBtn { padding: 5px 12px; font-size: 12px; white-space: nowrap; }
+
+  /* Sort compacto — esconder label de texto */
+  .sortWrapper { gap: 5px; flex-shrink: 0; overflow: hidden; max-width: 160px; }
+  .sortLabel { display: none; }
+  .sortSelect { font-size: 12px; padding: 5px 8px; width: 100%; max-width: 100%; }
+
+  /* Header: esconder texto "Atualizar", manter só o ícone */
+  .reloadText { display: none; }
+
+  /* FAB visível no mobile */
+  .fab { display: flex; }
+
+  /* Group button menor no mobile */
+  .groupBtn { width: 34px; height: 34px; }
+
+  /* Badge de críticas ocupa espaço demais no header mobile — esconder */
+  .tabBadgeCritical { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

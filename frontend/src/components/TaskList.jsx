@@ -4,12 +4,45 @@ import styles from "./TaskList.module.css";
 
 const PAGE_SIZE = 10;
 
-export default function TaskList({ tasks, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist }) {
+const PRIORITY_GROUPS = [
+  { priority: 1, label: "🔴 Críticas", cls: "groupCritical" },
+  { priority: 2, label: "🟠 Altas",    cls: "groupHigh" },
+  { priority: 3, label: "🟡 Médias",   cls: "groupMedium" },
+  { priority: 4, label: "🟢 Baixas",   cls: "groupLow" },
+];
+
+function SkeletonCard() {
+  return (
+    <div className={styles.skeleton}>
+      <div className={styles.skeletonCheck} />
+      <div className={styles.skeletonBody}>
+        <div className={styles.skeletonTitle} />
+        <div className={styles.skeletonMeta} />
+      </div>
+    </div>
+  );
+}
+
+export default function TaskList({
+  tasks,
+  loading = false,
+  grouped = false,
+  onComplete, onReopen, onDelete, onUpdate,
+  onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist,
+}) {
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    setPage(1);
-  }, [tasks]);
+  useEffect(() => { setPage(1); }, [tasks, grouped]);
+
+  const cardProps = { onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist };
+
+  if (loading) {
+    return (
+      <div className={styles.list}>
+        {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+      </div>
+    );
+  }
 
   if (tasks.length === 0) {
     return (
@@ -20,6 +53,32 @@ export default function TaskList({ tasks, onComplete, onReopen, onDelete, onUpda
     );
   }
 
+  /* ── Modo agrupado por prioridade ── */
+  if (grouped) {
+    return (
+      <div className={styles.groupedList}>
+        {PRIORITY_GROUPS.map(({ priority, label, cls }) => {
+          const group = tasks.filter((t) => t.priority === priority);
+          if (group.length === 0) return null;
+          return (
+            <div key={priority} className={styles.group}>
+              <div className={`${styles.groupHeader} ${styles[cls]}`}>
+                <span>{label}</span>
+                <span className={styles.groupCount}>{group.length}</span>
+              </div>
+              <div className={styles.list}>
+                {group.map((task) => (
+                  <TaskCard key={task.id} task={task} {...cardProps} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  /* ── Modo lista paginada (padrão) ── */
   const totalPages = Math.ceil(tasks.length / PAGE_SIZE);
   const paginated = tasks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -27,18 +86,7 @@ export default function TaskList({ tasks, onComplete, onReopen, onDelete, onUpda
     <>
       <div className={styles.list}>
         {paginated.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onComplete={onComplete}
-            onReopen={onReopen}
-            onDelete={onDelete}
-            onUpdate={onUpdate}
-            onAddChecklist={onAddChecklist}
-            onToggleChecklist={onToggleChecklist}
-            onUpdateChecklist={onUpdateChecklist}
-            onDeleteChecklist={onDeleteChecklist}
-          />
+          <TaskCard key={task.id} task={task} {...cardProps} />
         ))}
       </div>
       {tasks.length > PAGE_SIZE && (

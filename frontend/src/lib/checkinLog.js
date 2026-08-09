@@ -1,4 +1,5 @@
-import { storageGet, storageAppend } from "./storage";
+import { storageGet, storageAppend, storageSet } from "./storage";
+import { saveCheckin, updateCheckinFeedback, fetchCheckins } from "../api/dailyFocusCheckins";
 
 const LS_KEY = "checkinLog";
 const MAX_ENTRIES = 200;
@@ -11,12 +12,11 @@ function localIsoDate() {
 
 export function logCheckinUsage(estadoId, modeId) {
   if (!estadoId || !modeId) return;
-  storageAppend(LS_KEY, {
-    estadoId,
-    modeId,
-    date: localIsoDate(),
-    hour: new Date().getHours(),
-  }, MAX_ENTRIES);
+  const date = localIsoDate();
+  const hour = new Date().getHours();
+  storageAppend(LS_KEY, { estadoId, modeId, date, hour }, MAX_ENTRIES);
+  // Sincroniza com Supabase (fire-and-forget)
+  saveCheckin(estadoId, modeId, date, hour).catch(() => {});
 }
 
 const FEEDBACK_KEY = "checkinFeedback";
@@ -24,12 +24,10 @@ const MAX_FEEDBACK = 200;
 
 export function logSessionFeedback(estadoId, modeId, rating) {
   if (!estadoId && !modeId) return;
-  storageAppend(FEEDBACK_KEY, {
-    estadoId,
-    modeId,
-    rating, // 1 = positivo, -1 = negativo
-    date: localIsoDate(),
-  }, MAX_FEEDBACK);
+  const date = localIsoDate();
+  storageAppend(FEEDBACK_KEY, { estadoId, modeId, rating, date }, MAX_FEEDBACK);
+  // Sincroniza com Supabase (fire-and-forget)
+  updateCheckinFeedback(estadoId, modeId, date, rating).catch(() => {});
 }
 
 export function getSessionFeedback() {
@@ -77,4 +75,39 @@ export function getCheckinStreak() {
     else break;
   }
   return streak;
+}
+
+/**
+ * Carrega check-ins e feedbacks do Supabase e mescla com localStorage.
+ * Deduplicação por date+estadoId+hour para checkins e date+estadoId+modeId para feedbacks.
+ * Deve ser chamado no boot do app após login.
+ */
+export async function loadRemoteCheckins() {
+  try {
+    const { checkins: remote, feedbacks: remoteFeedbacks } = await fetchCheckins();
+
+    // Mescla checkins
+    if (remote.length) {
+      const local = storageGet(LS_KEY, []);
+      const seen = new Set(local.map((e) => `${e.date}|${e.estadoId}|${e.hour}`));
+      const fresh = remote.filter((e) => !seen.has(`${e.date}|${e.estadoId}|${e.hour}`));
+      if (fresh.length) {
+        const merged = [...local, ...fresh].slice(-MAX_ENTRIES);
+        storageSet(LS_KEY, merged);
+      }
+    }
+
+    // Mescla feedbacks
+    if (remoteFeedbacks.length) {
+      const localFb = storageGet(FEEDBACK_KEY, []);
+      const seenFb = new Set(localFb.map((e) => `${e.date}|${e.estadoId}|${e.modeId}`));
+      const freshFb = remoteFeedbacks.filter((e) => !seenFb.has(`${e.date}|${e.estadoId}|${e.modeId}`));
+      if (freshFb.length) {
+        const mergedFb = [...localFb, ...freshFb].slice(-MAX_FEEDBACK);
+        storageSet(FEEDBACK_KEY, mergedFb);
+      }
+    }
+  } catch {
+    // Falha silenciosa
+  }
 }

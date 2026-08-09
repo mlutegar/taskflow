@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  title       String
+  description String?
+  completed   Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+  priority    Int       @default(4)
+  dueDate     DateTime? @map("due_date")
+  recurrence  String?   // "daily" | "weekly" | "biweekly" | "monthly"
+
+  checklist   ChecklistItem[]
+  dailyTasks  DailyTask[]
+
+  @@map("tasks")
+}
+
+model ChecklistItem {
+  id          BigInt   @id @default(autoincrement())
+  taskId      String   @map("task_id")
+  parentId    BigInt?  @map("parent_id")
+  description String
+  note        String?
+  completed   Boolean  @default(false)
+  order       Int      @default(0)
+
+  task        Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  parent      ChecklistItem?  @relation("ChecklistChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children    ChecklistItem[] @relation("ChecklistChildren")
+
+  @@map("checklist_items")
+}
+
+model Routine {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  title             String
+  description       String?
+  targetValue       Float?    @map("target_value")
+  unit              String?
+  currentProgress   Float     @default(0) @map("current_progress")
+  lastCompletedDate DateTime? @map("last_completed_date")
+  completionHistory String    @default("[]") @map("completion_history")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  checklist         RoutineChecklistItem[]
+
+  @@map("routines")
+}
+
+model RoutineChecklistItem {
+  id          BigInt  @id @default(autoincrement())
+  routineId   String  @map("routine_id")
+  description String
+  completed   Boolean @default(false)
+  order       Int     @default(0)
+
+  routine     Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+
+  @@map("routine_checklist_items")
+}
+
+model ModeStat {
+  modeId    String   @map("mode_id")
+  userId    String   @map("user_id")
+  taskCount Int      @default(0) @map("task_count")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@id([modeId, userId])
+  @@map("mode_stats")
+}
+
+model DailyTask {
+  id        BigInt   @id @default(autoincrement())
+  userId    String   @map("user_id")
+  date      DateTime @map("date")
+  taskId    String   @map("task_id")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([date, taskId, userId])
+  @@map("daily_tasks")
+}
+
+model DailyFocusSession {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  date        DateTime @map("date")
+  completedAt String?  @map("completed_at") // TIME stored as string HH:MM
+  level       Int      @default(1)
+  tasks       String   @default("[]") // JSON array stored as string
+  timings     String   @default("[]") // JSON stored as string
+  rushMode    Boolean  @default(false) @map("rush_mode")
+  estadoId    String?  @map("estado_id")
+  tabMode     Boolean  @default(false) @map("tab_mode")
+  cycleCount  Int      @default(0) @map("cycle_count")
+  tabsOpened  Int      @default(0) @map("tabs_opened")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("daily_focus_sessions")
+}
+
+model DailyFocusCheckin {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  estadoId  String   @map("estado_id")
+  modeId    String   @map("mode_id")
+  date      DateTime @map("date")
+  hour      Int
+  rating    Int?     // -1 or 1
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("daily_focus_checkins")
+}
+
+model DailyFocusDayState {
+  userId    String   @map("user_id")
+  date      DateTime @map("date")
+  level     Int      @default(0)
+  usedModes String   @default("{}") @map("used_modes") // JSON stored as string
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@id([userId, date])
+  @@map("daily_focus_day_state")
+}
+
+model DailyFocusAchievement {
+  userId         String   @id @map("user_id")
+  achievementIds String   @default("[]") @map("achievement_ids") // JSON stored as string
+  updatedAt      DateTime @default(now()) @map("updated_at")
+
+  @@map("daily_focus_achievements")
+}
+
+model UserPreferences {
+  userId          String   @id @map("user_id")
+  customModes     String   @default("[]")  @map("custom_modes")     // JSON array
+  deletedModeIds  String   @default("[]")  @map("deleted_mode_ids") // JSON array — modos que o usuário deletou
+  weeklyGoal      Int      @default(5)     @map("weekly_goal")
+  activities      String   @default("[]")  @map("activities")       // JSON array
+  estadosCustom   String   @default("[]")  @map("estados_custom")   // JSON array
+  paperReminders  String   @default("[]")  @map("paper_reminders")  // JSON array
+  lastEstadoId    String?  @map("last_estado_id")                   // último estado selecionado no check-in
+  onboarded       Boolean  @default(false) @map("onboarded")        // flag de onboarding do check-in
+  updatedAt       DateTime @updatedAt      @map("updated_at")
+
+  @@map("user_preferences")
+}
+
+model SessionUsageLog {
+  id             BigInt   @id @default(autoincrement())
+  userId         String   @map("user_id")
+  modeId         String   @map("mode_id")
+  date           String   // YYYY-MM-DD
+  hour           Int
+  worked         Boolean  @default(false)
+  focusedMinutes Int      @default(0) @map("focused_minutes")
+  idleMinutes    Int      @default(0) @map("idle_minutes")
+  idleReason     String   @default("[]") @map("idle_reason")   // JSON array
+  feeling        String   @default("[]")                        // JSON array
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, modeId, date, hour])
+  @@map("session_usage_logs")
+}
+
+model UserModeActivation {
+  id        BigInt   @id @default(autoincrement())
+  userId    String   @map("user_id")
+  modeId    String   @map("mode_id")
+  date      String   // YYYY-MM-DD
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, modeId, date])
+  @@map("user_mode_activations")
+}

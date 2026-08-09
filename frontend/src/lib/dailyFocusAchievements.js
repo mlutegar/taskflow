@@ -1,4 +1,5 @@
 import { storageGet, storageSet } from "./storage";
+import { fetchAchievements, upsertAchievement } from "../api/dailyFocusAchievements";
 
 const LS_KEY = "daily_focus_achievements";
 
@@ -14,6 +15,7 @@ export const ACHIEVEMENTS = [
   { id: "level_2",       emoji: "📈", name: "Subindo",             desc: "Chegou ao Nível 2 pela primeira vez" },
   { id: "self_aware",   emoji: "🧠", name: "Auto-conhecimento",   desc: "Usou o check-in de estado 5 vezes" },
   { id: "observador",  emoji: "🔭", name: "Observador",          desc: "7 dias seguidos de check-in de estado" },
+  { id: "cycle_master", emoji: "🪟", name: "Multi-Tab Master",    desc: "Completou 3 ou mais ciclos em uma sessão de Abas" },
 ];
 
 function getUnlocked() {
@@ -49,9 +51,32 @@ export function tryUnlock(ids) {
 
   if (newlyUnlocked.length > 0) {
     saveUnlocked(unlocked);
+    // Sincroniza cada novo achievement com Supabase (fire-and-forget)
+    for (const ach of newlyUnlocked) {
+      upsertAchievement(ach.id).catch(() => {});
+    }
   }
 
   return newlyUnlocked;
+}
+
+/**
+ * Carrega achievements do Supabase e mescla com localStorage (union).
+ * Deve ser chamado no boot do app após login.
+ */
+export async function loadRemoteAchievements() {
+  try {
+    const remote = await fetchAchievements();
+    if (!remote.length) return;
+
+    const local = getUnlocked();
+    const merged = [...new Set([...local, ...remote])];
+    if (merged.length !== local.length) {
+      saveUnlocked(merged);
+    }
+  } catch {
+    // Falha silenciosa
+  }
 }
 
 export function isUnlocked(id) {

@@ -10,6 +10,8 @@
  */
 
 import { storageGet, storageSet } from "./storage";
+import { fetchModeActivations } from "../api/preferences";
+import { withOfflineFallback } from "./syncQueue";
 
 const KEY = "modeActivations";
 const RETENTION_DAYS = 365;
@@ -35,15 +37,71 @@ function save(entries) {
   storageSet(KEY, entries);
 }
 
+// ── Batch buffer ──────────────────────────────────────────────────────────────
+// Acumula ativações e envia em lote a cada 30s (ou ao fechar a página).
+
+const _buffer = [];
+let _batchTimer = null;
+
+function _flushBatch() {
+  if (!_buffer.length) return;
+  const batch = _buffer.splice(0);
+  // Envia um por um mas via fila offline — se falhar, reenvia ao voltar online
+  for (const { modeId, date } of batch) {
+    withOfflineFallback("POST", "/preferences/mode-activations", { modeId, date });
+  }
+}
+
+function _scheduleBatch() {
+  if (_batchTimer) return;
+  _batchTimer = setTimeout(() => {
+    _batchTimer = null;
+    _flushBatch();
+  }, 30_000);
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") _flushBatch();
+  });
+  window.addEventListener("pagehide", _flushBatch);
+}
+
 /**
  * Registra uma ativação do modo.
  * @param {string} modeId
  */
 export function logActivation(modeId) {
   if (!modeId) return;
+  const today = todayIso();
   const entries = load();
-  entries.push({ modeId, date: todayIso() });
+  entries.push({ modeId, date: today });
   save(entries);
+  // Acumula no buffer e envia em lote a cada 30s
+  _buffer.push({ modeId, date: today });
+  _scheduleBatch();
+}
+
+/**
+ * Carrega ativações do backend e mescla com localStorage.
+ * Deve ser chamado no boot após autenticação.
+ */
+export async function loadRemoteModeActivations() {
+  try {
+    const remote = await fetchModeActivations();
+    if (!Array.isArray(remote) || remote.length === 0) return;
+
+    const local = load();
+    const localKeys = new Set(local.map((e) => `${e.modeId}|${e.date}`));
+    const fresh = remote.filter((e) => !localKeys.has(`${e.modeId}|${e.date}`));
+    if (fresh.length === 0) return;
+
+    const merged = [...local, ...fresh];
+    const limit = cutoff();
+    save(merged.filter((e) => e.date >= limit));
+  } catch {
+    // falha silenciosa
+  }
 }
 
 /**
