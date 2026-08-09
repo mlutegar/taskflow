@@ -31,9 +31,18 @@ export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReas
   const entry = { modeId, date, hour, worked, focusedMinutes, idleMinutes, idleReason, feeling };
   storageAppend(LS_KEY, entry, MAX_ENTRIES);
 
-  // Sync com Supabase (fire-and-forget)
-  import("../api/sessionUsageLogs").then(({ saveUsageLog }) => {
-    saveUsageLog(entry).catch(() => {});
+  // Sync com backend (fire-and-forget com retry offline)
+  import("./syncQueue").then(({ withOfflineFallback }) => {
+    withOfflineFallback("POST", "/session-usage-logs", {
+      mode_id:         entry.modeId,
+      date:            entry.date,
+      hour:            entry.hour,
+      worked:          entry.worked,
+      focused_minutes: entry.focusedMinutes,
+      idle_minutes:    entry.idleMinutes,
+      idle_reason:     entry.idleReason,
+      feeling:         entry.feeling,
+    });
   });
 }
 

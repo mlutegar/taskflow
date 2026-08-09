@@ -66,6 +66,7 @@ function Root() {
       loadRemoteCheckins(),
       loadRemotePreferences(),
       loadRemoteModeActivations(),
+      loadRemoteUsageLogs(),
     ]).catch(() => {});
   }, [user]);
 
