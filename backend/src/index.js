@@ -12,6 +12,8 @@ import modeStatsRoutes from "./routes/modeStats.js";
 import dailyFocusRoutes from "./routes/dailyFocus.js";
 import preferencesRoutes from "./routes/preferences.js";
 import sessionUsageLogsRoutes from "./routes/sessionUsageLogs.js";
+import modeLogRoutes from "./routes/modeLog.js";
+import modeComboLogRoutes from "./routes/modeComboLog.js";
 
 const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5175";
@@ -35,6 +37,8 @@ fastify.register(modeStatsRoutes, { prefix: "/mode-stats" });
 fastify.register(dailyFocusRoutes, { prefix: "/daily-focus" });
 fastify.register(preferencesRoutes, { prefix: "/preferences" });
 fastify.register(sessionUsageLogsRoutes, { prefix: "/session-usage-logs" });
+fastify.register(modeLogRoutes, { prefix: "/mode-log" });
+fastify.register(modeComboLogRoutes, { prefix: "/mode-combo-log" });
 
 // Erro global
 fastify.setErrorHandler((error, request, reply) => {

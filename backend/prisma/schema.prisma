@@ -186,3 +186,30 @@ model UserModeActivation {
   @@unique([userId, modeId, date])
   @@map("user_mode_activations")
 }
+
+model ModeLog {
+  id        BigInt   @id @default(autoincrement())
+  userId    String   @map("user_id")
+  modeId    String   @map("mode_id")
+  date      String   // YYYY-MM-DD
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, modeId, date])
+  @@map("mode_logs")
+}
+
+model ModeComboLog {
+  id             BigInt   @id @default(autoincrement())
+  userId         String   @map("user_id")
+  modeIdA        String   @map("mode_id_a")
+  modeIdB        String   @map("mode_id_b")
+  date           String
+  hour           Int
+  worked         Boolean?
+  focusedMinutes Int      @default(0) @map("focused_minutes")
+  feeling        String   @default("[]")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, modeIdA, modeIdB, date, hour])
+  @@map("mode_combo_logs")
+}

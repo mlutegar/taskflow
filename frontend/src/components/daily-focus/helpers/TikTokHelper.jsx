@@ -1,12 +1,21 @@
 import styles from "../DailyFocus.module.css";
 
-export const DEFAULT_STATE = { cycle: 1, videosWatched: false, taskInCycle: 0 };
+export const DEFAULT_STATE = { cycle: 1, videosWatched: false, taskInCycle: 0, platform: "tiktok", variant: "prog_both" };
 
 export default function TikTokHelper({ state, onChange }) {
   const s = { ...DEFAULT_STATE, ...state };
 
-  const numVideos = s.cycle * 5;
-  const numTasks = s.cycle;
+  const variant  = s.variant  ?? "prog_both";
+  const platform = s.platform ?? "tiktok";
+  const baseVideos = s.baseVideos ?? 5;
+  const numVideos  = variant === "fixed"  ? baseVideos
+    : variant === "detox" ? Math.max(1, 4 - s.cycle) * baseVideos
+    : s.cycle * baseVideos;
+  const numTasks = variant === "prog_both" ? s.cycle
+    : variant === "detox"   ? Math.max(1, 4 - s.cycle)
+    : 1;
+  const platformLabel = platform === "reels" ? "Reels" : "vídeos";
+  const platformEmoji = platform === "reels" ? "🎬" : "📱";
 
   const nextCycle = () => {
     onChange({ ...s, cycle: s.cycle + 1, videosWatched: false, taskInCycle: 0 });
@@ -32,8 +41,8 @@ export default function TikTokHelper({ state, onChange }) {
 
       <div className={styles.statRow}>
         <div className={styles.statItem}>
-          <span className={styles.statNum}>📱</span>
-          <span className={styles.statLabel}>{numVideos} vídeos</span>
+          <span className={styles.statNum}>{platformEmoji}</span>
+          <span className={styles.statLabel}>{numVideos} {platformLabel}</span>
         </div>
         <div className={styles.statItem}>
           <span className={styles.statNum}>{numTasks}</span>
@@ -44,7 +53,7 @@ export default function TikTokHelper({ state, onChange }) {
       <div>
         <div className={styles.helperInputLabel}>
           {!s.videosWatched
-            ? `Assista ${numVideos} vídeos, depois marque aqui:`
+            ? `Assista ${numVideos} ${platformLabel}, depois marque aqui:`
             : `Fez ${s.taskInCycle + 1}ª tarefa do ciclo?`}
         </div>
         {!s.videosWatched ? (
@@ -53,7 +62,7 @@ export default function TikTokHelper({ state, onChange }) {
             style={{ width: "100%" }}
             onClick={() => onChange({ ...s, videosWatched: true })}
           >
-            ✓ Assisti os {numVideos} vídeos
+            ✓ Assisti os {numVideos} {platformLabel}
           </button>
         ) : (
           <button

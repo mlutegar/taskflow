@@ -58,13 +58,19 @@ export async function loadRemotePreferences() {
     }
 
     // customModes: mescla por ID, respeitando deletedSet
+    console.log("[prefs] remote.customModes:", remote.customModes);
+    console.log("[prefs] deletedSet:", [...deletedSet]);
     if (Array.isArray(remote.customModes) && remote.customModes.length > 0) {
       const localModes  = lsGet(LS_CUSTOM_MODES, []);
       const localIds    = new Set(localModes.map((m) => m.id));
       // Adiciona modos remotos que não existem localmente e não foram deletados
       const incoming = remote.customModes.filter((m) => !localIds.has(m.id) && !deletedSet.has(m.id));
+      console.log("[prefs] incoming modes:", incoming);
       if (incoming.length > 0) {
         lsSet(LS_CUSTOM_MODES, [...localModes, ...incoming]);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("customModesUpdated"));
+        }
       }
     }
 

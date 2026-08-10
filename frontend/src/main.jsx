@@ -11,12 +11,16 @@ import { loadRemoteCheckins } from "./lib/checkinLog.js";
 import { loadRemotePreferences } from "./lib/userPreferences.js";
 import { loadRemoteModeActivations } from "./lib/modeActivations.js";
 import { loadRemoteUsageLogs } from "./lib/sessionUsageLog.js";
+import { loadRemoteModeLog } from "./lib/modeLog.js";
+import { loadRemoteModeComboLog } from "./lib/modeComboLog.js";
+import { useStreakReminder } from "./hooks/useStreakReminder.js";
 
 // ── Lazy loading de rotas (reduz chunk inicial) ───────────────────────────────
 const App          = lazy(() => import("./App.jsx"));
 const DailyFocusApp = lazy(() => import("./DailyFocusApp.jsx"));
 const DashboardPage = lazy(() => import("./components/dashboard/DashboardPage.jsx"));
 const ProfilePage   = lazy(() => import("./components/auth/ProfilePage.jsx"));
+const HistoryPage   = lazy(() => import("./components/history/HistoryPage.jsx"));
 
 // ── 404 page ─────────────────────────────────────────────────────────────────
 function NotFoundPage() {
@@ -106,8 +110,12 @@ function Root() {
       loadRemotePreferences(),
       loadRemoteModeActivations(),
       loadRemoteUsageLogs(),
+      loadRemoteModeLog(),
+      loadRemoteModeComboLog(),
     ]).catch(() => {});
   }, [user]);
+
+  useStreakReminder();
 
   if (loading) return <LoadingScreen />;
   if (!user)   return <LoginPage signIn={signIn} signUp={signUp} />;
@@ -116,6 +124,7 @@ function Root() {
   if (hash === "#/daily-focus") Page = <DailyFocusApp />;
   else if (hash === "#/dashboard") Page = <DashboardPage />;
   else if (hash === "#/profile")   Page = <ProfilePage onSignOut={signOut} />;
+  else if (hash === "#/history")   Page = <HistoryPage />;
   else if (hash === "#/" || hash === "#") Page = <App />;
   else Page = <NotFoundPage />;
 

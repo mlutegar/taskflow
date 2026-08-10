@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { icon: "🎯", label: "Daily Focus", hash: "#/daily-focus" },
   { icon: "📊", label: "Dashboard", hash: "#/dashboard" },
   { icon: "👤", label: "Perfil", hash: "#/profile" },
+  { icon: "📋", label: "Histórico", hash: "#/history" },
 ];
 
 // Fix #5: navegação sem reload via hashchange

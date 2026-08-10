@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   BarChart, Bar, LineChart, Line, ReferenceLine,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -764,10 +764,90 @@ function SessionHistory({ history }) {
   );
 }
 
+// ── SemanaComparativo ─────────────────────────────────────────────────────────
+
+function SemanaComparativo({ allHistory }) {
+  const { thisWeek, lastWeek } = useMemo(() => {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Sunday
+
+    const startOfThisWeek = new Date(now);
+    startOfThisWeek.setHours(0, 0, 0, 0);
+    startOfThisWeek.setDate(now.getDate() - dayOfWeek);
+
+    const startOfLastWeek = new Date(startOfThisWeek);
+    startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+
+    const pad = (n) => String(n).padStart(2, "0");
+    const toIsoLocal = (d) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    const thisWeekStart = toIsoLocal(startOfThisWeek);
+    const lastWeekStart = toIsoLocal(startOfLastWeek);
+    const lastWeekEnd   = thisWeekStart; // exclusive
+
+    const thisWeek = allHistory.filter((e) => {
+      const iso = toIso(e.date);
+      return iso >= thisWeekStart;
+    });
+
+    const lastWeek = allHistory.filter((e) => {
+      const iso = toIso(e.date);
+      return iso >= lastWeekStart && iso < lastWeekEnd;
+    });
+
+    return { thisWeek, lastWeek };
+  }, [allHistory]);
+
+  if (!thisWeek.length && !lastWeek.length) return null;
+
+  const thisSessions = thisWeek.length;
+  const lastSessions = lastWeek.length;
+  const thisTasks    = thisWeek.reduce((s, e) => s + e.tasks.length, 0);
+  const lastTasks    = lastWeek.reduce((s, e) => s + e.tasks.length, 0);
+
+  function DiffBadge({ current, previous }) {
+    const diff = current - previous;
+    if (diff === 0) return <span style={{ color: "var(--text-muted)", fontSize: 12 }}>= igual à semana passada</span>;
+    const color = diff > 0 ? "var(--success)" : "var(--danger)";
+    const arrow = diff > 0 ? "▲" : "▼";
+    return (
+      <span style={{ color, fontSize: 12, fontWeight: 600 }}>
+        {arrow} {Math.abs(diff)} vs semana passada
+      </span>
+    );
+  }
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>Semana atual vs anterior</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ background: "var(--surface-2)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Sessões</div>
+          <div style={{ fontSize: 30, fontWeight: 700, color: "var(--accent)", lineHeight: 1, marginBottom: 6 }}>{thisSessions}</div>
+          <DiffBadge current={thisSessions} previous={lastSessions} />
+        </div>
+        <div style={{ background: "var(--surface-2)", borderRadius: "var(--radius-sm)", padding: "14px 16px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Tarefas</div>
+          <div style={{ fontSize: 30, fontWeight: 700, color: "var(--success)", lineHeight: 1, marginBottom: 6 }}>{thisTasks}</div>
+          <DiffBadge current={thisTasks} previous={lastTasks} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const [periodIdx, setPeriodIdx] = useState(1); // 30d default
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setLoaded(true), 400);
+    return () => clearTimeout(handle);
+  }, []);
+
   const days = PERIOD_OPTS[periodIdx].days;
 
   const allHistory = useMemo(() => getHistory(), []);
@@ -779,6 +859,33 @@ export default function DashboardPage() {
   }, [days, allHistory]);
 
   const streak = getStreak();
+
+  if (!loaded) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.pageTitle}>Dashboard</div>
+        <div className={styles.pageSubtitle}>Carregando…</div>
+        <style>{`
+          @keyframes dashPulse {
+            0%, 100% { opacity: 0.5; }
+            50%       { opacity: 1;   }
+          }
+        `}</style>
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            style={{
+              height: 80,
+              borderRadius: 10,
+              background: "var(--surface-2, #2a2a38)",
+              marginBottom: 16,
+              animation: `dashPulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -798,6 +905,7 @@ export default function DashboardPage() {
       </div>
 
       <HeroStats history={history} streak={streak} />
+      <SemanaComparativo allHistory={allHistory} />
       <ActivityHeatmap history={history} days={days} />
       <SessionsBarChart history={history} days={days} />
       <LevelLineChart history={history} days={days} allHistory={allHistory} />

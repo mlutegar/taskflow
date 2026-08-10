@@ -13,9 +13,13 @@
 
 import { api } from "./apiClient";
 
+const bc = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("taskflow.sync") : null;
+
 const LS_KEY  = "taskflow.syncQueue";
 const MAX_AGE = 24 * 60 * 60 * 1000; // 24 horas em ms
 const MAX_LEN = 200;
+const LOCK_KEY = "taskflow.syncQueue.flushLock";
+const LOCK_TTL = 10_000;
 
 function now() { return Date.now(); }
 
@@ -47,6 +51,7 @@ export function enqueue(method, path, body) {
   const items = load();
   items.push({ method, path, body, ts: now() });
   save(items);
+  try { bc?.postMessage("enqueued"); } catch {}
 }
 
 /** Retorna o número de itens pendentes na fila. */
@@ -54,31 +59,38 @@ export function queueSize() {
   return load().length;
 }
 
-let _flushing = false;
+function acquireLock() {
+  try {
+    const ts = Number(localStorage.getItem(LOCK_KEY) || "0");
+    const elapsed = performance.now() - ts;
+    if (elapsed < LOCK_TTL && ts > 0) return false;
+    localStorage.setItem(LOCK_KEY, String(performance.now()));
+    return true;
+  } catch { return true; }
+}
+
+function releaseLock() {
+  try { localStorage.removeItem(LOCK_KEY); } catch {}
+}
 
 /**
  * Tenta reenviar todos os itens da fila.
  * Chamado automaticamente ao voltar online.
  */
 export async function flushQueue() {
-  if (_flushing) return;
-  _flushing = true;
-
+  if (!acquireLock()) return;
   const items = load();
-  if (!items.length) { _flushing = false; return; }
-
+  if (!items.length) { releaseLock(); return; }
   const failed = [];
   for (const item of items) {
     try {
       await api[item.method.toLowerCase()](item.path, item.body);
     } catch {
-      // Se ainda falhar, mantém na fila
       failed.push(item);
     }
   }
-
   save(failed);
-  _flushing = false;
+  releaseLock();
 }
 
 // Drena a fila quando o browser volta a ficar online
@@ -87,6 +99,7 @@ if (typeof window !== "undefined") {
     // Pequeno delay para garantir que a conexão está estável
     setTimeout(flushQueue, 1_500);
   });
+  if (bc) { bc.onmessage = () => {}; }
 }
 
 /**

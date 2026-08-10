@@ -1,5 +1,6 @@
-// Log local de conclusões por modo (para "mais usados na semana").
-// Guarda { modeId, date: "YYYY-MM-DD" } e retém ~90 dias. Por dispositivo.
+// Log de conclusões por modo (para "mais usados na semana").
+// Guarda { modeId, date: "YYYY-MM-DD" } e retém ~90 dias.
+// Padrão offline-first: localStorage + sync backend (fire-and-forget).
 
 import { storageGet, storageSet } from "./storage";
 
@@ -7,7 +8,8 @@ const LS_KEY = "modeLog";
 const RETAIN_DAYS = 90;
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 }
 
 function read() {
@@ -25,10 +27,16 @@ export function logCompletion(modeId) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - RETAIN_DAYS);
   const cutoffIso = cutoff.toISOString().slice(0, 10);
+  const date = todayIso();
 
   const list = read().filter((e) => e.date >= cutoffIso);
-  list.push({ modeId, date: todayIso() });
+  list.push({ modeId, date });
   write(list);
+
+  // Sync com backend (fire-and-forget com retry offline)
+  import("./syncQueue").then(({ withOfflineFallback }) => {
+    withOfflineFallback("POST", "/mode-log", { modeId, date });
+  });
 }
 
 /**
@@ -47,4 +55,37 @@ export function usageStats(days = 7) {
   return Object.entries(counts)
     .map(([modeId, count]) => ({ modeId, count }))
     .sort((a, b) => b.count - a.count);
+}
+
+/** Retorna todos os registros salvos (cronológico decrescente). */
+export function getAllLogs() {
+  return [...read()].sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+/**
+ * Carrega registros do backend e mescla com localStorage.
+ * Deduplicação por modeId + date.
+ * Deve ser chamado no boot do app após login.
+ */
+export async function loadRemoteModeLog() {
+  try {
+    const { fetchModeLogs } = await import("../api/modeLog");
+    const remote = await fetchModeLogs();
+    if (!remote || !remote.length) return;
+
+    const local = read();
+    const seen = new Set(local.map((e) => `${e.modeId}|${e.date}`));
+    const fresh = remote.filter((e) => !seen.has(`${e.modeId}|${e.date}`));
+    if (!fresh.length) return;
+
+    // Mantém retenção de 90 dias
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - RETAIN_DAYS);
+    const cutoffIso = cutoff.toISOString().slice(0, 10);
+
+    const merged = [...local, ...fresh].filter((e) => e.date >= cutoffIso);
+    write(merged);
+  } catch {
+    // Falha silenciosa — app funciona com dados locais
+  }
 }

@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useConfirm } from "./ConfirmDialog";
 import ModeSession from "./ModeSession";
+import ModeComboSession from "./ModeComboSession";
 import ModalOverlay from "./shared/ModalOverlay";
 import styles from "./ModesPanel.module.css";
 import dfStyles from "./daily-focus/DailyFocus.module.css";
 import { modeStatsApi } from "../api/modeStats";
-import { getPinned, metaFor } from "../lib/splitePinned";
+import { getPinned, metaFor, pin, unpin } from "../lib/splitePinned";
 import { logCompletion, usageStats } from "../lib/modeLog";
 import { getAllActivations } from "../lib/modeActivations";
 import { getCustomModes, saveCustomMode, deleteCustomMode } from "../lib/customModes";
@@ -19,6 +20,10 @@ import {
   clearPendingReminder,
   getCurrentHourBlock,
 } from "../lib/sessionUsageLog";
+import { getComboStats } from "../lib/modeComboLog";
+
+// ── sessionStorage key para persistir seleção de combo ──────────────────────
+const COMBO_SS_KEY = "modeComboSelected";
 
 const MODES_INLINE_REMOVED = [
   {
@@ -690,6 +695,28 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const [expanded, setExpanded] = useState(null);
   const [activeSession, setActiveSession] = useState(null); // objeto completo do modo
   const [showCreate, setShowCreate] = useState(false);
+  // Combo de modos: array com até 2 ids selecionados; activeCombo = { modeA, modeB }
+  // Persiste no sessionStorage por ~10 min para sobreviver troca de tabs
+  const [comboSelected, setComboSelectedRaw] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(COMBO_SS_KEY);
+      if (!raw) return [];
+      const { ids, ts } = JSON.parse(raw);
+      if (Date.now() - ts < 10 * 60 * 1000) return ids;
+    } catch {}
+    return [];
+  });
+  const setComboSelected = useCallback((updater) => {
+    setComboSelectedRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      try { sessionStorage.setItem(COMBO_SS_KEY, JSON.stringify({ ids: next, ts: Date.now() })); } catch {}
+      return next;
+    });
+  }, []);
+
+  const [activeCombo, setActiveCombo] = useState(null);
+  // Estatísticas de combos já realizados
+  const [comboStats, setComboStats] = useState(() => getComboStats());
   const [sortBy, setSortBy] = useState("default"); // "default" | "tasks" | "random" | "smart"
   const [category, setCategory] = useState(""); // "" = todas
   const [pinnedSplite, setPinnedSplite] = useState(() => getPinned());
@@ -700,6 +727,23 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   });
 
   const [customModes, setCustomModes] = useState(() => getCustomModes());
+  // ── Novas features ──────────────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedCategories, setCollapsedCategories] = useState(new Set());
+  const [showAddActivity, setShowAddActivity] = useState(false);
+  const [newActivity, setNewActivity] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [flashingCard, setFlashingCard] = useState(null);
+  const [shuffleAnim, setShuffleAnim] = useState(false);
+  const sessionRef = useRef(null);
+
+  // Atualiza modos customizados quando o backend os hidrata no localStorage (ex: primeiro acesso no celular)
+  useEffect(() => {
+    const handler = () => setCustomModes(getCustomModes());
+    window.addEventListener("customModesUpdated", handler);
+    return () => window.removeEventListener("customModesUpdated", handler);
+  }, []);
+
   const { confirm, ConfirmUI } = useConfirm();
 
   // Registros de uso pós-sessão para insights nos cards
@@ -759,10 +803,48 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
 
   const toggle = (id) => setExpanded((p) => (p === id ? null : id));
 
+  const toggleCombo = (id) => {
+    setComboSelected((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length < 2) return [...prev, id];
+      // Substitui o mais antigo (índice 0) pelo novo
+      return [prev[1], id];
+    });
+  };
+
+  const handleStartCombo = () => {
+    if (comboSelected.length !== 2) return;
+    const modeA = modeById[comboSelected[0]];
+    const modeB = modeById[comboSelected[1]];
+    if (modeA && modeB) setActiveCombo({ modeA, modeB });
+  };
+
   const handleSaveMode = (newMode) => {
     const updated = saveCustomMode(newMode);
     setCustomModes(updated ?? getCustomModes());
     setShowCreate(false);
+  };
+
+  const toggleCategory = (name) => {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  };
+
+  const handleAddActivity = () => {
+    const activity = newActivity.trim();
+    if (!activity) return;
+    const updated = pin(activity);
+    setPinnedSplite([...updated]);
+    setNewActivity("");
+    setShowAddActivity(false);
+  };
+
+  const handleUnpinActivity = (activity) => {
+    const updated = unpin(activity);
+    setPinnedSplite([...updated]);
   };
 
   const handleDeleteMode = async (id) => {
@@ -782,9 +864,18 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
 
   const incompleteCustomModes = customModes.filter((m) => !hasRequiredFields(m));
 
-  const allModes = [...MODES, ...buildSpliteModes(pinnedSplite), ...customModes]
+  // Cards do Splite ordenados por frequência de uso (mais usado primeiro)
+  const spliteCards = buildSpliteModes(pinnedSplite)
+    .sort((a, b) => (activations[b.id] || 0) - (activations[a.id] || 0));
+
+  const allModes = [...MODES.filter((m) => m.id !== "splite"), ...spliteCards, ...customModes]
     .filter(hasRequiredFields);
   const modeById = Object.fromEntries(allModes.map((m) => [m.id, m]));
+
+  // Filtra por busca de texto
+  const displayModes = searchQuery.trim()
+    ? allModes.filter((m) => m.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : allModes;
 
   // Top modos da semana (com metadados conhecidos)
   const topWeekly = weekly
@@ -794,7 +885,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const weeklyMax = topWeekly.reduce((mx, w) => Math.max(mx, w.count), 0);
 
   // Categorias presentes (na ordem canônica, só as que têm modos)
-  const presentCategories = CATEGORY_ORDER.filter((c) => allModes.some((m) => categoryOf(m) === c));
+  const presentCategories = CATEGORY_ORDER.filter((c) => displayModes.some((m) => categoryOf(m) === c));
 
   // ── Scores inteligentes pré-computados (evita recalcular por comparação no sort) ──
   const smartScores = useMemo(() => {
@@ -856,6 +947,8 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const handleSetRandom = () => {
     setRandomSeed((s) => (s || 1) * 1103515245 + 12345); // novo seed = novo embaralhamento
     setSortBy("random");
+    setShuffleAnim(true);
+    setTimeout(() => setShuffleAnim(false), 550);
   };
 
   const applySort = (list) => {
@@ -873,13 +966,47 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   // Quando sort é smart/random → lista plana (sem agrupamento por categoria)
   const flatSortedModes =
     sortBy === "random" || sortBy === "smart"
-      ? applySort(category ? allModes.filter((m) => categoryOf(m) === category) : allModes)
+      ? applySort(category ? displayModes.filter((m) => categoryOf(m) === category) : displayModes)
       : null;
 
   // Sem filtro → agrupa por categoria; com filtro → um único grupo
   const groups = category
-    ? [{ name: category, modes: applySort(allModes.filter((m) => categoryOf(m) === category)) }]
-    : presentCategories.map((c) => ({ name: c, modes: applySort(allModes.filter((m) => categoryOf(m) === c)) }));
+    ? [{ name: category, modes: applySort(displayModes.filter((m) => categoryOf(m) === category)) }]
+    : presentCategories.map((c) => ({ name: c, modes: applySort(displayModes.filter((m) => categoryOf(m) === c)) }));
+
+  // Pré-computa contagem de combos por modo (quantas vezes aparece em qualquer par)
+  const comboCountByMode = useMemo(() => {
+    const map = {};
+    for (const s of comboStats) {
+      map[s.modeIdA] = (map[s.modeIdA] || 0) + s.total;
+      map[s.modeIdB] = (map[s.modeIdB] || 0) + s.total;
+    }
+    return map;
+  }, [comboStats]);
+
+  // Sugestão inteligente de combo: par com maior soma de smartScores ainda não tentado
+  const comboSuggestion = useMemo(() => {
+    if (sortBy !== "smart") return null;
+    const triedPairs = new Set(comboStats.map((s) => `${s.modeIdA}+${s.modeIdB}`));
+    const topModes = allModes
+      .filter((m) => (smartScores[m.id] ?? 0) >= 2)
+      .sort((a, b) => (smartScores[b.id] ?? 0) - (smartScores[a.id] ?? 0))
+      .slice(0, 6);
+    let best = null;
+    let bestScore = -Infinity;
+    for (let i = 0; i < topModes.length; i++) {
+      for (let j = i + 1; j < topModes.length; j++) {
+        const [a, b] = [topModes[i].id, topModes[j].id].sort();
+        const key = `${a}+${b}`;
+        const score = (smartScores[topModes[i].id] ?? 0) + (smartScores[topModes[j].id] ?? 0);
+        if (!triedPairs.has(key) && score > bestScore) {
+          bestScore = score;
+          best = { modeA: topModes[i], modeB: topModes[j] };
+        }
+      }
+    }
+    return best;
+  }, [sortBy, comboStats, allModes, smartScores]);
 
   const renderCard = (mode, index) => {
     const open = expanded === mode.id;
@@ -890,10 +1017,13 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     // Badge "ideal agora" para os top-3 no smart sort
     const score = smartScores[mode.id] ?? 0;
     const showSmartBadge = sortBy === "smart" && score >= 2 && index < 3;
+    const isComboSelected = comboSelected.includes(mode.id);
+    const comboCount = comboCountByMode[mode.id] || 0;
+    const isActiveSession = activeSession?.id === mode.id;
     return (
       <div
         key={mode.id}
-        className={`${styles.card} ${open ? styles.cardOpen : ""} ${mode.isCustom ? styles.cardCustom : ""}`}
+        className={`${styles.card} ${open ? styles.cardOpen : ""} ${mode.isCustom ? styles.cardCustom : ""} ${isComboSelected ? styles.cardComboSelected : ""} ${isActiveSession ? styles.cardActive : ""}`}
         style={{ "--mode-color": mode.color, "--mode-bg": mode.colorBg }}
       >
         <div className={styles.cardHeader}>
@@ -902,6 +1032,9 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
             <div className={styles.cardMeta}>
               <div className={styles.cardNameRow}>
                 <span className={styles.cardName}>{mode.name}</span>
+                {isActiveSession && (
+                  <span className={styles.cardActiveIndicator}>● Em sessão</span>
+                )}
                 {showSmartBadge && (
                   <span className={styles.smartBadge} title={`Pontuação smart: ${score}`}>
                     ✨ ideal agora
@@ -915,6 +1048,15 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
                   <span className={styles.statBadge} style={{ opacity: 0.75 }} title="Ativações">
                     ▶ {activationCount}
                   </span>
+                )}
+                {comboCount > 0 && (
+                  <span className={styles.statBadge} style={{ background: "rgba(124,110,245,0.12)", color: "var(--accent)", border: "1px solid rgba(124,110,245,0.25)" }} title={`${comboCount} sessão(ões) em combo`}>
+                    🔀 {comboCount}
+                  </span>
+                )}
+                {/* Badge "nunca usado" — só exibe no modo smart para encorajar exploração */}
+                {taskCount === 0 && activationCount === 0 && sortBy === "smart" && (
+                  <span className={styles.neverUsedBadge} title="Você ainda não usou este modo">Nunca usado</span>
                 )}
                 {/* Feature 8: taxa de sucesso baseada nos registros de uso */}
                 {successRate && (
@@ -960,18 +1102,50 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
           </button>
 
           <div className={styles.cardActions}>
-            <button
-              className={styles.startBtn}
-              onClick={() => setActiveSession(mode)}
-              title={`Iniciar ${mode.name}`}
-            >
-              ▶ Iniciar
-            </button>
+            {isActiveSession ? (
+              <button
+                className={styles.viewSessionBtn}
+                onClick={() => sessionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                title="Ir para a sessão ativa"
+              >
+                ● Ver sessão ↑
+              </button>
+            ) : (
+              <>
+                <button
+                  className={`${styles.comboBtn} ${isComboSelected ? styles.comboBtnActive : ""}`}
+                  onClick={() => toggleCombo(mode.id)}
+                  title={isComboSelected ? "Remover do combo" : "Adicionar ao combo"}
+                >
+                  {isComboSelected ? "✓" : "+"}
+                </button>
+                <button
+                  className={`${styles.startBtn} ${flashingCard === mode.id ? styles.startBtnFlash : ""}`}
+                  onClick={() => {
+                    setFlashingCard(mode.id);
+                    setTimeout(() => setFlashingCard(null), 450);
+                    setTimeout(() => setActiveSession(mode), 150);
+                  }}
+                  title={`Iniciar ${mode.name}`}
+                >
+                  ▶ Iniciar
+                </button>
+              </>
+            )}
             {mode.isCustom && (
               <button
                 className={styles.deleteBtn}
                 onClick={() => handleDeleteMode(mode.id)}
                 title="Excluir modo"
+              >
+                ×
+              </button>
+            )}
+            {mode.id.startsWith("splite_") && (
+              <button
+                className={styles.deleteBtn}
+                onClick={() => handleUnpinActivity(mode.preset?.activity)}
+                title="Remover atividade"
               >
                 ×
               </button>
@@ -1107,12 +1281,12 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
       </div>
 
       {/* Mais usados na semana */}
-      {topWeekly.length > 0 && (
-        <div className={styles.weeklyPanel}>
-          <div className={styles.weeklyHeader}>
-            <span className={styles.weeklyTitle}>⚡ Mais usados na semana</span>
-            <span className={styles.weeklyNote}>últimos 7 dias · por dispositivo</span>
-          </div>
+      <div className={styles.weeklyPanel}>
+        <div className={styles.weeklyHeader}>
+          <span className={styles.weeklyTitle}>⚡ Mais usados na semana</span>
+          <span className={styles.weeklyNote}>últimos 7 dias · por dispositivo</span>
+        </div>
+        {topWeekly.length > 0 ? (
           <div className={styles.weeklyList}>
             {topWeekly.map((w) => (
               <div key={w.modeId} className={styles.weeklyRow}>
@@ -1128,57 +1302,127 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
               </div>
             ))}
           </div>
+        ) : (
+          <div className={styles.weeklyEmpty}>
+            <span className={styles.weeklyEmptyIcon}>📊</span>
+            Use 3+ modos essa semana para ver seu padrão aqui.
+          </div>
+        )}
+      </div>
+
+      {/* Painel: combos já testados */}
+      {comboStats.length > 0 && (
+        <div className={styles.weeklyPanel}>
+          <div className={styles.weeklyHeader}>
+            <span className={styles.weeklyTitle}>🔀 Combos testados</span>
+            <span className={styles.weeklyNote}>por taxa de sucesso</span>
+          </div>
+          <div className={styles.weeklyList}>
+            {comboStats.slice(0, 5).map((s) => {
+              const mA = modeById[s.modeIdA];
+              const mB = modeById[s.modeIdB];
+              if (!mA || !mB) return null;
+              return (
+                <div key={s.key} className={styles.weeklyRow}>
+                  <span className={styles.weeklyEmoji}>{mA.emoji}</span>
+                  <span className={styles.weeklyName} title={`${mA.name} + ${mB.name}`}>
+                    {mA.name} + {mB.name}
+                  </span>
+                  <div className={styles.weeklyBarTrack}>
+                    <div
+                      className={styles.weeklyBarFill}
+                      style={{
+                        width: `${s.successRate}%`,
+                        background: s.successRate >= 70 ? "var(--success)" : s.successRate >= 40 ? "var(--accent)" : "#e05252",
+                      }}
+                    />
+                  </div>
+                  <span className={styles.weeklyCount}>{s.successRate}%</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Filtro por categoria */}
-      <div className={styles.sortBar}>
-        <span className={styles.sortLabel}>Categoria:</span>
+      {/* Barra de busca + toggle filtros */}
+      <div className={styles.searchRow}>
+        <div className={styles.searchBar} style={{ flex: 1 }}>
+          <span className={styles.searchIcon}>🔍</span>
+          <input
+            type="text"
+            placeholder="Buscar modos..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={styles.searchInput}
+          />
+          {searchQuery && (
+            <button className={styles.searchClear} onClick={() => setSearchQuery("")}>×</button>
+          )}
+        </div>
         <button
-          className={`${styles.sortBtn} ${category === "" ? styles.sortBtnActive : ""}`}
-          onClick={() => setCategory("")}
+          className={`${styles.filterToggleBtn} ${(showFilters || category !== "" || sortBy !== "default") ? styles.filterToggleBtnActive : ""}`}
+          onClick={() => setShowFilters((v) => !v)}
+          title="Filtrar e ordenar"
         >
-          Todas
+          {(category !== "" || sortBy !== "default") && <span className={styles.filterDot} />}
+          Filtrar {showFilters ? "▲" : "▼"}
         </button>
-        {presentCategories.map((c) => (
-          <button
-            key={c}
-            className={`${styles.sortBtn} ${category === c ? styles.sortBtnActive : ""}`}
-            onClick={() => setCategory(c)}
-          >
-            {c}
-          </button>
-        ))}
       </div>
 
-      {/* Ordenação */}
-      <div className={styles.sortBar}>
-        <span className={styles.sortLabel}>Ordenar:</span>
-        <button
-          className={`${styles.sortBtn} ${sortBy === "default" ? styles.sortBtnActive : ""}`}
-          onClick={() => setSortBy("default")}
-        >
-          Padrão
-        </button>
-        <button
-          className={`${styles.sortBtn} ${sortBy === "tasks" ? styles.sortBtnActive : ""}`}
-          onClick={() => setSortBy("tasks")}
-        >
-          ⚡ Mais usados
-        </button>
-        <button
-          className={`${styles.sortBtn} ${sortBy === "random" ? styles.sortBtnActive : ""}`}
-          onClick={handleSetRandom}
-        >
-          🎲 Aleatório
-        </button>
-        <button
-          className={`${styles.sortBtn} ${sortBy === "smart" ? styles.sortBtnActive : ""}`}
-          onClick={() => setSortBy("smart")}
-        >
-          ✨ Para mim agora
-        </button>
-      </div>
+      {/* Painel de filtros colapsável */}
+      {showFilters && (
+        <div className={styles.filterPanel}>
+          {/* Filtro por categoria */}
+          <div className={styles.sortBar}>
+            <span className={styles.sortLabel}>Categoria:</span>
+            <button
+              className={`${styles.sortBtn} ${category === "" ? styles.sortBtnActive : ""}`}
+              onClick={() => setCategory("")}
+            >
+              Todas
+            </button>
+            {presentCategories.map((c) => (
+              <button
+                key={c}
+                className={`${styles.sortBtn} ${category === c ? styles.sortBtnActive : ""}`}
+                onClick={() => setCategory(c)}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+
+          {/* Ordenação */}
+          <div className={styles.sortBar}>
+            <span className={styles.sortLabelOrder}>↕ Ordem:</span>
+            <button
+              className={`${styles.sortBtnOrder} ${sortBy === "default" ? styles.sortBtnOrderActive : ""}`}
+              onClick={() => setSortBy("default")}
+            >
+              Padrão
+            </button>
+            <button
+              className={`${styles.sortBtnOrder} ${sortBy === "tasks" ? styles.sortBtnOrderActive : ""}`}
+              onClick={() => setSortBy("tasks")}
+            >
+              ⚡ Mais usados
+            </button>
+            <button
+              className={`${styles.sortBtnOrder} ${sortBy === "random" ? styles.sortBtnOrderActive : ""}`}
+              onClick={handleSetRandom}
+            >
+              <span className={shuffleAnim ? styles.shuffleSpin : ""}>🎲</span> Aleatório
+            </button>
+            <button
+              className={`${styles.sortBtnOrder} ${sortBy === "smart" ? styles.sortBtnOrderActive : ""}`}
+              onClick={() => setSortBy("smart")}
+            >
+              ✨ Para mim agora
+            </button>
+          </div>
+        </div>
+      )}
 
       {sortBy === "smart" && (
         <p className={styles.smartSortHint}>
@@ -1186,29 +1430,170 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         </p>
       )}
 
+      {/* Sugestão automática de combo no modo smart */}
+      {comboSuggestion && (
+        <div className={styles.comboSuggestion}>
+          <span className={styles.comboSuggestionIcon}>💡</span>
+          <span className={styles.comboSuggestionText}>
+            Combo sugerido:{" "}
+            <strong>{comboSuggestion.modeA.emoji} {comboSuggestion.modeA.name}</strong>
+            {" + "}
+            <strong>{comboSuggestion.modeB.emoji} {comboSuggestion.modeB.name}</strong>
+            {" "}— ambos têm boa pontuação agora e você ainda não testou juntos.
+          </span>
+          <button
+            className={styles.comboSuggestionBtn}
+            onClick={() => {
+              setComboSelected([comboSuggestion.modeA.id, comboSuggestion.modeB.id]);
+              setActiveCombo({ modeA: comboSuggestion.modeA, modeB: comboSuggestion.modeB });
+            }}
+          >
+            Testar →
+          </button>
+        </div>
+      )}
+
       {flatSortedModes ? (
         <div className={styles.grid}>
           {flatSortedModes.map((mode, i) => renderCard(mode, i))}
         </div>
       ) : (
-        groups.map((group) => (
-          <div key={group.name} className={styles.categoryGroup}>
-            <div className={styles.categoryHeader}>
-              <span className={styles.categoryTitle}>{group.name}</span>
-              <span className={styles.categoryCount}>{group.modes.length}</span>
+        groups.map((group) => {
+          const collapsed = collapsedCategories.has(group.name);
+          return (
+            <div key={group.name} className={styles.categoryGroup}>
+              <div className={styles.categoryHeader}>
+                <button
+                  className={styles.categoryToggleBtn}
+                  onClick={() => toggleCategory(group.name)}
+                  title={collapsed ? "Expandir" : "Recolher"}
+                >
+                  <span className={`${styles.categoryChevron} ${collapsed ? "" : styles.categoryChevronOpen}`}>›</span>
+                  <span className={styles.categoryTitle}>{group.name}</span>
+                  <span className={styles.categoryCount}>{group.modes.length}</span>
+                </button>
+                {group.name === "Ciclos" && (
+                  <button
+                    className={styles.addActivityBtn}
+                    onClick={() => setShowAddActivity((v) => !v)}
+                    title="Adicionar atividade ao Splite Mode"
+                  >
+                    + Atividade
+                  </button>
+                )}
+              </div>
+
+              {group.name === "Ciclos" && showAddActivity && (
+                <div className={styles.addActivityRow}>
+                  <input
+                    type="text"
+                    className={styles.addActivityInput}
+                    placeholder="Nome da atividade (ex: Tocar violão)"
+                    value={newActivity}
+                    onChange={(e) => setNewActivity(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAddActivity()}
+                    autoFocus
+                  />
+                  <button className={styles.addActivityConfirm} onClick={handleAddActivity}>
+                    Adicionar
+                  </button>
+                  <button className={styles.addActivityCancel} onClick={() => { setShowAddActivity(false); setNewActivity(""); }}>
+                    ×
+                  </button>
+                </div>
+              )}
+
+              {!collapsed && (
+                <>
+                  {group.modes.length === 0 && group.name === "Ciclos" ? (
+                    <div className={styles.emptyActivities}>
+                      <span className={styles.emptyActivitiesIcon}>🔄</span>
+                      <div style={{ flex: 1 }}>
+                        <span className={styles.emptyActivitiesText}>Adicione atividades para criar ciclos alternados.</span>
+                        <div className={styles.activitySuggestions}>
+                          {["🎸 Tocar violão", "🧘 Meditar", "🏃 Caminhar", "📖 Ler", "✏️ Esticar"].map((s) => (
+                            <button
+                              key={s}
+                              className={styles.activitySuggestionChip}
+                              onClick={() => {
+                                setNewActivity(s.replace(/^[^\s]+\s/, ""));
+                                setShowAddActivity(true);
+                              }}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button className={styles.emptyActivitiesBtn} onClick={() => setShowAddActivity(true)}>
+                        + Personalizar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={styles.grid}>
+                      {group.modes.map((mode, i) => renderCard(mode, i))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-            <div className={styles.grid}>
-              {group.modes.map((mode, i) => renderCard(mode, i))}
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
 
       {showCreate && (
         <CreateModeModal onSave={handleSaveMode} onClose={() => setShowCreate(false)} />
       )}
 
+      {/* Barra flutuante de combo */}
+      {comboSelected.length > 0 && !activeCombo && (
+        <div className={`${styles.comboBar} ${comboSelected.length === 1 ? styles.comboBarPending : ""}`}>
+          {comboSelected.length === 1 ? (
+            <>
+              <span className={styles.comboBarLabel}>
+                {modeById[comboSelected[0]]?.emoji} {modeById[comboSelected[0]]?.name}
+              </span>
+              <span className={styles.comboBarHint}>+ escolha mais 1 modo</span>
+              <button className={styles.comboBarClear} onClick={() => setComboSelected([])}>×</button>
+            </>
+          ) : (() => {
+            const mA = modeById[comboSelected[0]];
+            const mB = modeById[comboSelected[1]];
+            const typeMismatch = mA?.type && mB?.type && mA.type !== mB.type;
+            return (
+              <>
+                <span className={styles.comboBarLabel}>
+                  {mA?.emoji} {mA?.name}{" + "}{mB?.emoji} {mB?.name}
+                </span>
+                {typeMismatch && (
+                  <span className={styles.comboBarTypeMismatch} title={`${mA.name} é "${mA.type}" · ${mB.name} é "${mB.type}"`}>
+                    ⚠️ tipos diferentes
+                  </span>
+                )}
+                <button className={styles.comboBarStart} onClick={handleStartCombo}>
+                  🔀 Testar juntos
+                </button>
+                <button className={styles.comboBarClear} onClick={() => setComboSelected([])}>×</button>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {activeCombo && (
+        <ModeComboSession
+          modeA={activeCombo.modeA}
+          modeB={activeCombo.modeB}
+          onClose={() => {
+            setActiveCombo(null);
+            setComboSelected([]);
+            setComboStats(getComboStats());
+          }}
+        />
+      )}
+
       {activeSession && (
+        <div ref={sessionRef}>
         <ModeSession
           modeId={activeSession.id}
           mode={activeSession}
@@ -1232,6 +1617,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
             refreshInsights();
           }}
         />
+        </div>
       )}
 
       {ConfirmUI}
