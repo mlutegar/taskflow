@@ -155,10 +155,14 @@ export default function DailyFocusPage() {
   const maxLevel = getMaxLevel();
   const dayLevel = getDayLevel();
 
-  // All modes (built-in + custom)
-  const ALL_MODES = useMemo(() => {
-    return [...MODES, ...getCustomModes()];
+  // All modes (built-in + custom) — reativo ao evento customModesUpdated
+  const [customModes, setCustomModes] = useState(() => getCustomModes());
+  useEffect(() => {
+    const handler = () => setCustomModes(getCustomModes());
+    window.addEventListener("customModesUpdated", handler);
+    return () => window.removeEventListener("customModesUpdated", handler);
   }, []);
+  const ALL_MODES = useMemo(() => [...MODES, ...customModes], [customModes]);
 
   // Streak e modo sugerido (calculados uma vez ao montar)
   const streak = getStreak();
@@ -745,7 +749,7 @@ export default function DailyFocusPage() {
     const comboIds = (estado?.modeIds?.length > 0) ? estado.modeIds : (modeId ? [modeId] : []);
 
     // Separa combo em "durante" e "entre" com base no type do modo
-    const allModesMap = Object.fromEntries([...MODES, ...JSON.parse(localStorage.getItem("customModes") || "[]")].map((m) => [m.id, m]));
+    const allModesMap = Object.fromEntries(ALL_MODES.map((m) => [m.id, m]));
     const duranteIds = comboIds.filter((id) => (allModesMap[id]?.type ?? "durante") === "durante");
     const entreIds   = comboIds.filter((id) => (allModesMap[id]?.type ?? "durante") === "entre");
 
@@ -1037,6 +1041,7 @@ export default function DailyFocusPage() {
                   onMoveDown={() => handleTaskMoveDown(i)}
                   canMoveUp={i > 0}
                   canMoveDown={i < tasks.length - 1}
+                  allModes={ALL_MODES}
                   usedModes={usedModes}
                   suggestedModeId={checkinModeId ?? suggestedModeId}
                   hideDuration={tabMode}
@@ -1761,6 +1766,7 @@ export default function DailyFocusPage() {
               ? (tasks[pickerForTask]?.helperModeIds ?? [])
               : activeHelperModeIds
           }
+          customModes={customModes}
           usedModes={usedModes}
           suggestedModeId={suggestedModeId}
           filterType="durante"
@@ -1772,6 +1778,7 @@ export default function DailyFocusPage() {
       {showInterPicker && (
         <HelperPickerModal
           currentIds={currentTask.interModeIds ?? []}
+          customModes={customModes}
           usedModes={usedModes}
           filterType="entre"
           onSelect={handleSelectInterHelper}

@@ -103,23 +103,25 @@ if (typeof window !== "undefined") {
 }
 
 /**
- * Wrapper: tenta executar `fn` imediatamente; se falhar por rede,
- * enfileira para retry. Retorna Promise que sempre resolve (nunca rejeita).
+ * Wrapper: tenta executar a requisição imediatamente; se falhar por rede,
+ * enfileira para retry. Sempre resolve (nunca rejeita).
  *
  * @param {"POST"|"PUT"|"PATCH"|"DELETE"} method
  * @param {string} path
  * @param {any}    body
+ * @returns {Promise<{ok: boolean, queued: boolean, result?: any}>}
  */
 export async function withOfflineFallback(method, path, body) {
   try {
-    return await api[method.toLowerCase()](path, body);
+    const result = await api[method.toLowerCase()](path, body);
+    return { ok: true, queued: false, result };
   } catch (err) {
     // Só enfileira erros de rede/timeout (não erros 4xx/5xx da API)
     const isNetworkErr = !err.message?.startsWith("Erro ") && !(err.message?.includes("401"));
     if (isNetworkErr) {
       enqueue(method, path, body);
+      return { ok: false, queued: true };
     }
-    // Não propaga — fire-and-forget com fallback
-    return null;
+    return { ok: false, queued: false };
   }
 }

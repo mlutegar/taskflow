@@ -18,6 +18,7 @@ import ExercicioHelper, { DEFAULT_STATE as exercicioDefault } from "./ExercicioH
 import PomodoroHelper, { DEFAULT_STATE as pomodoroDefault } from "./PomodoroHelper";
 import DiarioFaladoHelper, { DEFAULT_STATE as diarioFaladoDefault } from "./DiarioFaladoHelper";
 import CantarHelper, { DEFAULT_STATE as cantarDefault } from "./CantarHelper";
+import UmaCoisaHelper, { DEFAULT_STATE as umaCoisaDefault } from "./UmaCoisaHelper";
 
 /**
  * Registry of all available helper panels for Daily Focus.
@@ -53,6 +54,8 @@ export const HELPER_REGISTRY = {
   pomodoro: { Component: PomodoroHelper, defaultState: pomodoroDefault },
   diario_falado: { Component: DiarioFaladoHelper, defaultState: diarioFaladoDefault },
   cantar: { Component: CantarHelper, defaultState: cantarDefault },
+  uma_coisa_5min:  { Component: UmaCoisaHelper, defaultState: { ...umaCoisaDefault, variant: "5min",  remaining: 5 * 60 } },
+  uma_coisa_15min: { Component: UmaCoisaHelper, defaultState: { ...umaCoisaDefault, variant: "15min", remaining: 15 * 60 } },
 };
 
 /**

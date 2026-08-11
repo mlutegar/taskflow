@@ -4,8 +4,8 @@ import { MODES, HELPER_GROUPS } from "../../../data/modes";
 import ModalOverlay from "../../shared/ModalOverlay";
 import styles from "../DailyFocus.module.css";
 
-function getGroupsWithCustom(usageMap = {}, filterType = null) {
-  const customModes = JSON.parse(localStorage.getItem("customModes") || "[]")
+function getGroupsWithCustom(usageMap = {}, filterType = null, customModes = []) {
+  const filteredCustom_input = customModes
     .filter((m) => m.prerequisite?.trim() && m.whyItWorks?.trim() && m.whenToUse?.trim());
   const sortByUsage = (modes) =>
     [...modes].sort((a, b) => (usageMap[b.id] || 0) - (usageMap[a.id] || 0));
@@ -26,7 +26,7 @@ function getGroupsWithCustom(usageMap = {}, filterType = null) {
 
   const filteredCustom = filterType && filterType !== "durante"
     ? []
-    : sortByUsage(customModes);
+    : sortByUsage(filteredCustom_input);
 
   return [
     ...groups,
@@ -44,7 +44,7 @@ const FILTER_DESCRIPTIONS = {
   entre: "Feito na pausa ou ao passar de uma tarefa pra outra — alongar, meditar, beber água, etc.",
 };
 
-function HelperPickerModal({ current, currentIds, usedModes = {}, suggestedModeId = null, filterType = null, onSelect, onClose, onRemove }) {
+function HelperPickerModal({ current, currentIds, customModes = [], usedModes = {}, suggestedModeId = null, filterType = null, onSelect, onClose, onRemove }) {
   // Suporta tanto o formato antigo (current: string) quanto o novo (currentIds: string[])
   const selectedIds = currentIds ?? (current ? [current] : []);
   const [preview, setPreview] = useState(null);
@@ -53,7 +53,7 @@ function HelperPickerModal({ current, currentIds, usedModes = {}, suggestedModeI
   const [animDir, setAnimDir] = useState("forward");
 
   const usageMap = Object.fromEntries(usageStats(30).map(({ modeId, count }) => [modeId, count]));
-  const allGroups = getGroupsWithCustom(usageMap, filterType);
+  const allGroups = getGroupsWithCustom(usageMap, filterType, customModes);
 
   // Filtro de busca aplicado sobre todos os grupos
   const groups = search.trim()

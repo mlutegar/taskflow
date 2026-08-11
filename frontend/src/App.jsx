@@ -14,6 +14,7 @@ import AddRoutineForm from "./components/AddRoutineForm";
 import ModesPanel from "./components/ModesPanel";
 import TodayPanel from "./components/TodayPanel";
 import styles from "./App.module.css";
+import { ToastProvider } from './components/shared/Toast';
 
 const TASK_FILTERS = [
   { label: "Todas", value: "" },
@@ -166,6 +167,7 @@ export default function App() {
   const totalRoutineCnt = routines.length;
 
   return (
+    <ToastProvider>
     <div
       className={styles.app}
       onTouchStart={handleTouchStart}
@@ -449,6 +451,7 @@ export default function App() {
 
       {ConfirmUI}
     </div>
+    </ToastProvider>
   );
 }
 

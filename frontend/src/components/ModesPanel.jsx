@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useConfirm } from "./ConfirmDialog";
+import { useToast } from './shared/Toast';
 import ModeSession from "./ModeSession";
 import ModeComboSession from "./ModeComboSession";
 import ModalOverlay from "./shared/ModalOverlay";
@@ -12,6 +13,7 @@ import { getAllActivations } from "../lib/modeActivations";
 import { getCustomModes, saveCustomMode, deleteCustomMode } from "../lib/customModes";
 import { useDialog } from "../lib/useDialog";
 import { MODES, CATEGORY_BY_ID, CATEGORY_ORDER } from "../data/modes";
+import { PRESET_COMBOS } from '../data/presetCombos';
 import {
   getUsageLogs,
   getBestHourForMode,
@@ -717,8 +719,8 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const [activeCombo, setActiveCombo] = useState(null);
   // Estatísticas de combos já realizados
   const [comboStats, setComboStats] = useState(() => getComboStats());
-  const [sortBy, setSortBy] = useState("default"); // "default" | "tasks" | "random" | "smart"
-  const [category, setCategory] = useState(""); // "" = todas
+  const [sortBy, setSortBy] = useState(() => localStorage.getItem('taskflow.modesSortBy') || 'default'); // "default" | "tasks" | "random" | "smart"
+  const [category, setCategory] = useState(() => localStorage.getItem('taskflow.modesCategory') || ''); // "" = todas
   const [pinnedSplite, setPinnedSplite] = useState(() => getPinned());
   const [weekly, setWeekly] = useState(() => usageStats(7));
   const [activations, setActivations] = useState(() => {
@@ -737,6 +739,46 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const [shuffleAnim, setShuffleAnim] = useState(false);
   const sessionRef = useRef(null);
 
+  // ── Sequência aleatória ─────────────────────────────────────────────────────
+  // #4 Progresso: IDs já iniciados na sequência atual
+  const [startedInSequence, setStartedInSequence] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('taskflow.sequenceStarted') || '[]')); }
+    catch { return new Set(); }
+  });
+  // #5 Ordens salvas (máx 3): [{id, name, seed}]
+  const [savedShuffles, setSavedShuffles] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('taskflow.savedShuffles') || '[]'); }
+    catch { return []; }
+  });
+  const [showSaveShuffleInput, setShowSaveShuffleInput] = useState(false);
+  const [shuffleSaveName, setShuffleSaveName] = useState('');
+  // #7 Sequência guiada
+  const [guidedMode, setGuidedMode] = useState(() => localStorage.getItem('taskflow.guidedMode') === 'true');
+  // #8 Smart shuffle (peso inversamente proporcional ao uso)
+  const [smartShuffle, setSmartShuffle] = useState(() => localStorage.getItem('taskflow.smartShuffle') === 'true');
+
+  // ── Favorites ───────────────────────────────────────────────────────────────
+  const [favoriteModes, setFavoriteModes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('taskflow.favoriteModes') || '[]'); }
+    catch { return []; }
+  });
+  const toggleFavorite = (id) => {
+    setFavoriteModes(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      localStorage.setItem('taskflow.favoriteModes', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // ── Auto-detox banner ────────────────────────────────────────────────────────
+  const [detoxDismissed, setDetoxDismissed] = useState(false);
+
+  // ── Preset Combos collapse ───────────────────────────────────────────────────
+  const [combosSectionCollapsed, setCombosSectionCollapsed] = useState(false);
+
+  // ── Compact view ─────────────────────────────────────────────────────────────
+  const [compactView, setCompactView] = useState(false);
+
   // Atualiza modos customizados quando o backend os hidrata no localStorage (ex: primeiro acesso no celular)
   useEffect(() => {
     const handler = () => setCustomModes(getCustomModes());
@@ -745,6 +787,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   }, []);
 
   const { confirm, ConfirmUI } = useConfirm();
+  const { showToast } = useToast();
 
   // Registros de uso pós-sessão para insights nos cards
   const [usageLogs, setUsageLogs] = useState(() => getUsageLogs());
@@ -777,6 +820,15 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   }, []);
 
   const handleModeTaskComplete = async (modeId) => {
+    // #4/#7: marcar como concluído na sequência aleatória
+    if (sortBy === "random") {
+      setStartedInSequence((prev) => {
+        const next = new Set(prev);
+        next.add(modeId);
+        localStorage.setItem('taskflow.sequenceStarted', JSON.stringify([...next]));
+        return next;
+      });
+    }
     // Log local para o painel "mais usados na semana"
     logCompletion(modeId);
     setWeekly(usageStats(7));
@@ -795,9 +847,11 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         localStorage.setItem("modeStats", JSON.stringify(updated));
         return updated;
       });
+      showToast('Progresso salvo!', 'success');
     } catch (e) {
       // Falhou no banco — localStorage já tem o valor otimista, ok por ora
       console.warn("Falha ao salvar stat no banco:", e.message);
+      showToast('Falha ao salvar — dados mantidos localmente', 'error');
     }
   };
 
@@ -823,6 +877,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     const updated = saveCustomMode(newMode);
     setCustomModes(updated ?? getCustomModes());
     setShowCreate(false);
+    showToast('Modo criado!', 'success');
   };
 
   const toggleCategory = (name) => {
@@ -857,6 +912,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     if (!ok) return;
     const updated = deleteCustomMode(id);
     setCustomModes(updated ?? getCustomModes());
+    showToast('Modo excluído.', 'info');
   };
 
   const hasRequiredFields = (m) =>
@@ -873,8 +929,9 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const modeById = Object.fromEntries(allModes.map((m) => [m.id, m]));
 
   // Filtra por busca de texto
-  const displayModes = searchQuery.trim()
-    ? allModes.filter((m) => m.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+  const sq = searchQuery.trim().toLowerCase();
+  const displayModes = sq
+    ? allModes.filter(m => m.name.toLowerCase().includes(sq) || (m.tagline || '').toLowerCase().includes(sq))
     : allModes;
 
   // Top modos da semana (com metadados conhecidos)
@@ -929,26 +986,104 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     return scores;
   }, [allModes, usageLogs, modeStats]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Auto-detox suggestion ──────────────────────────────────────────────────
+  const detoxSuggestion = useMemo(() => {
+    if (detoxDismissed) return null;
+    const recent = usageLogs.slice(-10);
+    const platforms = ['youtube', 'tiktok', 'reels', 'twitter', 'reddit', 'whatsapp', 'netflix'];
+    for (const p of platforms) {
+      const count = recent.filter(l => l.modeId && l.modeId.startsWith(p + '_')).length;
+      if (count >= 3) {
+        const detoxId = p + '_detox';
+        if (modeById[detoxId]) return { platform: p, count, detoxId };
+      }
+    }
+    return null;
+  }, [usageLogs, detoxDismissed, modeById]);
+
   // ── Ordem aleatória estável: só reembaralha quando o usuário clica em "Aleatório" ──
-  const [randomSeed, setRandomSeed] = useState(0);
+  const [randomSeed, setRandomSeed] = useState(() => parseInt(localStorage.getItem('taskflow.modesRandomSeed') || '0', 10));
   const randomOrder = useMemo(() => {
-    const ids = allModes.map((m) => m.id);
-    // Fisher-Yates com seed baseado no randomSeed
-    const arr = [...ids];
+    // #6: se há categoria ativa, embaralha apenas os modos dela
+    const pool = category ? allModes.filter((m) => categoryOf(m) === category) : allModes;
+    const ids = pool.map((m) => m.id);
     let rng = randomSeed || 1;
     const next = () => { rng = (rng * 1664525 + 1013904223) & 0xffffffff; return (rng >>> 0) / 0x100000000; };
+
+    if (smartShuffle) {
+      // #8: peso inversamente proporcional ao uso — menos usado = aparece antes
+      const scored = ids.map((id) => {
+        const r = next();
+        const usage = modeStats[id] || 0;
+        return { id, score: r / (usage + 1) };
+      });
+      return scored.sort((a, b) => b.score - a.score).map((s) => s.id);
+    }
+
+    // Fisher-Yates puro com seed
+    const arr = [...ids];
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(next() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
-  }, [allModes, randomSeed]);
+  }, [allModes, randomSeed, smartShuffle, modeStats, category]);
 
   const handleSetRandom = () => {
-    setRandomSeed((s) => (s || 1) * 1103515245 + 12345); // novo seed = novo embaralhamento
+    const newSeed = Math.floor(Math.random() * 0xffffffff) + 1;
+    setRandomSeed(newSeed);
+    localStorage.setItem('taskflow.modesRandomSeed', String(newSeed));
+    localStorage.setItem('taskflow.modesSortBy', 'random');
     setSortBy("random");
+    // #4: limpar progresso da sequência ao reembaralhar
+    setStartedInSequence(new Set());
+    localStorage.removeItem('taskflow.sequenceStarted');
     setShuffleAnim(true);
     setTimeout(() => setShuffleAnim(false), 550);
+  };
+
+  // #5: salvar ordem atual com nome
+  const handleSaveShuffle = () => {
+    const name = shuffleSaveName.trim() || `Ordem ${savedShuffles.length + 1}`;
+    const entry = { id: randomSeed, name, seed: randomSeed };
+    const updated = [...savedShuffles.filter((s) => s.seed !== randomSeed).slice(-2), entry];
+    setSavedShuffles(updated);
+    localStorage.setItem('taskflow.savedShuffles', JSON.stringify(updated));
+    setShuffleSaveName('');
+    setShowSaveShuffleInput(false);
+  };
+
+  // #5: carregar ordem salva
+  const loadSavedShuffle = (shuffle) => {
+    setRandomSeed(shuffle.seed);
+    localStorage.setItem('taskflow.modesRandomSeed', String(shuffle.seed));
+    setSortBy('random');
+    localStorage.setItem('taskflow.modesSortBy', 'random');
+    setStartedInSequence(new Set());
+    localStorage.removeItem('taskflow.sequenceStarted');
+  };
+
+  // #5: excluir ordem salva
+  const deleteSavedShuffle = (id) => {
+    const updated = savedShuffles.filter((s) => s.id !== id);
+    setSavedShuffles(updated);
+    localStorage.setItem('taskflow.savedShuffles', JSON.stringify(updated));
+  };
+
+  // #7: alternar sequência guiada
+  const toggleGuidedMode = () => {
+    setGuidedMode((prev) => {
+      localStorage.setItem('taskflow.guidedMode', String(!prev));
+      return !prev;
+    });
+  };
+
+  // #8: alternar smart shuffle
+  const toggleSmartShuffle = () => {
+    setSmartShuffle((prev) => {
+      localStorage.setItem('taskflow.smartShuffle', String(!prev));
+      return !prev;
+    });
   };
 
   const applySort = (list) => {
@@ -1009,6 +1144,23 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   }, [sortBy, comboStats, allModes, smartScores]);
 
   const renderCard = (mode, index) => {
+    const todayStr = new Intl.DateTimeFormat('en-CA').format(new Date()); // YYYY-MM-DD
+    const usedToday = usageLogs.some(l => l.modeId === mode.id && l.date === todayStr);
+
+    if (compactView) {
+      return (
+        <div key={mode.id} className={styles.compactCard} style={{ borderLeft: '3px solid ' + mode.color }}
+          onClick={() => setActiveSession(mode)}>
+          <span className={styles.compactEmoji}>{mode.emoji}</span>
+          <div className={styles.compactInfo}>
+            <strong>{mode.name}</strong>
+            <span className={styles.compactTagline}>{mode.tagline}</span>
+          </div>
+          {usedToday && <span className={styles.usedTodayBadge}>hoje</span>}
+        </div>
+      );
+    }
+
     const open = expanded === mode.id;
     const taskCount = modeStats[mode.id] || 0;
     const activationCount = activations[mode.id] || 0;
@@ -1020,10 +1172,15 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     const isComboSelected = comboSelected.includes(mode.id);
     const comboCount = comboCountByMode[mode.id] || 0;
     const isActiveSession = activeSession?.id === mode.id;
+    // #4/#7: estado na sequência aleatória
+    const inRandomMode = sortBy === "random";
+    const wasStartedInSeq = inRandomMode && startedInSequence.has(mode.id);
+    const isNextGuided = guidedMode && inRandomMode && !wasStartedInSeq &&
+      (flatSortedModes ? flatSortedModes.slice(0, index).every((m) => startedInSequence.has(m.id)) : false);
     return (
       <div
         key={mode.id}
-        className={`${styles.card} ${open ? styles.cardOpen : ""} ${mode.isCustom ? styles.cardCustom : ""} ${isComboSelected ? styles.cardComboSelected : ""} ${isActiveSession ? styles.cardActive : ""}`}
+        className={`${styles.card} ${open ? styles.cardOpen : ""} ${mode.isCustom ? styles.cardCustom : ""} ${isComboSelected ? styles.cardComboSelected : ""} ${isActiveSession ? styles.cardActive : ""} ${isNextGuided ? styles.guidedNext : ""} ${wasStartedInSeq ? styles.seqDone : ""}`}
         style={{ "--mode-color": mode.color, "--mode-bg": mode.colorBg }}
       >
         <div className={styles.cardHeader}>
@@ -1032,6 +1189,12 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
             <div className={styles.cardMeta}>
               <div className={styles.cardNameRow}>
                 <span className={styles.cardName}>{mode.name}</span>
+                {/* #4: badge de posição na sequência aleatória */}
+                {inRandomMode && (
+                  <span className={`${styles.seqBadge} ${wasStartedInSeq ? styles.seqBadgeDone : ""} ${isNextGuided ? styles.seqBadgeNext : ""}`}>
+                    {wasStartedInSeq ? "✓" : isNextGuided ? `▶ #${index + 1}` : `#${index + 1}`}
+                  </span>
+                )}
                 {isActiveSession && (
                   <span className={styles.cardActiveIndicator}>● Em sessão</span>
                 )}
@@ -1073,7 +1236,10 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
                   </span>
                 )}
               </div>
-              <span className={styles.cardTagline}>{mode.tagline}</span>
+              <div className={styles.cardTaglineRow}>
+                <span className={styles.cardTagline}>{mode.tagline}</span>
+                {usedToday && <span className={styles.usedTodayBadge}>usado hoje</span>}
+              </div>
               {/* Feature 1: recomendação proativa de horário */}
               {bestHour && (
                 <span className={styles.hourRecommendation} title="Baseado no seu histórico de uso">
@@ -1102,6 +1268,13 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
           </button>
 
           <div className={styles.cardActions}>
+            <button
+              className={styles.favBtn}
+              onClick={e => { e.stopPropagation(); toggleFavorite(mode.id); }}
+              title={favoriteModes.includes(mode.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+            >
+              {favoriteModes.includes(mode.id) ? '⭐' : '☆'}
+            </button>
             {isActiveSession ? (
               <button
                 className={styles.viewSessionBtn}
@@ -1124,6 +1297,15 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
                   onClick={() => {
                     setFlashingCard(mode.id);
                     setTimeout(() => setFlashingCard(null), 450);
+                    // #4: registrar início na sequência aleatória
+                    if (sortBy === "random") {
+                      setStartedInSequence((prev) => {
+                        const next = new Set(prev);
+                        next.add(mode.id);
+                        localStorage.setItem('taskflow.sequenceStarted', JSON.stringify([...next]));
+                        return next;
+                      });
+                    }
                     setTimeout(() => setActiveSession(mode), 150);
                   }}
                   title={`Iniciar ${mode.name}`}
@@ -1368,6 +1550,13 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
           {(category !== "" || sortBy !== "default") && <span className={styles.filterDot} />}
           Filtrar {showFilters ? "▲" : "▼"}
         </button>
+        <button
+          className={styles.filterToggleBtn}
+          onClick={() => setCompactView(c => !c)}
+          title={compactView ? 'Grade' : 'Compacto'}
+        >
+          {compactView ? '⊞' : '≡'}
+        </button>
       </div>
 
       {/* Painel de filtros colapsável */}
@@ -1378,7 +1567,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
             <span className={styles.sortLabel}>Categoria:</span>
             <button
               className={`${styles.sortBtn} ${category === "" ? styles.sortBtnActive : ""}`}
-              onClick={() => setCategory("")}
+              onClick={() => { setCategory(""); localStorage.setItem('taskflow.modesCategory', ''); }}
             >
               Todas
             </button>
@@ -1386,7 +1575,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
               <button
                 key={c}
                 className={`${styles.sortBtn} ${category === c ? styles.sortBtnActive : ""}`}
-                onClick={() => setCategory(c)}
+                onClick={() => { setCategory(c); localStorage.setItem('taskflow.modesCategory', c); }}
               >
                 {c}
               </button>
@@ -1398,13 +1587,13 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
             <span className={styles.sortLabelOrder}>↕ Ordem:</span>
             <button
               className={`${styles.sortBtnOrder} ${sortBy === "default" ? styles.sortBtnOrderActive : ""}`}
-              onClick={() => setSortBy("default")}
+              onClick={() => { setSortBy("default"); localStorage.setItem('taskflow.modesSortBy', 'default'); }}
             >
               Padrão
             </button>
             <button
               className={`${styles.sortBtnOrder} ${sortBy === "tasks" ? styles.sortBtnOrderActive : ""}`}
-              onClick={() => setSortBy("tasks")}
+              onClick={() => { setSortBy("tasks"); localStorage.setItem('taskflow.modesSortBy', 'tasks'); }}
             >
               ⚡ Mais usados
             </button>
@@ -1413,10 +1602,12 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
               onClick={handleSetRandom}
             >
               <span className={shuffleAnim ? styles.shuffleSpin : ""}>🎲</span> Aleatório
+              {/* #3: indicador de fixado */}
+              {sortBy === "random" && <span className={styles.randomLockIcon} title="Ordem fixada — persiste ao recarregar">🔒</span>}
             </button>
             <button
               className={`${styles.sortBtnOrder} ${sortBy === "smart" ? styles.sortBtnOrderActive : ""}`}
-              onClick={() => setSortBy("smart")}
+              onClick={() => { setSortBy("smart"); localStorage.setItem('taskflow.modesSortBy', 'smart'); }}
             >
               ✨ Para mim agora
             </button>
@@ -1428,6 +1619,75 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         <p className={styles.smartSortHint}>
           ✨ Ordenado por: horário ideal · taxa de sucesso · tempo parado · histórico
         </p>
+      )}
+
+      {/* ── Painel de ferramentas do modo aleatório ── */}
+      {sortBy === "random" && (
+        <div className={styles.randomToolbar}>
+          {/* #1: Reembaralhar */}
+          <button className={styles.randomToolbarBtn} onClick={handleSetRandom} title="Gerar nova ordem aleatória">
+            <span className={shuffleAnim ? styles.shuffleSpin : ""}>🔀</span> Reembaralhar
+          </button>
+
+          {/* #8: Smart shuffle */}
+          <button
+            className={`${styles.randomToolbarBtn} ${smartShuffle ? styles.randomToolbarBtnActive : ""}`}
+            onClick={toggleSmartShuffle}
+            title={smartShuffle ? "Aleatório inteligente ativo — modos menos usados aparecem primeiro" : "Ativar aleatório inteligente"}
+          >
+            🧠 {smartShuffle ? "Inteligente ativo" : "Inteligente"}
+          </button>
+
+          {/* #7: Sequência guiada */}
+          <button
+            className={`${styles.randomToolbarBtn} ${guidedMode ? styles.randomToolbarBtnActive : ""}`}
+            onClick={toggleGuidedMode}
+            title={guidedMode ? "Sequência guiada ativa — próximo modo destacado" : "Ativar sequência guiada"}
+          >
+            {guidedMode ? "▶ Guiado ativo" : "▶ Sequência guiada"}
+          </button>
+
+          {/* #4: Progresso da sequência */}
+          {startedInSequence.size > 0 && (
+            <span className={styles.seqProgress}>
+              {startedInSequence.size}/{flatSortedModes?.length ?? 0} feitos
+            </span>
+          )}
+
+          {/* #5: Salvar ordem */}
+          {!showSaveShuffleInput ? (
+            <button className={styles.randomToolbarBtn} onClick={() => setShowSaveShuffleInput(true)} title="Salvar esta ordem aleatória">
+              💾 Salvar ordem
+            </button>
+          ) : (
+            <div className={styles.saveShuffleRow}>
+              <input
+                className={styles.saveShuffleInput}
+                placeholder={`Ordem ${savedShuffles.length + 1}`}
+                value={shuffleSaveName}
+                onChange={(e) => setShuffleSaveName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveShuffle(); if (e.key === 'Escape') setShowSaveShuffleInput(false); }}
+                autoFocus
+              />
+              <button className={styles.saveShuffleConfirm} onClick={handleSaveShuffle}>✓</button>
+              <button className={styles.saveShuffleCancel} onClick={() => setShowSaveShuffleInput(false)}>×</button>
+            </div>
+          )}
+
+          {/* #5: Ordens salvas */}
+          {savedShuffles.length > 0 && (
+            <div className={styles.savedShufflesRow}>
+              {savedShuffles.map((s) => (
+                <div key={s.id} className={`${styles.savedShuffleChip} ${s.seed === randomSeed ? styles.savedShuffleChipActive : ""}`}>
+                  <button onClick={() => loadSavedShuffle(s)} title={`Carregar "${s.name}"`}>
+                    {s.name}
+                  </button>
+                  <button className={styles.savedShuffleDelete} onClick={() => deleteSavedShuffle(s.id)} title="Excluir">×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Sugestão automática de combo no modo smart */}
@@ -1450,6 +1710,62 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
           >
             Testar →
           </button>
+        </div>
+      )}
+
+      {/* Auto-detox banner */}
+      {detoxSuggestion && (
+        <div className={styles.detoxBanner}>
+          <span>
+            💡 Você usou <strong>{detoxSuggestion.platform}</strong> {detoxSuggestion.count}x nas últimas sessões.
+            Que tal tentar o <strong>{modeById[detoxSuggestion.detoxId]?.name}</strong>?
+          </span>
+          <button onClick={() => setExpanded(detoxSuggestion.detoxId)} className={styles.detoxBannerBtn}>Ver modo</button>
+          <button onClick={() => setDetoxDismissed(true)} className={styles.detoxBannerClose}>×</button>
+        </div>
+      )}
+
+      {/* Preset Combos */}
+      {!searchQuery && !category && sortBy === 'default' && (
+        <div className={styles.presetCombosSection}>
+          <div className={styles.presetCombosHeader}>
+            <span className={styles.presetCombosTitle}>🔗 Combos Prontos</span>
+            <button className={styles.presetCombosToggle} onClick={() => setCombosSectionCollapsed(c => !c)}>
+              {combosSectionCollapsed ? '▼ mostrar' : '▲ ocultar'}
+            </button>
+          </div>
+          {!combosSectionCollapsed && (
+            <div className={styles.presetCombosGrid}>
+              {PRESET_COMBOS.map(combo => (
+                <button
+                  key={combo.id}
+                  className={styles.presetComboCard}
+                  style={{ borderColor: combo.color, background: combo.colorBg }}
+                  onClick={() => setComboSelected([combo.modeIds[0], combo.modeIds[1]])}
+                  title={combo.description}
+                >
+                  <span className={styles.presetComboEmoji}>{combo.emoji}</span>
+                  <div className={styles.presetComboInfo}>
+                    <strong className={styles.presetComboName}>{combo.name}</strong>
+                    <span className={styles.presetComboModes}>
+                      {modeById[combo.modeIds[0]]?.emoji} + {modeById[combo.modeIds[1]]?.emoji}
+                    </span>
+                  </div>
+                  <span className={styles.presetComboSituation}>{combo.situation}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Favorites section */}
+      {favoriteModes.length > 0 && !searchQuery && !category && (
+        <div className={styles.categorySection}>
+          <h3 className={styles.categoryTitle}>⭐ Favoritos</h3>
+          <div className={styles.grid}>
+            {favoriteModes.map(id => { const m = modeById[id]; return m ? renderCard(m, 0) : null; })}
+          </div>
         </div>
       )}
 

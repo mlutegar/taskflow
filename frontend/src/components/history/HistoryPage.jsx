@@ -5,6 +5,8 @@ import { getUsageLogs } from "../../lib/sessionUsageLog";
 import { getCheckinLog } from "../../lib/checkinLog";
 import { MODES } from "../../data/modes";
 import { api } from "../../lib/apiClient";
+import { mergeLocal } from "../../lib/mergeLocal";
+import { cacheGet, cacheSet } from "../../lib/historyCache";
 import styles from "./HistoryPage.module.css";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -109,8 +111,20 @@ function ModesTab({ logs }) {
       <div className={styles.list}>
         {logs.map((l, i) => (
           <div key={i} className={styles.cardRow}>
-            <span className={styles.cardMode}>{getModeLabel(l.modeId)}</span>
-            <span className={styles.cardDate}>{formatDate(l.date)}</span>
+            <span className={styles.cardMode}>
+              {getModeLabel(l.modeId)}
+              {l._local && (
+                <span
+                  title="Salvo localmente — sincronizará em breve"
+                  style={{ marginLeft: 6, fontSize: 11, opacity: 0.6 }}
+                >
+                  🔄
+                </span>
+              )}
+            </span>
+            <span className={styles.cardDate}>
+              {formatDate(l.date)}{l.hour !== undefined ? ` · ${l.hour}h` : ""}
+            </span>
           </div>
         ))}
       </div>
@@ -145,7 +159,17 @@ function UsageLogsTab({ logs }) {
         {sorted.map((l, i) => (
           <div key={i} className={styles.card}>
             <div className={styles.cardHeader}>
-              <span className={styles.cardMode}>{getModeLabel(l.modeId)}</span>
+              <span className={styles.cardMode}>
+                {getModeLabel(l.modeId)}
+                {l._local && (
+                  <span
+                    title="Salvo localmente — sincronizará em breve"
+                    style={{ marginLeft: 6, fontSize: 11, opacity: 0.6 }}
+                  >
+                    🔄
+                  </span>
+                )}
+              </span>
               <span className={styles.cardDate}>{formatDate(l.date)}{l.hour !== undefined ? ` · ${l.hour}h` : ""}</span>
             </div>
             <div className={styles.cardMeta}>
@@ -222,56 +246,80 @@ export default function HistoryPage() {
   const [remoteCheckins, setRemoteCheckins] = useState(null);
 
   useEffect(() => {
-    // Fetch sessions
-    api.get("/daily-focus/sessions").then(data => {
-      if (Array.isArray(data)) {
-        setRemoteSessions(data.map(r => ({
-          date: r.date,
-          level: r.level,
-          tasks: r.tasks,
-          completedAt: r.completed_at,
-          rushMode: r.rush_mode,
-          tabMode: r.tab_mode,
-          cycleCount: r.cycle_count,
-        })));
-      } else {
-        setRemoteSessions([]);
-      }
-    }).catch(() => setRemoteSessions([]));
+    // Fetch sessions (com cache de 1 min)
+    const cachedSessions = cacheGet("sessions");
+    if (cachedSessions) {
+      setRemoteSessions(cachedSessions);
+    } else {
+      api.get("/daily-focus/sessions").then(data => {
+        const parsed = Array.isArray(data)
+          ? data.map(r => ({
+              date:        r.date,
+              level:       r.level,
+              tasks:       r.tasks,
+              completedAt: r.completed_at,
+              rushMode:    r.rush_mode,
+              tabMode:     r.tab_mode,
+              cycleCount:  r.cycle_count,
+            }))
+          : [];
+        cacheSet("sessions", parsed);
+        setRemoteSessions(parsed);
+      }).catch(() => setRemoteSessions([]));
+    }
 
-    // Fetch mode logs
-    api.get("/mode-log").then(data => {
-      setRemoteModes(Array.isArray(data) ? data : []);
-    }).catch(() => setRemoteModes([]));
+    // Fetch mode logs (com cache)
+    const cachedModes = cacheGet("modes");
+    if (cachedModes) {
+      setRemoteModes(cachedModes);
+    } else {
+      api.get("/mode-log").then(data => {
+        const parsed = Array.isArray(data) ? data : [];
+        cacheSet("modes", parsed);
+        setRemoteModes(parsed);
+      }).catch(() => setRemoteModes([]));
+    }
 
-    // Fetch usage logs
-    api.get("/session-usage-logs").then(data => {
-      if (Array.isArray(data)) {
-        setRemoteUsage(data.map(r => ({
-          modeId:         r.mode_id,
-          date:           r.date,
-          hour:           r.hour,
-          worked:         r.worked,
-          focusedMinutes: r.focused_minutes,
-          idleMinutes:    r.idle_minutes,
-          idleReason:     r.idle_reason || [],
-          feeling:        r.feeling || [],
-        })));
-      } else {
-        setRemoteUsage([]);
-      }
-    }).catch(() => setRemoteUsage([]));
+    // Fetch usage logs (com cache)
+    const cachedUsage = cacheGet("usage");
+    if (cachedUsage) {
+      setRemoteUsage(cachedUsage);
+    } else {
+      api.get("/session-usage-logs").then(data => {
+        const parsed = Array.isArray(data)
+          ? data.map(r => ({
+              modeId:         r.mode_id,
+              date:           r.date,
+              hour:           r.hour,
+              worked:         r.worked,
+              focusedMinutes: r.focused_minutes,
+              idleMinutes:    r.idle_minutes,
+              idleReason:     r.idle_reason || [],
+              feeling:        r.feeling || [],
+            }))
+          : [];
+        cacheSet("usage", parsed);
+        setRemoteUsage(parsed);
+      }).catch(() => setRemoteUsage([]));
+    }
 
-    // Fetch checkins
-    api.get("/daily-focus/checkins").then(data => {
-      const raw = Array.isArray(data) ? data : (Array.isArray(data?.checkins) ? data.checkins : []);
-      setRemoteCheckins(raw.map(r => ({
-        estadoId: r.estado_id,
-        modeId:   r.mode_id,
-        date:     r.date,
-        hour:     r.hour,
-      })));
-    }).catch(() => setRemoteCheckins([]));
+    // Fetch checkins (com cache)
+    const cachedCheckins = cacheGet("checkins");
+    if (cachedCheckins) {
+      setRemoteCheckins(cachedCheckins);
+    } else {
+      api.get("/daily-focus/checkins").then(data => {
+        const raw = Array.isArray(data) ? data : (Array.isArray(data?.checkins) ? data.checkins : []);
+        const parsed = raw.map(r => ({
+          estadoId: r.estado_id,
+          modeId:   r.mode_id,
+          date:     r.date,
+          hour:     r.hour,
+        }));
+        cacheSet("checkins", parsed);
+        setRemoteCheckins(parsed);
+      }).catch(() => setRemoteCheckins([]));
+    }
   }, []);
 
   const isLoading = remoteSessions === null || remoteModes === null || remoteUsage === null || remoteCheckins === null;
@@ -282,11 +330,27 @@ export default function HistoryPage() {
   const localUsage    = useMemo(() => getUsageLogs(), []);
   const localCheckins = useMemo(() => getCheckinLog(), []);
 
-  // Use remote if available, else local
-  const sessions = remoteSessions ?? localSessions;
-  const modeLogs = remoteModes    ?? localModes;
-  const usageLogs = remoteUsage   ?? localUsage;
-  const checkins  = remoteCheckins ?? localCheckins;
+  // Mescla remoto + local para não perder entradas ainda não sincronizadas.
+  // Itens só locais recebem _local: true para indicação visual na UI.
+  const sessions = useMemo(
+    () => mergeLocal(remoteSessions, localSessions, s => `${s.date}|${s.completedAt}`),
+    [remoteSessions, localSessions]
+  );
+
+  const modeLogs = useMemo(
+    () => mergeLocal(remoteModes, localModes, e => `${e.modeId}|${e.date}|${e.hour ?? ""}`),
+    [remoteModes, localModes]
+  );
+
+  const usageLogs = useMemo(
+    () => mergeLocal(remoteUsage, localUsage, e => `${e.modeId}|${e.date}|${e.hour ?? ""}`),
+    [remoteUsage, localUsage]
+  );
+
+  const checkins = useMemo(
+    () => mergeLocal(remoteCheckins, localCheckins, c => `${c.modeId}|${c.date}|${c.hour ?? ""}`),
+    [remoteCheckins, localCheckins]
+  );
 
   const counts = {
     sessions: sessions.length,

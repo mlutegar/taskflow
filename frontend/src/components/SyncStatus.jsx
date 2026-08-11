@@ -11,6 +11,11 @@
 import { useState, useEffect } from "react";
 import { queueSize, flushQueue } from "../lib/syncQueue";
 
+// Escuta o mesmo canal do syncQueue para atualização imediata
+const _bc = typeof BroadcastChannel !== "undefined"
+  ? new BroadcastChannel("taskflow.sync")
+  : null;
+
 export default function SyncStatus() {
   const [online, setOnline]    = useState(() => navigator.onLine);
   const [pending, setPending]  = useState(() => queueSize());
@@ -37,6 +42,9 @@ export default function SyncStatus() {
       update();
     };
 
+    // Reage imediatamente quando algo é enfileirado (cross-tab ou mesma aba)
+    if (_bc) _bc.onmessage = () => setPending(queueSize());
+
     window.addEventListener("online",  onOnline);
     window.addEventListener("offline", onOffline);
 
@@ -44,6 +52,7 @@ export default function SyncStatus() {
     const interval = setInterval(update, 5_000);
 
     return () => {
+      if (_bc) _bc.onmessage = null;
       window.removeEventListener("online",  onOnline);
       window.removeEventListener("offline", onOffline);
       clearInterval(interval);

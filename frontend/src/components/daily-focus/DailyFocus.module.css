@@ -640,6 +640,21 @@
 .helperInput:focus { border-color: var(--accent); }
 .helperInput::placeholder { color: var(--text-muted); }
 
+.helperTextInput {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.helperTextInput:focus { border-color: #4e9ef5; }
+.helperTextInput::placeholder { color: var(--text-muted); }
+
 .helperInputLabel {
   font-size: 11px;
   color: var(--text-muted);

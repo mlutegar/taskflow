@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import styles from "./ModeSession.module.css";
 import ModalOverlay from "./shared/ModalOverlay";
 import { useDialog } from "../lib/useDialog";
 import { logActivation } from "../lib/modeActivations";
 import PostSessionForm from "./sessions/PostSessionForm";
+import SessionSummary from "./shared/SessionSummary";
 import MusicSession from "./sessions/MusicSession";
 import TikTokSession from "./sessions/TikTokSession";
 import SpliteSession from "./sessions/SpliteSession";
@@ -52,9 +53,17 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
   const [quickAdd, setQuickAdd] = useState(false);
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [showPostForm, setShowPostForm] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryData, setSummaryData] = useState(null);
+  const startTimeRef = useRef(performance.now());
 
-  // Ao fechar a sessão (seja pelo botão X ou ao concluir): mostra formulário pós-sessão
-  const handleSessionDone = () => { setConfirmingClose(false); setShowPostForm(true); };
+  // Ao fechar a sessão (seja pelo botão X ou ao concluir): mostra resumo antes do formulário pós-sessão
+  const handleSessionDone = (tasksCompleted = 0) => {
+    setConfirmingClose(false);
+    const durationMinutes = Math.max(1, Math.round((performance.now() - startTimeRef.current) / 60000));
+    setSummaryData({ durationMinutes, tasksCompleted });
+    setShowSummary(true);
+  };
 
   // Intercepta o fechamento para mostrar confirmação (quando o usuário clica X no meio)
   const handleClose = () => setConfirmingClose(true);
@@ -152,6 +161,17 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
   return (
     <ModalOverlay onClose={handleClose}>
       <div className={styles.modal} ref={dialogRef} role="dialog" aria-modal="true" aria-label={mode?.name ? `Sessão: ${mode.name}` : "Sessão de modo"} tabIndex={-1}>
+        {/* ── Resumo pós-sessão ────────────────────────────── */}
+        {showSummary && summaryData && (
+          <SessionSummary
+            mode={mode}
+            durationMinutes={summaryData.durationMinutes}
+            tasksCompleted={summaryData.tasksCompleted}
+            onClose={() => { setShowSummary(false); setShowPostForm(true); }}
+            onContinue={() => { setShowSummary(false); startTimeRef.current = performance.now(); }}
+          />
+        )}
+
         {/* ── Formulário pós-sessão ─────────────────────────── */}
         {showPostForm ? (
           <PostSessionForm
@@ -174,7 +194,7 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
                   ⚠️ Encerrar a sessão? O progresso será perdido.
                 </span>
                 <button
-                  onClick={handleSessionDone}
+                  onClick={() => handleSessionDone(0)}
                   style={{
                     padding: "7px 14px", borderRadius: "var(--radius-sm)", border: "none",
                     background: "#e05252", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",

@@ -1,0 +1,29 @@
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; animation: fadeIn 0.2s ease;
+}
+.card {
+  background: #1a1a2e; border-radius: 16px; padding: 32px 28px;
+  max-width: 380px; width: 90%; text-align: center;
+  animation: scaleIn 0.2s ease;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+.emoji { font-size: 3rem; margin-bottom: 8px; }
+.modeName { font-size: 1.3rem; font-weight: 700; margin: 0 0 12px; }
+.duration { font-size: 2rem; font-weight: 800; opacity: 0.9; margin-bottom: 8px; }
+.tasks { font-size: 1rem; opacity: 0.8; margin-bottom: 16px; }
+.motivation { font-size: 0.9rem; opacity: 0.7; margin: 0 0 24px; line-height: 1.5; }
+.actions { display: flex; flex-direction: column; gap: 10px; }
+.btnClose {
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px; padding: 10px; cursor: pointer; color: inherit; font-size: 0.9rem;
+}
+.btnClose:hover { background: rgba(255,255,255,0.12); }
+.btnContinue {
+  border: none; border-radius: 8px; padding: 10px 16px;
+  cursor: pointer; color: #fff; font-size: 0.9rem; font-weight: 600;
+}
+.btnContinue:hover { filter: brightness(1.1); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }

@@ -308,31 +308,6 @@
 
 @media (max-width: 520px) {
   .weeklyName { width: 88px; }
-
-  /* Acessibilidade mobile: tamanhos maiores */
-  .cardToggle { padding: 14px 12px; gap: 11px; }
-  .cardEmoji { font-size: 26px; width: 32px; }
-  .cardName { font-size: 16px; }
-  .cardTagline { font-size: 13.5px; }
-  .hourRecommendation { font-size: 13px; }
-
-  .startBtn {
-    padding: 11px 18px;
-    font-size: 14px;
-    min-height: 44px;
-  }
-
-  .cardActions { margin: 0 8px; gap: 6px; }
-
-  .sortBar { gap: 8px; padding-bottom: 4px; }
-  .sortBtn {
-    padding: 9px 14px;
-    font-size: 13px;
-    min-height: 42px;
-  }
-
-  .statBadge { font-size: 11.5px; padding: 3px 9px; }
-  .categoryTitle { font-size: 14px; }
 }
 
 /* ── Barra de busca ───────────────────────────────────── */
@@ -1499,60 +1474,98 @@
 
 /* ── Mobile ───────────────────────────────────────────── */
 @media (max-width: 520px) {
-  /* Cards: mais compactos */
-  .cardToggle { padding: 10px 11px; gap: 9px; }
-  .cardEmoji { font-size: 17px; width: 22px; }
-  .cardName { font-size: 13px; }
-  .cardTagline { font-size: 11px; }
-  .cardActions { margin: 0 6px; gap: 3px; }
-  .startBtn { padding: 6px 10px; font-size: 11px; }
-  .cardBody { padding: 10px 12px 12px; gap: 10px; }
-  .cardNameRow { gap: 5px; flex-wrap: wrap; }
-  .statBadge { font-size: 9px; padding: 1px 5px; }
-  .hourRecommendation { font-size: 10px; }
+  /* ── Card: layout em dois níveis ──
+     Linha 1: [emoji | nome/tagline | chevron]  (toggle ocupa largura toda)
+     Linha 2: [fav] [combo] [▶ Iniciar]          (actions como faixa inferior)
+  */
+  .cardHeader {
+    flex-wrap: wrap;
+  }
 
-  /* Panel header: esconde a descrição, só mostra o botão criar */
+  .cardToggle {
+    width: 100%;
+    padding: 12px 14px;
+    gap: 11px;
+    border-bottom: none; /* borda vem do actions */
+  }
+
+  .cardEmoji { font-size: 24px; width: 28px; }
+  .cardName   { font-size: 15px; }
+  .cardTagline { font-size: 12.5px; }
+  .hourRecommendation { font-size: 11.5px; }
+  .cardNameRow { gap: 6px; flex-wrap: wrap; }
+  .statBadge { font-size: 10.5px; padding: 2px 7px; }
+
+  /* Actions: faixa de largura total na base do card */
+  .cardActions {
+    width: 100%;
+    margin: 0;
+    padding: 8px 14px;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* Botão Iniciar: grande e claro */
+  .startBtn {
+    padding: 9px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    min-height: 40px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Body do card aberto */
+  .cardBody { padding: 12px 14px 14px; gap: 11px; }
+
+  /* Panel header */
   .subtitle { display: none; }
   .panelHeader { flex-direction: row; justify-content: flex-end; padding: 0; }
-  .createBtn { align-self: flex-start; padding: 6px 12px; font-size: 12px; }
+  .createBtn { align-self: flex-start; padding: 7px 14px; font-size: 13px; }
 
-  /* Semana: mais compacto */
+  /* Semana */
   .weeklyPanel { padding: 10px 11px; gap: 7px; }
   .weeklyName { width: 80px; font-size: 12px; }
   .weeklyTitle { font-size: 12px; }
   .weeklyNote { display: none; }
 
-  /* Filtros: scroll horizontal em vez de quebrar linha */
+  /* Filtros: scroll horizontal sem quebra de linha */
   .sortBar {
     overflow-x: auto;
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    margin-top: -4px;
     padding-bottom: 2px;
+    gap: 6px;
   }
   .sortBar::-webkit-scrollbar { display: none; }
   .sortLabel { display: none; }
-  .sortBtn { font-size: 11px; padding: 4px 9px; flex-shrink: 0; }
+  .sortBtn {
+    flex-shrink: 0;
+    font-size: 13px;
+    padding: 8px 14px;
+    min-height: 38px;
+  }
 
-  /* Categorias: título menor */
-  .categoryTitle { font-size: 10px; }
-  .categoryGroup { gap: 7px; }
-  .grid { gap: 6px; }
+  /* Categorias e grid */
+  .categoryTitle { font-size: 11px; }
+  .categoryGroup { gap: 6px; }
+  .grid { gap: 5px; }
 
-  /* Root: menos espaçamento vertical */
+  /* Root */
   .root { gap: 12px; }
 
-  /* Daily Focus card: menor */
+  /* Modal */
   .formRow { flex-direction: column; }
   .modal { max-height: 95vh; }
 
-  /* Lembretes: mais compactos */
+  /* Lembretes */
   .reminderBanner { padding: 9px 11px; gap: 8px; }
   .reminderText { font-size: 12px; }
   .reminderRegisterBtn { font-size: 11px; padding: 4px 9px; }
 
-  /* Esconde pré-requisito e context tags no card fechado — muito ruído */
+  /* Esconde ruído no card fechado */
   .cardPrereqHint { display: none; }
   .contextTags { display: none; }
 }
@@ -1684,4 +1697,235 @@
   0%   { transform: rotate(0deg) scale(1); }
   40%  { transform: rotate(180deg) scale(1.3); }
   100% { transform: rotate(360deg) scale(1); }
+}
+
+/* ── Favorites ──────────────────────────────────────────── */
+.favBtn { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 2px 4px; color: inherit; opacity: 0.7; transition: opacity 0.15s; }
+.favBtn:hover { opacity: 1; }
+
+/* ── Category section (used for favorites) ──────────────── */
+.categorySection { display: flex; flex-direction: column; gap: 10px; }
+
+/* ── Used today badge ───────────────────────────────────── */
+.usedTodayBadge { font-size: 0.65rem; background: rgba(78,204,163,0.2); color: #4ecca3; border-radius: 4px; padding: 1px 5px; font-weight: 600; white-space: nowrap; }
+
+/* ── Card tagline row ───────────────────────────────────── */
+.cardTaglineRow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* ── Detox banner ───────────────────────────────────────── */
+.detoxBanner { display: flex; align-items: center; gap: 10px; background: rgba(240,165,64,0.12); border: 1px solid rgba(240,165,64,0.3); border-radius: 8px; padding: 10px 14px; font-size: 0.875rem; flex-wrap: wrap; }
+.detoxBannerBtn { background: rgba(240,165,64,0.2); border: 1px solid rgba(240,165,64,0.4); border-radius: 6px; padding: 4px 10px; cursor: pointer; color: #f0a540; font-size: 0.8rem; white-space: nowrap; }
+.detoxBannerClose { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: inherit; opacity: 0.5; padding: 0; margin-left: auto; }
+.detoxBannerClose:hover { opacity: 1; }
+
+/* ── Preset Combos ──────────────────────────────────────── */
+.presetCombosSection { margin-bottom: 8px; }
+.presetCombosHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.presetCombosTitle { font-weight: 600; font-size: 0.95rem; }
+.presetCombosToggle { background: none; border: none; cursor: pointer; color: inherit; opacity: 0.6; font-size: 0.8rem; font-family: inherit; }
+.presetCombosToggle:hover { opacity: 1; }
+.presetCombosGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.presetComboCard { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid; cursor: pointer; text-align: left; transition: transform 0.15s, box-shadow 0.15s; font-family: inherit; }
+.presetComboCard:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.presetComboEmoji { font-size: 1.4rem; }
+.presetComboInfo { display: flex; align-items: center; justify-content: space-between; }
+.presetComboName { font-size: 0.85rem; font-weight: 600; }
+.presetComboModes { font-size: 0.9rem; }
+.presetComboSituation { font-size: 0.72rem; opacity: 0.7; line-height: 1.3; }
+
+/* ── Compact view ───────────────────────────────────────── */
+.compactCard { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.04); cursor: pointer; transition: background 0.15s; }
+.compactCard:hover { background: rgba(255,255,255,0.08); }
+.compactEmoji { font-size: 1.2rem; flex-shrink: 0; }
+.compactInfo { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.compactTagline { font-size: 0.72rem; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ══════════════════════════════════════════════════════════════
+   ── Melhorias modo aleatório ─────────────────────────────────
+   ══════════════════════════════════════════════════════════════ */
+
+/* #3: Ícone de cadeado no botão Aleatório quando fixado */
+.randomLockIcon {
+  font-size: 0.7rem;
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
+/* #1/#5/#7/#8: Toolbar do modo aleatório */
+.randomToolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(124, 110, 245, 0.06);
+  border: 1px solid rgba(124, 110, 245, 0.18);
+  border-radius: 10px;
+  margin-bottom: 4px;
+}
+
+.randomToolbarBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 7px;
+  border: 1px solid rgba(124, 110, 245, 0.25);
+  background: rgba(124, 110, 245, 0.08);
+  color: inherit;
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.randomToolbarBtn:hover {
+  background: rgba(124, 110, 245, 0.16);
+  border-color: rgba(124, 110, 245, 0.4);
+}
+.randomToolbarBtnActive {
+  background: rgba(124, 110, 245, 0.22);
+  border-color: rgba(124, 110, 245, 0.6);
+  color: #b8acff;
+  font-weight: 600;
+}
+
+/* #4: Contador de progresso da sequência */
+.seqProgress {
+  font-size: 0.78rem;
+  opacity: 0.7;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(78, 204, 163, 0.1);
+  color: #4ecca3;
+  border: 1px solid rgba(78, 204, 163, 0.2);
+  white-space: nowrap;
+}
+
+/* #5: Linha de salvar shuffle */
+.saveShuffleRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.saveShuffleInput {
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(124, 110, 245, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 0.8rem;
+  font-family: inherit;
+  width: 130px;
+  outline: none;
+}
+.saveShuffleInput:focus { border-color: rgba(124, 110, 245, 0.7); }
+.saveShuffleConfirm {
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(78, 204, 163, 0.2);
+  color: #4ecca3;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.saveShuffleCancel {
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.5;
+  font-size: 1rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.saveShuffleCancel:hover { opacity: 1; }
+
+/* #5: Chips de ordens salvas */
+.savedShufflesRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.savedShuffleChip {
+  display: flex;
+  align-items: center;
+  border-radius: 7px;
+  border: 1px solid rgba(124, 110, 245, 0.25);
+  background: rgba(124, 110, 245, 0.08);
+  overflow: hidden;
+}
+.savedShuffleChip button:first-child {
+  padding: 4px 10px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.savedShuffleChip button:first-child:hover { background: rgba(124, 110, 245, 0.12); }
+.savedShuffleChipActive {
+  border-color: rgba(124, 110, 245, 0.6);
+  background: rgba(124, 110, 245, 0.18);
+}
+.savedShuffleChipActive button:first-child { color: #b8acff; font-weight: 600; }
+.savedShuffleDelete {
+  padding: 4px 7px;
+  background: none;
+  border: none;
+  border-left: 1px solid rgba(124, 110, 245, 0.2);
+  color: inherit;
+  opacity: 0.4;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.savedShuffleDelete:hover { opacity: 1; background: rgba(224, 82, 82, 0.15); color: #e05252; }
+
+/* #4: Badge de posição na sequência */
+.seqBadge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(124, 110, 245, 0.12);
+  color: rgba(184, 172, 255, 0.8);
+  border: 1px solid rgba(124, 110, 245, 0.2);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.seqBadgeDone {
+  background: rgba(78, 204, 163, 0.15);
+  color: #4ecca3;
+  border-color: rgba(78, 204, 163, 0.3);
+}
+/* #7: próximo na sequência guiada */
+.seqBadgeNext {
+  background: rgba(240, 165, 64, 0.18);
+  color: #f0a540;
+  border-color: rgba(240, 165, 64, 0.4);
+  animation: seqPulse 1.4s ease-in-out infinite;
+}
+
+/* #4: Card concluído na sequência */
+.seqDone {
+  opacity: 0.55;
+}
+.seqDone:hover {
+  opacity: 0.9;
+}
+
+/* #7: Próximo card na sequência guiada */
+.guidedNext {
+  box-shadow: 0 0 0 2px rgba(240, 165, 64, 0.5), 0 4px 16px rgba(240, 165, 64, 0.12);
+}
+
+@keyframes seqPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }

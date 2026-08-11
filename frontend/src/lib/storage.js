@@ -17,12 +17,19 @@ export function storageGet(key, defaultValue = null) {
   }
 }
 
-/** Write a JSON value. Silently fails if storage is full. */
+/**
+ * Write a JSON value.
+ * Returns true on success, false on failure (e.g. storage quota exceeded).
+ */
 export function storageSet(key, value) {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(value));
-  } catch {
-    // silently fail (e.g. storage quota exceeded)
+    return true;
+  } catch (err) {
+    if (err?.name === "QuotaExceededError" || err?.code === 22) {
+      console.warn(`[taskflow] localStorage cheio — não foi possível salvar "${key}". Considere limpar dados antigos.`);
+    }
+    return false;
   }
 }
 

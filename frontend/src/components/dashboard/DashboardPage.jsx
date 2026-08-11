@@ -8,6 +8,7 @@ import { usageStats } from "../../lib/modeLog";
 import { getCheckinLog, getSessionFeedback } from "../../lib/checkinLog";
 import { getAllWithStatus } from "../../lib/dailyFocusAchievements";
 import { getUsageLogs, getFeelingStats, getTemporalTrend, getCorrelationByEstado } from "../../lib/sessionUsageLog";
+import { getMoodModeStats } from "../../lib/moodModeCorrelation";
 import { MODES } from "../../data/modes";
 import { ESTADOS_DEFAULT } from "../daily-focus/stateToMode";
 import styles from "./Dashboard.module.css";
@@ -837,6 +838,67 @@ function SemanaComparativo({ allHistory }) {
   );
 }
 
+// ── Humor × Modo chart ───────────────────────────────────────────────────────
+
+const ESTADO_COLORS = {
+  travado:         "#4ea8cc",
+  cansado:         "#7c6ef5",
+  ansioso:         "#f0a540",
+  sem_foco:        "#4ecca3",
+  disperso:        "#e05252",
+  energizado:      "#b06ef5",
+  sobrecarregado:  "#2d9bf0",
+  procrastinando:  "#e1306c",
+};
+
+function MoodModeChart() {
+  const moodModeData = useMemo(() => getMoodModeStats(), []);
+
+  if (moodModeData.length < 3) {
+    return (
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>🧠 Humor × Modo Eficaz</div>
+        <div className={styles.empty}>
+          📊 Dados insuficientes ainda — use mais modos após seus check-ins para ver correlações aqui.
+        </div>
+      </div>
+    );
+  }
+
+  const topModes = [...new Set(moodModeData.map((d) => d.modeId))].slice(0, 8);
+  const estados = [...new Set(moodModeData.map((d) => d.estado))];
+  const chartData = topModes.map((modeId) => {
+    const entry = {
+      modeId,
+      modeName: moodModeData.find((d) => d.modeId === modeId)?.modeName || modeId,
+    };
+    for (const estado of estados) {
+      const match = moodModeData.find((d) => d.modeId === modeId && d.estado === estado);
+      entry[estado] = match?.successRate || 0;
+    }
+    return entry;
+  });
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>🧠 Humor × Modo Eficaz</div>
+      <div className={styles.chartWrap}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 60 }}>
+            <XAxis dataKey="modeName" angle={-35} textAnchor="end" tick={{ fill: "#7a7a9a", fontSize: 11 }} />
+            <YAxis tickFormatter={(v) => v + "%"} domain={[0, 100]} tick={{ fill: "#7a7a9a", fontSize: 10 }} tickLine={false} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, name) => [v + "%", name]} />
+            <Legend wrapperStyle={{ fontSize: 11, color: "#7a7a9a" }} />
+            {estados.map((e) => (
+              <Bar key={e} dataKey={e} name={e} fill={ESTADO_COLORS[e] || "#7c6ef5"} radius={[3, 3, 0, 0]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -911,6 +973,7 @@ export default function DashboardPage() {
       <LevelLineChart history={history} days={days} allHistory={allHistory} />
       <TopModes days={days} />
       <EstadosSection days={days} />
+      <MoodModeChart />
       <UsageInsights />
       <Achievements />
       <AvgTime history={history} />

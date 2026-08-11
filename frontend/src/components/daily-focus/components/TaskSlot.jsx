@@ -14,13 +14,12 @@ function savePresets(list) {
   try { localStorage.setItem(PRESETS_KEY, JSON.stringify(list)); } catch {}
 }
 
-function getModeById(id) {
+function getModeById(id, allModes) {
   if (!id) return null;
-  const custom = JSON.parse(localStorage.getItem("customModes") || "[]");
-  return [...MODES, ...custom].find((m) => m.id === id) || null;
+  return allModes.find((m) => m.id === id) || null;
 }
 
-function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes: _allModes, usedModes = [], suggestedModeId = null, hideDuration = false }) {
+function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes = [], usedModes = [], suggestedModeId = null, hideDuration = false }) {
   const [query, setQuery] = useState(slot.title);
   const [results, setResults] = useState([]);
   const [todayTasks, setTodayTasks] = useState([]);
@@ -82,8 +81,8 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
 
   const saveCurrentCombo = useCallback(() => {
     if (helperModeIds.length < 2) return;
-    const label = helperModeIds.map((id) => getModeById(id)?.emoji ?? "").join("") + " " +
-      helperModeIds.map((id) => getModeById(id)?.name ?? id).join(" + ");
+    const label = helperModeIds.map((id) => getModeById(id, allModes)?.emoji ?? "").join("") + " " +
+      helperModeIds.map((id) => getModeById(id, allModes)?.name ?? id).join(" + ");
     const next = [{ ids: helperModeIds, label }, ...presets.filter((p) => p.ids.join() !== helperModeIds.join())].slice(0, MAX_PRESETS);
     savePresets(next);
     setPresets(next);
@@ -192,7 +191,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
         <div className={styles.slotHelperArea}>
           <span className={styles.slotHelperLabel}>🎯 Durante</span>
           {helperModeIds.map((modeId) => {
-            const m = getModeById(modeId);
+            const m = getModeById(modeId, allModes);
             if (!m) return null;
             return (
               <span key={modeId} className={styles.modeChip}>
@@ -240,7 +239,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === "Enter") applyPreset(p); }}
               >
-                {p.ids.map((id) => getModeById(id)?.emoji ?? "").join("")}
+                {p.ids.map((id) => getModeById(id, allModes)?.emoji ?? "").join("")}
                 <button className={styles.comboPresetChipDelete} onClick={(e) => deletePreset(e, i)} title="Remover preset">×</button>
               </span>
             ))}
@@ -251,7 +250,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
         {level > 1 && <div className={styles.slotHelperArea}>
           <span className={styles.slotHelperLabel}>☕ Entre</span>
           {interModeIds.map((modeId) => {
-            const m = getModeById(modeId);
+            const m = getModeById(modeId, allModes);
             if (!m) return null;
             return (
               <span key={modeId} className={`${styles.modeChip} ${styles.modeChipInter}`}>
@@ -281,6 +280,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
       {showHelperPicker === "durante" && (
         <HelperPickerModal
           currentIds={helperModeIds}
+          customModes={allModes.filter((m) => !MODES.find((b) => b.id === m.id))}
           usedModes={usedModes}
           suggestedModeId={suggestedModeId}
           filterType="durante"
@@ -297,6 +297,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
       {showHelperPicker === "entre" && (
         <HelperPickerModal
           currentIds={interModeIds}
+          customModes={allModes.filter((m) => !MODES.find((b) => b.id === m.id))}
           usedModes={usedModes}
           filterType="entre"
           onSelect={(id) => {

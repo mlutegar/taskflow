@@ -12,6 +12,10 @@ function todayIso() {
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 }
 
+function nowHour() {
+  return new Date().getHours();
+}
+
 function read() {
   const list = storageGet(LS_KEY, []);
   return Array.isArray(list) ? list : [];
@@ -28,14 +32,15 @@ export function logCompletion(modeId) {
   cutoff.setDate(cutoff.getDate() - RETAIN_DAYS);
   const cutoffIso = cutoff.toISOString().slice(0, 10);
   const date = todayIso();
+  const hour = nowHour();
 
   const list = read().filter((e) => e.date >= cutoffIso);
-  list.push({ modeId, date });
+  list.push({ modeId, date, hour });
   write(list);
 
   // Sync com backend (fire-and-forget com retry offline)
   import("./syncQueue").then(({ withOfflineFallback }) => {
-    withOfflineFallback("POST", "/mode-log", { modeId, date });
+    withOfflineFallback("POST", "/mode-log", { modeId, date, hour });
   });
 }
 
@@ -74,8 +79,8 @@ export async function loadRemoteModeLog() {
     if (!remote || !remote.length) return;
 
     const local = read();
-    const seen = new Set(local.map((e) => `${e.modeId}|${e.date}`));
-    const fresh = remote.filter((e) => !seen.has(`${e.modeId}|${e.date}`));
+    const seen = new Set(local.map((e) => `${e.modeId}|${e.date}|${e.hour ?? ""}`));
+    const fresh = remote.filter((e) => !seen.has(`${e.modeId}|${e.date}|${e.hour ?? ""}`));
     if (!fresh.length) return;
 
     // Mantém retenção de 90 dias
