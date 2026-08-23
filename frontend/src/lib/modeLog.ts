@@ -1,0 +1,107 @@
+// Log de conclusões por modo (para "mais usados na semana").
+// Guarda { modeId, date: "YYYY-MM-DD" } e retém ~90 dias.
+// Padrão offline-first: localStorage + sync backend (fire-and-forget).
+
+import { storageGet, storageSet } from "./storage";
+
+const LS_KEY = "modeLog";
+const RETAIN_DAYS = 90;
+
+interface ModeLogEntry {
+  modeId: string;
+  date: string;
+  hour: number;
+}
+
+interface UsageStat {
+  modeId: string;
+  count: number;
+}
+
+function todayIso(): string {
+  const d = new Date();
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+}
+
+function nowHour(): number {
+  return new Date().getHours();
+}
+
+function read(): ModeLogEntry[] {
+  const list = storageGet(LS_KEY, []);
+  return Array.isArray(list) ? list : [];
+}
+
+function write(list: ModeLogEntry[]): void {
+  storageSet(LS_KEY, list);
+}
+
+/** Registra uma conclusão de tarefa no modo informado. */
+export function logCompletion(modeId: string): void {
+  if (!modeId) return;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - RETAIN_DAYS);
+  const cutoffIso = cutoff.toISOString().slice(0, 10);
+  const date = todayIso();
+  const hour = nowHour();
+
+  const list = read().filter((e) => e.date >= cutoffIso);
+  list.push({ modeId, date, hour });
+  write(list);
+
+  // Sync com backend (fire-and-forget com retry offline)
+  import("./syncQueue").then(({ withOfflineFallback }) => {
+    withOfflineFallback("POST", "/mode-log", { modeId, date, hour });
+  });
+}
+
+/**
+ * Contagem por modo nos últimos `days` dias.
+ * Retorna [{ modeId, count }] ordenado do maior para o menor.
+ */
+export function usageStats(days: number = 7): UsageStat[] {
+  const start = new Date();
+  start.setDate(start.getDate() - (days - 1));
+  const startIso = start.toISOString().slice(0, 10);
+
+  const counts: Record<string, number> = {};
+  for (const e of read()) {
+    if (e.date >= startIso) counts[e.modeId] = (counts[e.modeId] || 0) + 1;
+  }
+  return Object.entries(counts)
+    .map(([modeId, count]) => ({ modeId, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/** Retorna todos os registros salvos (cronológico decrescente). */
+export function getAllLogs(): ModeLogEntry[] {
+  return [...read()].sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+/**
+ * Carrega registros do backend e mescla com localStorage.
+ * Deduplicação por modeId + date.
+ * Deve ser chamado no boot do app após login.
+ */
+export async function loadRemoteModeLog(): Promise<void> {
+  try {
+    const { fetchModeLogs } = await import("../api/modeLog");
+    const remote: ModeLogEntry[] = await fetchModeLogs();
+    if (!remote || !remote.length) return;
+
+    const local = read();
+    const seen = new Set(local.map((e) => `${e.modeId}|${e.date}|${e.hour ?? ""}`));
+    const fresh = remote.filter((e) => !seen.has(`${e.modeId}|${e.date}|${e.hour ?? ""}`));
+    if (!fresh.length) return;
+
+    // Mantém retenção de 90 dias
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - RETAIN_DAYS);
+    const cutoffIso = cutoff.toISOString().slice(0, 10);
+
+    const merged = [...local, ...fresh].filter((e) => e.date >= cutoffIso);
+    write(merged);
+  } catch {
+    // Falha silenciosa — app funciona com dados locais
+  }
+}

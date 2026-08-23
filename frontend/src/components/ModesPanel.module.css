@@ -2,6 +2,8 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 /* ── Incomplete Custom Modes Warning ──────────────────────── */
@@ -91,6 +93,8 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none; /* Firefox */
   padding-bottom: 2px; /* espaço para o scroll touch */
+  width: 100%;
+  max-width: 100%;
 }
 .sortBar::-webkit-scrollbar { display: none; } /* Chrome/Safari */
 
@@ -1592,9 +1596,9 @@
   .sortLabel { display: none; }
   .sortBtn {
     flex-shrink: 0;
-    font-size: 14px;
-    padding: 10px 16px;
-    min-height: 42px;
+    font-size: 12px;
+    padding: 6px 11px;
+    min-height: unset;
   }
 
   /* Categorias e grid */
@@ -1829,7 +1833,7 @@
 .presetCombosTitle { font-weight: 600; font-size: 0.95rem; }
 .presetCombosToggle { background: none; border: none; cursor: pointer; color: inherit; opacity: 0.6; font-size: 0.8rem; font-family: inherit; }
 .presetCombosToggle:hover { opacity: 1; }
-.presetCombosGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.presetCombosGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 10px; }
 .presetComboCard { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid; cursor: pointer; text-align: left; transition: transform 0.15s, box-shadow 0.15s; font-family: inherit; }
 .presetComboCard:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
 .presetComboEmoji { font-size: 1.4rem; }

@@ -18,6 +18,25 @@
   --low: #4ecca3;
   --radius: 10px;
   --radius-sm: 6px;
+
+  /* ── Tipografia responsiva ────────────────────────────────────────────────
+     Use estas variáveis nos componentes ao invés de px fixos.
+     Em telas pequenas (≤480px) os valores diminuem automaticamente. */
+  --font-xs:   11px;
+  --font-sm:   13px;
+  --font-base: 15px;
+  --font-lg:   18px;
+  --font-xl:   22px;
+}
+
+@media (max-width: 480px) {
+  :root {
+    --font-xs:   10px;
+    --font-sm:   12px;
+    --font-base: 14px;
+    --font-lg:   16px;
+    --font-xl:   19px;
+  }
 }
 
 html {
@@ -63,6 +82,15 @@ html { -webkit-text-size-adjust: 100%; }
 
 /* Better tap highlight on mobile */
 * { -webkit-tap-highlight-color: transparent; }
+
+/* ─── Focus visible: navegação por teclado ──────────────────────────────────
+   Remove outline padrão feio mas mantém indicador claro para usuários de teclado. */
+*:focus { outline: none; }
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
 
 /* ─── iOS: impede zoom automático ao focar em inputs ───────────────────────
    O Safari faz zoom quando o input tem font-size < 16px.

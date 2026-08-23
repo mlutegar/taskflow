@@ -22,7 +22,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           "vendor-react":    ["react", "react-dom"],
-          "vendor-supabase": ["@supabase/supabase-js"],
           "vendor-recharts": ["recharts"],
         },
       },
@@ -32,7 +31,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icon.svg"],
+      includeAssets: ["icon.svg", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "TaskFlow",
         short_name: "TaskFlow",
@@ -43,15 +42,31 @@ export default defineConfig({
         display: "standalone",
         scope: "/taskflow/",
         start_url: "/taskflow/",
+        categories: ["productivity", "utilities"],
         icons: [
-          { src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" },
+          { src: "icon.svg",     sizes: "any", type: "image/svg+xml" },
+          { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,woff2}"],
         navigateFallback: "index.html",
-        // ── Cache de rotas de API (NetworkFirst: tenta rede, cai no cache) ──
         runtimeCaching: [
+          // ── Assets estáticos com hash (JS, CSS, fontes) → CacheFirst ──────
+          {
+            urlPattern: /\.(?:js|css|woff2?)(\?.*)?$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "taskflow-assets",
+              expiration: {
+                maxEntries: 60,
+                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 dias
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // ── Rotas de API (NetworkFirst: tenta rede, cai no cache) ─────────
           {
             urlPattern: ({ url }) =>
               url.pathname.startsWith("/api/") ||
