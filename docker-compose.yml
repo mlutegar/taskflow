@@ -13,6 +13,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3001
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5175}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
     volumes:
       - taskflow_data:/data
     healthcheck:
