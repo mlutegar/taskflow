@@ -49,6 +49,11 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
   const [newActivity,   setNewActivity]   = useState("");
   const [pinned,        setPinned]        = useState(() => getPinned());
 
+  // Recorde pessoal (usado quando preset.trackRecord === true)
+  const recordKey = preset?.recordLabel ? `taskflow.record.${preset.recordLabel}` : null;
+  const [record, setRecord] = useState(() => recordKey ? (parseInt(localStorage.getItem(recordKey)) || 0) : 0);
+  const [currentCount, setCurrentCount] = useState("");
+
   const numTasks = cycle;
 
   // ── Persistir no localStorage toda vez que o estado relevante mudar ─────
@@ -202,8 +207,46 @@ export default function SpliteSession({ preset, tasks, onCompleteTask, onToggleC
                   </button>
                 </div>
               )}
+              {/* Contador de recorde pessoal (ex: embaixadinha) */}
+              {preset?.trackRecord && recordKey && (
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {record > 0 && (
+                    <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                      🏆 Recorde atual: <strong style={{ color: "var(--text)" }}>{record}</strong>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min="0"
+                      placeholder="Quantas você fez?"
+                      value={currentCount}
+                      onChange={(e) => setCurrentCount(e.target.value)}
+                      style={{ width: 160 }}
+                    />
+                    {currentCount && parseInt(currentCount) > record && (
+                      <span style={{ fontSize: 12, color: "#4ecca3", fontWeight: 600 }}>🎉 Novo recorde!</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { setTaskInCycle(0); setStep("select_task"); }}>
+            <button
+              className={`${styles.btn} ${styles.btnPrimary}`}
+              onClick={() => {
+                if (preset?.trackRecord && recordKey && currentCount) {
+                  const n = parseInt(currentCount);
+                  if (!isNaN(n) && n > record) {
+                    setRecord(n);
+                    localStorage.setItem(recordKey, String(n));
+                  }
+                }
+                setCurrentCount("");
+                setTaskInCycle(0);
+                setStep("select_task");
+              }}
+            >
               ✅ Fiz!
             </button>
             <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setStep("summary")}>Encerrar</button>

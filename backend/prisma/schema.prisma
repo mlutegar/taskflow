@@ -7,6 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
 model Task {
   id          String    @id @default(uuid())
   userId      String    @map("user_id")
@@ -15,6 +24,7 @@ model Task {
   completed   Boolean   @default(false)
   createdAt   DateTime  @default(now()) @map("created_at")
   completedAt DateTime? @map("completed_at")
+  deletedAt   DateTime? @map("deleted_at")
   priority    Int       @default(4)
   dueDate     DateTime? @map("due_date")
   recurrence  String?   // "daily" | "weekly" | "biweekly" | "monthly"
@@ -22,13 +32,17 @@ model Task {
   checklist   ChecklistItem[]
   dailyTasks  DailyTask[]
 
+  @@index([userId])
+  @@index([userId, completed])
+  @@index([userId, dueDate])
+  @@index([userId, deletedAt])
   @@map("tasks")
 }
 
 model ChecklistItem {
-  id          BigInt   @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   taskId      String   @map("task_id")
-  parentId    BigInt?  @map("parent_id")
+  parentId    Int?     @map("parent_id")
   description String
   note        String?
   completed   Boolean  @default(false)
@@ -38,6 +52,7 @@ model ChecklistItem {
   parent      ChecklistItem?  @relation("ChecklistChildren", fields: [parentId], references: [id], onDelete: Cascade)
   children    ChecklistItem[] @relation("ChecklistChildren")
 
+  @@index([taskId])
   @@map("checklist_items")
 }
 
@@ -55,11 +70,12 @@ model Routine {
 
   checklist         RoutineChecklistItem[]
 
+  @@index([userId])
   @@map("routines")
 }
 
 model RoutineChecklistItem {
-  id          BigInt  @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   routineId   String  @map("routine_id")
   description String
   completed   Boolean @default(false)
@@ -81,7 +97,7 @@ model ModeStat {
 }
 
 model DailyTask {
-  id        BigInt   @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   userId    String   @map("user_id")
   date      DateTime @map("date")
   taskId    String   @map("task_id")
@@ -91,6 +107,8 @@ model DailyTask {
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([date, taskId, userId])
+  @@index([userId])
+  @@index([taskId])
   @@map("daily_tasks")
 }
 
@@ -109,6 +127,7 @@ model DailyFocusSession {
   tabsOpened  Int      @default(0) @map("tabs_opened")
   createdAt   DateTime @default(now()) @map("created_at")
 
+  @@index([userId, createdAt])
   @@map("daily_focus_sessions")
 }
 
@@ -122,6 +141,7 @@ model DailyFocusCheckin {
   rating    Int?     // -1 or 1
   createdAt DateTime @default(now()) @map("created_at")
 
+  @@index([userId, date])
   @@map("daily_focus_checkins")
 }
 
@@ -160,24 +180,26 @@ model UserPreferences {
 }
 
 model SessionUsageLog {
-  id             BigInt   @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   userId         String   @map("user_id")
   modeId         String   @map("mode_id")
   date           String   // YYYY-MM-DD
   hour           Int
-  worked         Boolean  @default(false)
+  worked         Boolean?                  // null = "mais ou menos"
   focusedMinutes Int      @default(0) @map("focused_minutes")
   idleMinutes    Int      @default(0) @map("idle_minutes")
   idleReason     String   @default("[]") @map("idle_reason")   // JSON array
   feeling        String   @default("[]")                        // JSON array
+  comboWith      String?  @map("combo_with")                   // modeId do parceiro se foi sessão combo
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@unique([userId, modeId, date, hour])
+  @@index([userId, date])
   @@map("session_usage_logs")
 }
 
 model UserModeActivation {
-  id        BigInt   @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   userId    String   @map("user_id")
   modeId    String   @map("mode_id")
   date      String   // YYYY-MM-DD
@@ -188,18 +210,19 @@ model UserModeActivation {
 }
 
 model ModeLog {
-  id        BigInt   @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   userId    String   @map("user_id")
   modeId    String   @map("mode_id")
   date      String   // YYYY-MM-DD
   createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([userId, modeId, date])
+  @@index([userId, date])
   @@map("mode_logs")
 }
 
 model ModeComboLog {
-  id             BigInt   @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   userId         String   @map("user_id")
   modeIdA        String   @map("mode_id_a")
   modeIdB        String   @map("mode_id_b")

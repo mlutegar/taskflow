@@ -18,16 +18,34 @@ export async function saveUsageLog(entry) {
 }
 
 export async function fetchUsageLogs() {
-  const data = await api.get("/session-usage-logs");
-  if (!data || !Array.isArray(data)) return [];
-  return data.map((r) => ({
-    modeId:         r.mode_id,
-    date:           r.date,
-    hour:           r.hour,
-    worked:         r.worked,
-    focusedMinutes: r.focused_minutes,
-    idleMinutes:    r.idle_minutes,
-    idleReason:     r.idle_reason || [],
-    feeling:        r.feeling || [],
-  }));
+  const all = [];
+  let cursor = undefined;
+
+  // Pagina até buscar todos os registros
+  while (true) {
+    const url  = cursor ? `/session-usage-logs?cursor=${cursor}` : "/session-usage-logs";
+    const data = await api.get(url);
+    if (!data) break;
+
+    // Suporta formato antigo (array) e novo ({ items, nextCursor })
+    const items      = Array.isArray(data) ? data : (data.items ?? []);
+    const nextCursor = Array.isArray(data) ? null  : data.nextCursor;
+
+    all.push(...items.map((r) => ({
+      ...(r.id ? { id: r.id } : {}),
+      modeId:         r.mode_id,
+      date:           r.date,
+      hour:           r.hour,
+      worked:         r.worked,
+      focusedMinutes: r.focused_minutes,
+      idleMinutes:    r.idle_minutes,
+      idleReason:     r.idle_reason || [],
+      feeling:        r.feeling || [],
+    })));
+
+    if (!nextCursor) break;
+    cursor = nextCursor;
+  }
+
+  return all;
 }

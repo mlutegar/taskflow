@@ -27,7 +27,12 @@ export default async function dailyFocusRoutes(fastify) {
 
   // POST /daily-focus/sessions
   fastify.post("/sessions", async (req, reply) => {
-    const { date, completedAt, level, tasks, timings, rushMode, estadoId, tabMode, cycleCount, tabsOpened } = req.body;
+    const { date, completedAt, level, tasks, timings, rushMode, estadoId, tabMode, cycleCount, tabsOpened } = req.body ?? {};
+
+    if (!date || !/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+      return reply.status(400).send({ error: "date obrigatório no formato DD/MM/YYYY." });
+    }
+
     const session = await prisma.dailyFocusSession.create({
       data: {
         userId: req.userId,
@@ -47,33 +52,58 @@ export default async function dailyFocusRoutes(fastify) {
     return { id: session.id };
   });
 
-  // GET /daily-focus/sessions
+  // GET /daily-focus/sessions?page=1&limit=50
   fastify.get("/sessions", async (req) => {
-    const sessions = await prisma.dailyFocusSession.findMany({
-      where: { userId: req.userId },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    });
+    const page  = Math.max(1, parseInt(req.query.page  ?? "1",  10));
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit ?? "50", 10)));
+    const skip  = (page - 1) * limit;
 
-    return sessions.map((s) => ({
-      date: isoToPtBR(s.date.toISOString().split("T")[0]),
-      completedAt: s.completedAt || "",
-      level: s.level,
-      tasks: parseJson(s.tasks, []),
-      timings: parseJson(s.timings, []),
-      rushMode: s.rushMode,
-      estadoId: s.estadoId,
-      tabMode: s.tabMode,
-      cycleCount: s.cycleCount,
-      tabsOpened: s.tabsOpened,
-    }));
+    const [total, sessions] = await Promise.all([
+      prisma.dailyFocusSession.count({ where: { userId: req.userId } }),
+      prisma.dailyFocusSession.findMany({
+        where: { userId: req.userId },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: sessions.map((s) => ({
+        date: isoToPtBR(s.date.toISOString().split("T")[0]),
+        completedAt: s.completedAt || "",
+        level: s.level,
+        tasks: parseJson(s.tasks, []),
+        timings: parseJson(s.timings, []),
+        rushMode: s.rushMode,
+        estadoId: s.estadoId,
+        tabMode: s.tabMode,
+        cycleCount: s.cycleCount,
+        tabsOpened: s.tabsOpened,
+      })),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   });
 
   // ── Check-ins ─────────────────────────────────────────────────────────────
 
   // POST /daily-focus/checkins
   fastify.post("/checkins", async (req, reply) => {
-    const { estadoId, modeId, date, hour } = req.body;
+    const { estadoId, modeId, date, hour } = req.body ?? {};
+
+    if (!estadoId || typeof estadoId !== "string") {
+      return reply.status(400).send({ error: "estadoId obrigatório." });
+    }
+    if (!modeId || typeof modeId !== "string") {
+      return reply.status(400).send({ error: "modeId obrigatório." });
+    }
+    if (!date) {
+      return reply.status(400).send({ error: "date obrigatório." });
+    }
+    if (hour === undefined || hour === null || hour < 0 || hour > 23) {
+      return reply.status(400).send({ error: "hour deve ser entre 0 e 23." });
+    }
+
     await prisma.dailyFocusCheckin.create({
       data: {
         userId: req.userId,
@@ -114,7 +144,11 @@ export default async function dailyFocusRoutes(fastify) {
 
   // PATCH /daily-focus/checkins/feedback
   fastify.patch("/checkins/feedback", async (req, reply) => {
-    const { estadoId, modeId, date, rating } = req.body;
+    const { estadoId, modeId, date, rating } = req.body ?? {};
+
+    if (rating !== -1 && rating !== 1) {
+      return reply.status(400).send({ error: "rating deve ser -1 ou 1." });
+    }
 
     const existing = await prisma.dailyFocusCheckin.findFirst({
       where: {

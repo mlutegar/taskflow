@@ -1,6 +1,10 @@
 import prisma from "../prisma.js";
 import { authenticate } from "../auth.js";
 
+function parseJson(val, fallback) {
+  try { return JSON.parse(val); } catch { return fallback; }
+}
+
 export default async function modeComboLogRoutes(fastify) {
   fastify.addHook("preHandler", authenticate);
 
@@ -26,7 +30,7 @@ export default async function modeComboLogRoutes(fastify) {
       hour: l.hour,
       worked: l.worked,
       focusedMinutes: l.focusedMinutes,
-      feeling: JSON.parse(l.feeling),
+      feeling: parseJson(l.feeling, []),
       createdAt: l.createdAt,
     }));
   });
@@ -40,6 +44,9 @@ export default async function modeComboLogRoutes(fastify) {
       return reply
         .status(400)
         .send({ error: "modeIdA, modeIdB, date e hour são obrigatórios." });
+    }
+    if (typeof hour !== "number" || hour < 0 || hour > 23) {
+      return reply.status(400).send({ error: "hour deve ser um número entre 0 e 23." });
     }
 
     await prisma.modeComboLog.upsert({

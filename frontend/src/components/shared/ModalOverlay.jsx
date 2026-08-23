@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import styles from './ModalOverlay.module.css'
 
 export default function ModalOverlay({ onClose, children }) {
@@ -8,7 +9,7 @@ export default function ModalOverlay({ onClose, children }) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  return (
+  return createPortal(
     <div
       className={styles.overlay}
       role="dialog"
@@ -16,6 +17,7 @@ export default function ModalOverlay({ onClose, children }) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       {children}
-    </div>
+    </div>,
+    document.body
   )
 }

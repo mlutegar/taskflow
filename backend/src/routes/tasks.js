@@ -32,6 +32,21 @@ async function fetchWithChecklist(id, userId) {
   return shapeTask({ ...task, checklist: task.checklist });
 }
 
+const MUTATION_RATE_LIMIT = {
+  config: {
+    rateLimit: {
+      max: 100,
+      timeWindow: 5 * 60 * 1000,
+      keyGenerator: (req) => req.userId ?? req.ip,
+      errorResponseBuilder: () => ({
+        statusCode: 429,
+        error: "Too Many Requests",
+        message: "Muitas requisições. Tente novamente em alguns minutos.",
+      }),
+    },
+  },
+};
+
 export default async function tasksRoutes(fastify) {
   fastify.addHook("preHandler", authenticate);
 
@@ -65,7 +80,7 @@ export default async function tasksRoutes(fastify) {
   });
 
   // POST /tasks
-  fastify.post("/", async (req, reply) => {
+  fastify.post("/", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { title, description, priority, due_date, recurrence } = req.body;
     const task = await prisma.task.create({
       data: {
@@ -83,7 +98,7 @@ export default async function tasksRoutes(fastify) {
   });
 
   // PATCH /tasks/:id
-  fastify.patch("/:id", async (req, reply) => {
+  fastify.patch("/:id", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id } = req.params;
     const body = req.body;
 
@@ -109,7 +124,7 @@ export default async function tasksRoutes(fastify) {
   });
 
   // DELETE /tasks/:id
-  fastify.delete("/:id", async (req, reply) => {
+  fastify.delete("/:id", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id } = req.params;
     const existing = await prisma.task.findFirst({ where: { id, userId: req.userId } });
     if (!existing) return reply.status(404).send({ error: "Tarefa não encontrada." });
@@ -118,7 +133,7 @@ export default async function tasksRoutes(fastify) {
   });
 
   // POST /tasks/:id/complete
-  fastify.post("/:id/complete", async (req, reply) => {
+  fastify.post("/:id/complete", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id } = req.params;
     const task = await prisma.task.findFirst({ where: { id, userId: req.userId } });
     if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });
@@ -141,7 +156,7 @@ export default async function tasksRoutes(fastify) {
   });
 
   // POST /tasks/:id/reopen
-  fastify.post("/:id/reopen", async (req, reply) => {
+  fastify.post("/:id/reopen", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id } = req.params;
     const existing = await prisma.task.findFirst({ where: { id, userId: req.userId } });
     if (!existing) return reply.status(404).send({ error: "Tarefa não encontrada." });
@@ -188,7 +203,7 @@ export default async function tasksRoutes(fastify) {
   });
 
   // POST /tasks/:id/checklist
-  fastify.post("/:id/checklist", async (req, reply) => {
+  fastify.post("/:id/checklist", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id: taskId } = req.params;
     const { description, parent_id: parentId = null } = req.body;
 
@@ -208,7 +223,7 @@ export default async function tasksRoutes(fastify) {
   });
 
   // PATCH /tasks/:id/checklist/:itemId
-  fastify.patch("/:id/checklist/:itemId", async (req, reply) => {
+  fastify.patch("/:id/checklist/:itemId", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id: taskId, itemId } = req.params;
     const { description, note } = req.body;
 
@@ -227,7 +242,7 @@ export default async function tasksRoutes(fastify) {
   });
 
   // PATCH /tasks/:id/checklist/:itemId/toggle
-  fastify.patch("/:id/checklist/:itemId/toggle", async (req, reply) => {
+  fastify.patch("/:id/checklist/:itemId/toggle", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id: taskId, itemId } = req.params;
 
     const task = await prisma.task.findFirst({ where: { id: taskId, userId: req.userId } });
@@ -244,7 +259,7 @@ export default async function tasksRoutes(fastify) {
   });
 
   // DELETE /tasks/:id/checklist/:itemId
-  fastify.delete("/:id/checklist/:itemId", async (req, reply) => {
+  fastify.delete("/:id/checklist/:itemId", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id: taskId, itemId } = req.params;
 
     const task = await prisma.task.findFirst({ where: { id: taskId, userId: req.userId } });

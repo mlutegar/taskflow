@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { logUsage, addPendingReminder } from "../../lib/sessionUsageLog";
+import { logCompletion } from "../../lib/modeLog";
+import { useToast } from "../shared/Toast";
 import styles from "./PostSessionForm.module.css";
 
 const IDLE_REASONS = [
@@ -61,30 +63,82 @@ function MinutesInput({ label, value, onChange, placeholder = "ex: 25" }) {
   );
 }
 
-export default function PostSessionForm({ modeId, modeName, onDone }) {
+export default function PostSessionForm({ modeId, modeName, suggestedMinutes, onDone }) {
+  const { showToast } = useToast();
   const [worked,         setWorked]         = useState(null);
-  const [focusedMinutes, setFocusedMinutes] = useState(0);
+  const [focusedMinutes, setFocusedMinutes] = useState(() => suggestedMinutes ?? 0);
   const [idleMinutes,    setIdleMinutes]    = useState(0);
   const [idleReason,     setIdleReason]     = useState([]);
   const [feeling,        setFeeling]        = useState([]);
-  const [saved,          setSaved]          = useState(false);
+  const [phase,          setPhase]          = useState("form"); // "form" | "saving" | "saved"
+  const [undoTimer,      setUndoTimer]      = useState(5);
+  const ivRef = useRef(null);
+
+  // Fix #9 — reseta campos se o modeId mudar (reutilização do componente sem desmontagem)
+  useEffect(() => {
+    setWorked(null);
+    setFocusedMinutes(suggestedMinutes ?? 0);
+    setIdleMinutes(0);
+    setIdleReason([]);
+    setFeeling([]);
+    setPhase("form");
+    setUndoTimer(5);
+  }, [modeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleArr = (setArr, id) => {
     setArr((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   };
 
   const handleSubmit = () => {
-    logUsage({ modeId, worked: worked ?? false, focusedMinutes, idleMinutes, idleReason, feeling });
-    setSaved(true);
-    setTimeout(onDone, 900);
+    // Fix #4 — avisa (soft) se ambos os tempos estão zerados
+    if (focusedMinutes === 0 && idleMinutes === 0) {
+      showToast("💡 Preencha ao menos o tempo focado ou ocioso para um registro mais preciso.", "info");
+    }
+    setPhase("saving");
+    let count = 5;
+    setUndoTimer(count);
+    ivRef.current = setInterval(() => {
+      count -= 1;
+      setUndoTimer(count);
+      if (count <= 0) {
+        clearInterval(ivRef.current);
+        const saved = logUsage({ modeId, worked: worked ?? false, focusedMinutes, idleMinutes, idleReason, feeling });
+        logCompletion(modeId);
+        if (!saved) {
+          showToast("⚠️ Não foi possível salvar localmente (armazenamento cheio). Os dados foram enviados ao servidor.", "error");
+        }
+        setPhase("saved");
+        setTimeout(onDone, 900);
+      }
+    }, 1000);
   };
+
+  const handleUndo = () => {
+    clearInterval(ivRef.current);
+    setPhase("form");
+    setUndoTimer(5);
+  };
+
+  useEffect(() => () => clearInterval(ivRef.current), []);
 
   const handleSkip = () => {
     addPendingReminder(modeId, modeName || modeId);
     onDone();
   };
 
-  if (saved) {
+  if (phase === "saving") {
+    return (
+      <div className={styles.root}>
+        <div className={styles.savedState}>
+          <span className={styles.savedEmoji}>💾</span>
+          <p className={styles.savedText}>Salvando em {undoTimer}s…</p>
+          <button className={styles.undoBtn} onClick={handleUndo} type="button">↩ Desfazer</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "saved") {
     return (
       <div className={styles.root}>
         <div className={styles.savedState}>

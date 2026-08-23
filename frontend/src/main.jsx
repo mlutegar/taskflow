@@ -1,6 +1,20 @@
 import { StrictMode, useState, useEffect, useRef, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
+
+// ── Web Vitals ────────────────────────────────────────────────────────────────
+// web-vitals não está instalado. Para ativar o monitoramento de CLS, LCP, FID,
+// FCP e TTFB, instale com:  npm install web-vitals
+// Depois substitua este bloco por:
+//
+// import { onCLS, onLCP, onFID, onFCP, onTTFB } from "web-vitals";
+// const reportVital = (metric) => console.log("[web-vitals]", metric.name, metric.value);
+// onCLS(reportVital);
+// onLCP(reportVital);
+// onFID(reportVital);
+// onFCP(reportVital);
+// onTTFB(reportVital);
 import AppShell from "./components/layout/AppShell.jsx";
 import LoginPage from "./components/auth/LoginPage.jsx";
 import { useAuth } from "./hooks/useAuth.js";
@@ -142,6 +156,8 @@ function Root() {
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <Root />
+    <ErrorBoundary>
+      <Root />
+    </ErrorBoundary>
   </StrictMode>
 );

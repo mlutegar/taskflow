@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import styles from "./ModeSession.module.css";
 import ModalOverlay from "./shared/ModalOverlay";
 import { useDialog } from "../lib/useDialog";
@@ -18,44 +18,108 @@ import CustomModeSession from "./sessions/CustomModeSession";
 import SingSession from "./sessions/SingSession";
 import PomodoroSession from "./sessions/PomodoroSession";
 import DiarioFaladoSession from "./sessions/DiarioFaladoSession";
+import NapSession from "./sessions/NapSession";
+import BreathingSession from "./sessions/BreathingSession";
+import SprintPendenciasSession from "./sessions/SprintPendenciasSession";
+import PapelCanetaSession from "./sessions/PapelCanetaSession";
+import SavedQueueSession from "./sessions/SavedQueueSession";
 
-const SESSION_MAP = {
-  music: MusicSession,
-  tiktok: TikTokSession,
-  tiktok_fixed: TikTokSession,
-  tiktok_prog_videos: TikTokSession,
-  tiktok_prog_both: TikTokSession,
-  reels_fixed: TikTokSession,
-  reels_prog_videos: TikTokSession,
-  reels_prog_both: TikTokSession,
-  tiktok_detox: TikTokSession,
-  reels_detox: TikTokSession,
-  splite: SpliteSession,
-  momentum: MomentumSession,
-  espresso: EspressoSession,
-  rpg: RPGSession,
-  lazyfal: LazyFalconSession,
-  caferitual: CafeRitualSession,
-  tabhop: TabHopSession,
-  sing: SingSession,
-  pomodoro: PomodoroSession,
-  // Modos de atividade independentes — reutilizam SpliteSession com preset
-  agua: SpliteSession,
-  meditar: SpliteSession,
-  ler_diario: SpliteSession,
-  esticar: SpliteSession,
-  livro: SpliteSession,
-  exercicio: SpliteSession,
-  diario_falado: DiarioFaladoSession,
+// Plataformas que compartilham a lógica do TikTokSession.
+// Adicionar nova plataforma aqui é suficiente — sem precisar listar cada variante manualmente.
+const TIKTOK_LIKE_PLATFORMS = {
+  tiktok:   ["fixed", "prog_videos", "prog_both", "detox"],
+  reels:    ["fixed", "prog_videos", "prog_both", "detox"],
+  youtube:  ["fixed", "prog_videos", "prog_both", "detox"],
+  twitter:  ["fixed", "prog_videos", "prog_both", "detox"],
+  reddit:   ["fixed", "prog_videos", "prog_both", "detox"],
+  whatsapp: ["fixed", "prog_tasks",  "prog_both", "detox"],
+  gamer:    ["fixed", "prog"],
+  netflix:  ["episode", "detox"],
+  playlist: ["fixed", "prog"],
 };
 
-export default function ModeSession({ modeId, mode, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }) {
+const SESSION_MAP = {
+  music:    MusicSession,
+  tiktok:   TikTokSession,  // entrada raiz sem variante
+  splite:   SpliteSession,
+  momentum: MomentumSession,
+  espresso: EspressoSession,
+  rpg:      RPGSession,
+  lazyfal:  LazyFalconSession,
+  caferitual: CafeRitualSession,
+  tabhop:   TabHopSession,
+  sing:     SingSession,
+  pomodoro: PomodoroSession,
+  // Modos de atividade independentes — reutilizam SpliteSession com preset
+  agua:        SpliteSession,
+  meditar:     SpliteSession,
+  ler_diario:  SpliteSession,
+  esticar:     SpliteSession,
+  livro:       SpliteSession,
+  exercicio:   SpliteSession,
+  diario_falado: DiarioFaladoSession,
+  nap:       NapSession,
+  soneca_5:  NapSession,
+  soneca_15: NapSession,
+  respiracao: BreathingSession,
+  sprint_pendencias: SprintPendenciasSession,
+  papel_caneta:            PapelCanetaSession,
+  papel_caneta_frase:      PapelCanetaSession,
+  papel_caneta_estimativa: PapelCanetaSession,
+  tiktok_salvos:    SavedQueueSession,
+  instagram_salvos: SavedQueueSession,
+};
+
+// Registra dinamicamente todas as combinações plataforma_variante
+Object.entries(TIKTOK_LIKE_PLATFORMS).forEach(([platform, variants]) => {
+  variants.forEach((variant) => {
+    SESSION_MAP[`${platform}_${variant}`] = TikTokSession;
+  });
+});
+
+const ModeSession = forwardRef(function ModeSession({ modeId, mode, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }, ref) {
   const [quickAdd, setQuickAdd] = useState(false);
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [showPostForm, setShowPostForm] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [summaryData, setSummaryData] = useState(null);
   const startTimeRef = useRef(performance.now());
+
+  // Swipe para fechar (mobile bottom-sheet)
+  const swipeTouchY = useRef(null);
+  const swipeDelta = useRef(0);
+  const modalRef = useRef(null);
+
+  const onTouchStart = (e) => {
+    const tag = e.target.tagName.toLowerCase();
+    if (['input', 'textarea', 'select', 'button'].includes(tag)) return;
+    swipeTouchY.current = e.touches[0].clientY;
+    swipeDelta.current = 0;
+  };
+  const onTouchMove = (e) => {
+    if (swipeTouchY.current === null) return;
+    const delta = e.touches[0].clientY - swipeTouchY.current;
+    if (delta < 0) return; // só aceita arrastar para baixo
+    swipeDelta.current = delta;
+    if (modalRef.current) {
+      modalRef.current.style.transform = `translateY(${delta}px)`;
+      modalRef.current.style.transition = "none";
+    }
+  };
+  const onTouchEnd = () => {
+    if (modalRef.current) {
+      modalRef.current.style.transform = "";
+      modalRef.current.style.transition = "";
+    }
+    if (swipeDelta.current > 100) handleClose();
+    swipeTouchY.current = null;
+    swipeDelta.current = 0;
+  };
+
+  // Expõe triggerClose() para o componente pai via ref
+  useImperativeHandle(ref, () => ({
+    triggerClose: () => handleClose(),
+  }));
 
   // Ao fechar a sessão (seja pelo botão X ou ao concluir): mostra resumo antes do formulário pós-sessão
   const handleSessionDone = (tasksCompleted = 0) => {
@@ -66,7 +130,7 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
   };
 
   // Intercepta o fechamento para mostrar confirmação (quando o usuário clica X no meio)
-  const handleClose = () => setConfirmingClose(true);
+  const handleClose = useCallback(() => setConfirmingClose(true), []);
 
   // Registra ativação do modo ao abrir a sessão
   useEffect(() => {
@@ -151,16 +215,27 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
     }
   };
 
-  const Session = SESSION_MAP[mode?.session || modeId];
+  const sessionKey = mode?.session || modeId;
+  const isCustom = !SESSION_MAP[sessionKey] && mode?.isCustom;
+  if (!SESSION_MAP[sessionKey] && !isCustom) {
+    console.warn(`[ModeSession] Sessão não encontrada para "${sessionKey}" — usando fallback SpliteSession.`);
+  }
+  const Session = SESSION_MAP[sessionKey] ?? (isCustom ? null : SpliteSession);
   const preset = mode?.preset;
-
-  // Modo personalizado: usa sessão genérica se não há entrada no mapa
-  const isCustom = !Session && mode?.isCustom;
-  if (!Session && !isCustom) return null;
 
   return (
     <ModalOverlay onClose={handleClose}>
-      <div className={styles.modal} ref={dialogRef} role="dialog" aria-modal="true" aria-label={mode?.name ? `Sessão: ${mode.name}` : "Sessão de modo"} tabIndex={-1}>
+      <div
+        className={styles.modal}
+        ref={(el) => { dialogRef.current = el; modalRef.current = el; }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={mode?.name ? `Sessão: ${mode.name}` : "Sessão de modo"}
+        tabIndex={-1}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         {/* ── Resumo pós-sessão ────────────────────────────── */}
         {showSummary && summaryData && (
           <SessionSummary
@@ -177,6 +252,7 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
           <PostSessionForm
             modeId={modeId}
             modeName={mode?.name}
+            suggestedMinutes={summaryData?.durationMinutes ?? 0}
             onDone={onClose}
           />
         ) : (
@@ -188,26 +264,36 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
                 background: "var(--surface)",
                 borderBottom: "1px solid var(--border)",
                 padding: "14px 18px",
-                display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
               }}>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
-                  ⚠️ Encerrar a sessão? O progresso será perdido.
+                <span style={{ flex: 1, minWidth: 160, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                  ⚠️ Encerrar a sessão?
                 </span>
                 <button
                   onClick={() => handleSessionDone(0)}
                   style={{
-                    padding: "7px 14px", borderRadius: "var(--radius-sm)", border: "none",
-                    background: "#e05252", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                    padding: "7px 12px", borderRadius: "var(--radius-sm)", border: "none",
+                    background: "#e05252", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer",
                   }}
                 >
-                  Encerrar
+                  📝 Registrar e sair
+                </button>
+                <button
+                  onClick={onClose}
+                  style={{
+                    padding: "7px 12px", borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--border)", background: "var(--surface-2)",
+                    color: "var(--text-muted)", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                  }}
+                >
+                  Sair sem registrar
                 </button>
                 <button
                   onClick={() => setConfirmingClose(false)}
                   style={{
-                    padding: "7px 14px", borderRadius: "var(--radius-sm)",
-                    border: "1px solid var(--border)", background: "var(--surface-2)",
-                    color: "var(--text-muted)", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                    padding: "7px 10px", borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--border)", background: "none",
+                    color: "var(--text-muted)", fontWeight: 600, fontSize: 12, cursor: "pointer",
                   }}
                 >
                   Cancelar
@@ -305,4 +391,6 @@ export default function ModeSession({ modeId, mode, tasks, routines = [], onComp
       </div>
     </ModalOverlay>
   );
-}
+});
+
+export default ModeSession;

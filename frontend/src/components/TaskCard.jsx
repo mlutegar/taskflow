@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, memo } from "react";
 import styles from "./TaskCard.module.css";
 
 // Item de checklist recursivo: permite subtarefas dentro de subtarefas.
@@ -214,9 +214,34 @@ function pacePlan(days, pending) {
   return { text: `${plural(perDay, "subtarefa", "subtarefas")} por dia`, urgent: perDay >= 3 };
 }
 
-export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist }) {
+function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
+
+  // ── Swipe gestures (mobile) ──────────────────────────────────────────────
+  const swipeTouchX = useRef(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const SWIPE_THRESHOLD = 80;
+
+  const handleSwipeTouchStart = (e) => {
+    const tag = e.target.tagName.toLowerCase();
+    if (['input', 'textarea', 'select', 'button'].includes(tag)) return;
+    swipeTouchX.current = e.touches[0].clientX;
+  };
+  const handleSwipeTouchMove = (e) => {
+    if (swipeTouchX.current === null) return;
+    const dx = e.touches[0].clientX - swipeTouchX.current;
+    setSwipeOffset(dx);
+  };
+  const handleSwipeTouchEnd = () => {
+    if (swipeOffset > SWIPE_THRESHOLD && !task.completed) {
+      handleComplete();
+    } else if (swipeOffset < -SWIPE_THRESHOLD && onDelete) {
+      onDelete(task.id);
+    }
+    setSwipeOffset(0);
+    swipeTouchX.current = null;
+  };
   const [editData, setEditData] = useState({
     title: task.title,
     description: task.description || "",
@@ -351,8 +376,24 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
     );
   }
 
+  const swipeRight = swipeOffset > 20;
+  const swipeLeft = swipeOffset < -20;
+
   return (
-    <div className={`${styles.card} ${task.completed ? styles.completed : ""} ${styles[`bar_${priority.cls}`]} ${doneFlash ? styles.doneFlash : ""}`}>
+    <div className={styles.swipeWrapper}>
+      {swipeRight && !task.completed && (
+        <div className={`${styles.swipeHint} ${styles.swipeHintComplete}`}>✓ Concluir</div>
+      )}
+      {swipeLeft && (
+        <div className={`${styles.swipeHint} ${styles.swipeHintDelete}`}>🗑 Excluir</div>
+      )}
+    <div
+      className={`${styles.card} ${task.completed ? styles.completed : ""} ${styles[`bar_${priority.cls}`]} ${doneFlash ? styles.doneFlash : ""}`}
+      style={{ transform: `translateX(${swipeOffset}px)`, transition: swipeTouchX.current ? "none" : "transform 0.25s ease" }}
+      onTouchStart={handleSwipeTouchStart}
+      onTouchMove={handleSwipeTouchMove}
+      onTouchEnd={handleSwipeTouchEnd}
+    >
       <div className={styles.main}>
         <button
           className={`${styles.checkbox} ${task.completed ? styles.checkboxDone : ""}`}
@@ -464,5 +505,13 @@ export default function TaskCard({ task, onComplete, onReopen, onDelete, onUpdat
         </div>
       )}
     </div>
+    </div>
   );
 }
+
+// Wrap with React.memo — only re-render when task id or updatedAt changes.
+export default memo(TaskCard, (prev, next) => {
+  return prev.task.id === next.task.id &&
+    prev.task.updatedAt === next.task.updatedAt &&
+    prev.task.updated_at === next.task.updated_at;
+});

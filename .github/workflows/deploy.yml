@@ -36,6 +36,11 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Audit dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
       - name: Lint
         working-directory: frontend
         run: npm run lint

@@ -12,12 +12,13 @@
  */
 
 import { api } from "./apiClient";
+import { SYNC_QUEUE_MAX } from "../config/constants";
 
 const bc = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("taskflow.sync") : null;
 
 const LS_KEY  = "taskflow.syncQueue";
 const MAX_AGE = 24 * 60 * 60 * 1000; // 24 horas em ms
-const MAX_LEN = 200;
+const MAX_LEN = SYNC_QUEUE_MAX;
 const LOCK_KEY = "taskflow.syncQueue.flushLock";
 const LOCK_TTL = 10_000;
 

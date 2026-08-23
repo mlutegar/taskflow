@@ -1,3 +1,62 @@
+// NOTE: List virtualization with @tanstack/react-virtual is ready to enable.
+// To activate it:
+//   1. Run: npm install @tanstack/react-virtual
+//   2. Replace this file's flat-list render with the virtualized version below.
+//
+// ─── VIRTUALIZED IMPLEMENTATION ───────────────────────────────────────────────
+// import { useRef } from "react";
+// import { useVirtualizer } from "@tanstack/react-virtual";
+//
+// Inside the flat-list branch (replace the paginated section):
+//
+//   function VirtualTaskList({ tasks, cardProps }) {
+//     const parentRef = useRef(null);
+//     const rowVirtualizer = useVirtualizer({
+//       count: tasks.length,
+//       getScrollElement: () => parentRef.current,
+//       estimateSize: () => 80, // px — measured from TaskCard .main padding (14px*2) + content (~52px)
+//       overscan: 5,
+//     });
+//
+//     return (
+//       <div
+//         ref={parentRef}
+//         style={{ height: "600px", overflowY: "auto" }}
+//         className={styles.virtualContainer}
+//       >
+//         <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: "relative" }}>
+//           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+//             const task = tasks[virtualRow.index];
+//             return (
+//               <div
+//                 key={task.id}
+//                 data-index={virtualRow.index}
+//                 ref={rowVirtualizer.measureElement}
+//                 style={{
+//                   position: "absolute",
+//                   top: 0,
+//                   left: 0,
+//                   width: "100%",
+//                   transform: `translateY(${virtualRow.start}px)`,
+//                   paddingBottom: "8px",
+//                 }}
+//               >
+//                 <TaskCard key={task.id} task={task} {...cardProps} />
+//               </div>
+//             );
+//           })}
+//         </div>
+//       </div>
+//     );
+//   }
+//
+// Then in the main export, replace the paginated block with:
+//   return <VirtualTaskList tasks={tasks} cardProps={cardProps} />;
+//
+// Also add to TaskList.module.css:
+//   .virtualContainer { contain: strict; }
+// ──────────────────────────────────────────────────────────────────────────────
+
 import { useState, useEffect } from "react";
 import TaskCard from "./TaskCard";
 import styles from "./TaskList.module.css";

@@ -47,6 +47,18 @@
     border-bottom: none;
     animation: slideUpMobile 0.22s ease;
   }
+
+  /* Alça visual de swipe no topo do bottom sheet */
+  .modal::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    margin: 10px auto 4px;
+    flex-shrink: 0;
+  }
 }
 
 @keyframes slideUpMobile {

@@ -52,4 +52,7 @@ export const tasksApi = {
 
   deleteChecklistItem: (_taskId, itemId) =>
     api.delete(`/tasks/${_taskId}/checklist/${itemId}`),
+
+  /** Restaura uma tarefa soft-deletada (desfaz delete permanente). */
+  restore: (id) => api.post(`/tasks/${id}/restore`),
 };

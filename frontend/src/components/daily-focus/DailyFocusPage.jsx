@@ -234,9 +234,9 @@ export default function DailyFocusPage() {
     withOfflineFallback("PUT", "/preferences", { weeklyGoal: next });
   };
 
-  // Meta semanal
-  const weeklyStats = getWeeklyStats();
-  const weeklyCount = weeklyStats.filter((d) => d.count > 0).length;
+  // Meta semanal — memoizado para não recalcular a cada render
+  const weeklyStats = useMemo(() => getWeeklyStats(), []);
+  const weeklyCount = useMemo(() => weeklyStats.filter((d) => d.count > 0).length, [weeklyStats]);
   const WEEKLY_GOAL = weeklyGoal;
 
   // Persist on state changes
@@ -321,9 +321,13 @@ export default function DailyFocusPage() {
   const totalSecs = (currentTask.durationMin || 0) * 60;
   const activeHelperModeIds = currentTask.helperModeIds ?? [];
   // Aba ativa = tab selecionada manualmente, ou o primeiro modo, ou null
-  const activeTabModeId = (activeHelperTab && activeHelperModeIds.includes(activeHelperTab))
-    ? activeHelperTab
-    : activeHelperModeIds[0] ?? null;
+  const activeTabModeId = useMemo(
+    () =>
+      activeHelperTab && activeHelperModeIds.includes(activeHelperTab)
+        ? activeHelperTab
+        : activeHelperModeIds[0] ?? null,
+    [activeHelperTab, activeHelperModeIds]
+  );
   const helperEntry = getHelper(activeTabModeId);
   const helperMode = getModeById(activeTabModeId);
   const currentHelperState = helperStates[`${currentIdx}:${activeTabModeId}`] || {};
@@ -343,7 +347,7 @@ export default function DailyFocusPage() {
     });
   };
 
-  const allFilled = tasks.every((t) => t.title.trim());
+  const allFilled = useMemo(() => tasks.every((t) => t.title.trim()), [tasks]);
 
   const startSession = () => {
     if (!tabMode) {

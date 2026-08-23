@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import styles from "./RoutineCard.module.css";
 
 const TODAY = new Date().toISOString().split("T")[0];
@@ -9,7 +9,7 @@ function yesterday() {
   return d.toISOString().split("T")[0];
 }
 
-export default function RoutineCard({
+function RoutineCard({
   routine,
   onComplete,
   onUncomplete,
@@ -260,3 +260,11 @@ export default function RoutineCard({
     </div>
   );
 }
+
+// Wrap with React.memo — only re-render when routine id or updatedAt changes.
+export default memo(RoutineCard, (prev, next) => {
+  return prev.routine.id === next.routine.id &&
+    prev.routine.updatedAt === next.routine.updatedAt &&
+    prev.routine.updated_at === next.routine.updated_at &&
+    prev.routine.is_completed_today === next.routine.is_completed_today;
+});

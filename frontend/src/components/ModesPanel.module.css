@@ -241,10 +241,38 @@
 
 .weeklyHeader {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.weeklyToggleBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: inherit;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+.weeklyToggleBtn:hover { background: var(--surface-2); color: var(--text); }
+
+/* Skeleton loading */
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeletonList { display: flex; flex-direction: column; gap: 8px; }
+.skeletonRow {
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
 }
 
 .weeklyTitle {
@@ -807,7 +835,7 @@
 }
 
 .startBtn:hover { opacity: 0.88; }
-.startBtn:active { transform: scale(0.96); }
+.startBtn:active { transform: scale(0.93); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mode-color) 30%, transparent); }
 
 .startBtn.startBtnFlash::after {
   content: '';
@@ -1476,17 +1504,15 @@
 @media (max-width: 520px) {
   /* ── Card: layout em dois níveis ──
      Linha 1: [emoji | nome/tagline | chevron]  (toggle ocupa largura toda)
-     Linha 2: [fav] [combo] [▶ Iniciar]          (actions como faixa inferior)
+     Linha 2: ações — só visíveis quando card está fechado: ▶ Iniciar
+               quando aberto: ☆ + ▶ Iniciar (completo)
   */
-  .cardHeader {
-    flex-wrap: wrap;
-  }
+  .cardHeader { flex-wrap: wrap; }
 
   .cardToggle {
     width: 100%;
     padding: 12px 14px;
     gap: 11px;
-    border-bottom: none; /* borda vem do actions */
   }
 
   .cardEmoji { font-size: 24px; width: 28px; }
@@ -1507,17 +1533,40 @@
     gap: 8px;
   }
 
-  /* Botão Iniciar: grande e claro */
-  .startBtn {
-    padding: 9px 20px;
-    font-size: 14px;
-    font-weight: 700;
-    min-height: 40px;
-    border-radius: var(--radius-sm);
+  /* Card fechado: esconde fav e combo, só mostra Iniciar */
+  .card:not(.cardOpen) .favBtn,
+  .card:not(.cardOpen) .comboBtn { display: none; }
+  .card:not(.cardOpen) .cardActions {
+    padding: 7px 14px;
+    background: color-mix(in srgb, var(--mode-color, var(--accent)) 4%, transparent);
   }
 
-  /* Body do card aberto */
-  .cardBody { padding: 12px 14px 14px; gap: 11px; }
+  /* Card aberto: mostra tudo */
+  .cardOpen .cardActions { padding: 10px 14px; }
+
+  /* Botão Iniciar */
+  .startBtn {
+    padding: 10px 22px;
+    font-size: 14px;
+    font-weight: 700;
+    min-height: 44px;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.01em;
+  }
+
+  /* comboBtn e favBtn: área de toque maior */
+  .comboBtn {
+    width: 44px;
+    height: 44px;
+    font-size: 19px;
+  }
+  .favBtn {
+    padding: 8px;
+    font-size: 1.2rem;
+  }
+
+  /* Body do card: mais espaçoso e arejado */
+  .cardBody { padding: 14px 16px 16px; gap: 14px; }
 
   /* Panel header */
   .subtitle { display: none; }
@@ -1530,7 +1579,7 @@
   .weeklyTitle { font-size: 12px; }
   .weeklyNote { display: none; }
 
-  /* Filtros: scroll horizontal sem quebra de linha */
+  /* Chips de categoria: scroll horizontal sem quebra */
   .sortBar {
     overflow-x: auto;
     flex-wrap: nowrap;
@@ -1543,9 +1592,9 @@
   .sortLabel { display: none; }
   .sortBtn {
     flex-shrink: 0;
-    font-size: 13px;
-    padding: 8px 14px;
-    min-height: 38px;
+    font-size: 14px;
+    padding: 10px 16px;
+    min-height: 42px;
   }
 
   /* Categorias e grid */
@@ -1553,8 +1602,8 @@
   .categoryGroup { gap: 6px; }
   .grid { gap: 5px; }
 
-  /* Root */
-  .root { gap: 12px; }
+  /* Root: mais respiro entre seções */
+  .root { gap: 16px; }
 
   /* Modal */
   .formRow { flex-direction: column; }
@@ -1568,6 +1617,25 @@
   /* Esconde ruído no card fechado */
   .cardPrereqHint { display: none; }
   .contextTags { display: none; }
+
+  /* Combos Prontos: grid 2 colunas (sem overflow) */
+  .presetCombosGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow-x: unset;
+    gap: 8px;
+    padding-bottom: 0;
+  }
+  .presetComboCard {
+    min-width: unset;
+    max-width: unset;
+    width: 100%;
+    flex-shrink: unset;
+    padding: 11px 12px;
+  }
+  .presetComboName { font-size: 0.84rem; }
+  .presetComboSituation { font-size: 0.77rem; opacity: 0.88; line-height: 1.35; }
+  .presetComboEmoji { font-size: 1.4rem; }
 }
 
 /* ── Estado vazio do weekly panel ─────────────────────── */
@@ -1587,6 +1655,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg, #0f0f0f);
+  padding: 6px 0;
+  margin: 0 -2px;
 }
 
 .filterToggleBtn {
@@ -1661,6 +1735,24 @@
 }
 .viewSessionBtn:hover { background: color-mix(in srgb, var(--mode-color) 12%, transparent); }
 
+/* ── Botão "Encerrar sessão" no card ativo ─────────────── */
+.endSessionBtn {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 7px 11px;
+  background: none;
+  border: 1px solid var(--danger, #e05252);
+  color: var(--danger, #e05252);
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background 0.14s;
+}
+.endSessionBtn:hover { background: color-mix(in srgb, var(--danger, #e05252) 12%, transparent); }
+
 /* ── Sugestões de atividade rápida (Ciclos vazio) ──────── */
 .activitySuggestions {
   display: flex;
@@ -1711,6 +1803,19 @@
 
 /* ── Card tagline row ───────────────────────────────────── */
 .cardTaglineRow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* ── Duration badge ─────────────────────────────────────── */
+.durationBadge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: rgba(124,110,245,0.10);
+  color: var(--accent);
+  border: 1px solid rgba(124,110,245,0.20);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
 /* ── Detox banner ───────────────────────────────────────── */
 .detoxBanner { display: flex; align-items: center; gap: 10px; background: rgba(240,165,64,0.12); border: 1px solid rgba(240,165,64,0.3); border-radius: 8px; padding: 10px 14px; font-size: 0.875rem; flex-wrap: wrap; }

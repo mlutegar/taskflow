@@ -1,12 +1,14 @@
 /**
- * ModeComboSession — Modal para testar dois modos juntos e registrar o resultado.
+ * ModeComboSession — Modal para testar dois ou três modos juntos e registrar o resultado.
  * Melhorias:
  *  - Timer automático (stopwatch) que preenche "minutos focados"
- *  - Aviso quando os dois modos têm tipos diferentes (durante vs entre)
+ *  - Aviso quando os modos têm tipos diferentes (durante vs entre)
  *  - Undo por 5s antes de salvar definitivamente
+ *  - Suporta 2 ou 3 modos via prop `modes` (array)
  */
 import { useState, useEffect, useRef } from "react";
 import { logCombo } from "../lib/modeComboLog";
+import { logUsage } from "../lib/sessionUsageLog";
 import styles from "./ModeComboSession.module.css";
 
 const FEELINGS = [
@@ -18,6 +20,14 @@ const FEELINGS = [
   { id: "animado",   label: "⚡ Animado" },
 ];
 
+const IDLE_REASONS = [
+  { id: "distraction",  label: "📱 Distração" },
+  { id: "another_task", label: "📋 Outra tarefa" },
+  { id: "planned",      label: "☕ Pausa planejada" },
+  { id: "tiredness",    label: "😴 Cansaço" },
+  { id: "none",         label: "✅ Não fiquei ocioso" },
+];
+
 const MAX_STEPS_SHOWN = 4;
 
 function fmtTime(secs) {
@@ -26,10 +36,12 @@ function fmtTime(secs) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export default function ModeComboSession({ modeA, modeB, onClose }) {
-  const [worked, setWorked]     = useState(undefined); // true | false | null
-  const [minutes, setMinutes]   = useState("");
-  const [feeling, setFeeling]   = useState([]);
+export default function ModeComboSession({ modes, onClose }) {
+  const [worked, setWorked]       = useState(undefined); // true | false | null
+  const [minutes, setMinutes]     = useState("");
+  const [idleMinutes, setIdleMin] = useState("");
+  const [idleReason, setIdleReason] = useState([]);
+  const [feeling, setFeeling]     = useState([]);
   // Estados do fluxo: "running" | "form" | "saving" | "saved"
   const [phase, setPhase]       = useState("running");
   const [undoTimer, setUndoTimer] = useState(5); // contagem regressiva para undo
@@ -63,6 +75,11 @@ export default function ModeComboSession({ modeA, modeB, onClose }) {
       prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
     );
 
+  const toggleIdleReason = (id) =>
+    setIdleReason((prev) =>
+      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
+    );
+
   // Salva com countdown para undo
   const handleSubmit = () => {
     setPhase("saving");
@@ -73,13 +90,37 @@ export default function ModeComboSession({ modeA, modeB, onClose }) {
       setUndoTimer(count);
       if (count <= 0) {
         clearInterval(iv);
-        logCombo({
-          modeIdA: modeA.id,
-          modeIdB: modeB.id,
-          worked,
-          focusedMinutes: parseInt(minutes, 10) || 0,
-          feeling,
-        });
+        const focusedMins = parseInt(minutes, 10) || 0;
+        const idleMins = parseInt(idleMinutes, 10) || 0;
+
+        // Log all pairs for combo tracking
+        for (let i = 0; i < modes.length; i++) {
+          for (let j = i + 1; j < modes.length; j++) {
+            logCombo({
+              modeIdA: modes[i].id,
+              modeIdB: modes[j].id,
+              worked,
+              focusedMinutes: focusedMins,
+              feeling,
+            });
+          }
+        }
+
+        // Log usage for each mode with comboWith set to the other mode IDs joined
+        for (let i = 0; i < modes.length; i++) {
+          const others = modes.filter((_, idx) => idx !== i);
+          const comboWith = others[0]?.id; // primary partner (first other)
+          logUsage({
+            modeId: modes[i].id,
+            worked,
+            focusedMinutes: focusedMins,
+            idleMinutes: idleMins,
+            idleReason,
+            feeling,
+            comboWith,
+          });
+        }
+
         setPhase("saved");
         setTimeout(() => onClose(), 1600);
       }
@@ -95,7 +136,8 @@ export default function ModeComboSession({ modeA, modeB, onClose }) {
   };
 
   const canSubmit = worked !== undefined;
-  const typeMismatch = modeA.type && modeB.type && modeA.type !== modeB.type;
+  const types = [...new Set(modes.map((m) => m.type).filter(Boolean))];
+  const typeMismatch = types.length > 1;
 
   return (
     <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -105,7 +147,7 @@ export default function ModeComboSession({ modeA, modeB, onClose }) {
         <div className={styles.header}>
           <div className={styles.headerLeft}>
             <div className={styles.headerTitle}>
-              🔀 {modeA.name} + {modeB.name}
+              🔀 {modes.map((m) => m.name).join(" + ")}
             </div>
             <div className={styles.headerSub}>
               {phase === "running"
@@ -121,17 +163,17 @@ export default function ModeComboSession({ modeA, modeB, onClose }) {
           <div className={styles.typeMismatchBanner}>
             <span>⚠️</span>
             <span>
-              <strong>{modeA.name}</strong> é um modo <em>{modeA.type}</em> tarefas e{" "}
-              <strong>{modeB.name}</strong> é um modo <em>{modeB.type}</em> tarefas —
+              {modes.map((m) => `${m.name} (${m.type})`).join(", ")} —
               podem funcionar em fases diferentes da sessão.
             </span>
           </div>
         )}
 
-        {/* Dois modos lado a lado */}
+        {/* Modos lado a lado */}
         <div className={styles.modesGrid}>
-          <ModeCard mode={modeA} />
-          <ModeCard mode={modeB} />
+          {modes.map((m) => (
+            <ModeCard key={m.id} mode={m} />
+          ))}
         </div>
 
         {/* Botão encerrar (fase running) */}
@@ -173,23 +215,56 @@ export default function ModeComboSession({ modeA, modeB, onClose }) {
               </div>
             </div>
 
-            {/* Minutos focados (pré-preenchido pelo timer) */}
+            {/* Minutos focados + ociosos */}
+            <div className={styles.timesRow}>
+              <div>
+                <div className={styles.fieldLabel}>Minutos focados</div>
+                <div className={styles.minutesRow}>
+                  <input
+                    className={styles.minutesInput}
+                    type="number"
+                    min="0"
+                    max="480"
+                    placeholder="—"
+                    value={minutes}
+                    onChange={(e) => setMinutes(e.target.value)}
+                  />
+                  <span className={styles.minutesUnit}>min</span>
+                  {elapsed > 0 && (
+                    <span className={styles.timerHint}>⏱ timer</span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <div className={styles.fieldLabel}>Tempo ocioso depois</div>
+                <div className={styles.minutesRow}>
+                  <input
+                    className={styles.minutesInput}
+                    type="number"
+                    min="0"
+                    max="480"
+                    placeholder="—"
+                    value={idleMinutes}
+                    onChange={(e) => setIdleMin(e.target.value)}
+                  />
+                  <span className={styles.minutesUnit}>min</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Por que ficou ocioso */}
             <div>
-              <div className={styles.fieldLabel}>Minutos focados</div>
-              <div className={styles.minutesRow}>
-                <input
-                  className={styles.minutesInput}
-                  type="number"
-                  min="0"
-                  max="480"
-                  placeholder="—"
-                  value={minutes}
-                  onChange={(e) => setMinutes(e.target.value)}
-                />
-                <span className={styles.minutesUnit}>min</span>
-                {elapsed > 0 && (
-                  <span className={styles.timerHint}>⏱ medido pelo timer</span>
-                )}
+              <div className={styles.fieldLabel}>Por que ficou ocioso?</div>
+              <div className={styles.chips}>
+                {IDLE_REASONS.map((r) => (
+                  <button
+                    key={r.id}
+                    className={`${styles.chip} ${idleReason.includes(r.id) ? styles.chipSelected : ""}`}
+                    onClick={() => toggleIdleReason(r.id)}
+                  >
+                    {r.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -236,7 +311,7 @@ export default function ModeComboSession({ modeA, modeB, onClose }) {
             <span className={styles.savedEmoji}>✅</span>
             <span className={styles.savedText}>Combo registrado!</span>
             <span className={styles.savedSub}>
-              {modeA.emoji} {modeA.name} + {modeB.emoji} {modeB.name}
+              {modes.map((m) => `${m.emoji} ${m.name}`).join(" + ")}
             </span>
           </div>
         )}

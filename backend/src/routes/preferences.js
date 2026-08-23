@@ -87,15 +87,11 @@ export default async function preferencesRoutes(fastify) {
     const { modeId, date } = req.body ?? {};
     if (!modeId || !date) return reply.status(400).send({ error: "modeId e date são obrigatórios." });
 
-    try {
-      await prisma.userModeActivation.upsert({
-        where: { userId_modeId_date: { userId: req.userId, modeId, date } },
-        update: {},
-        create: { userId: req.userId, modeId, date },
-      });
-    } catch {
-      // ignora duplicatas silenciosamente
-    }
+    await prisma.userModeActivation.upsert({
+      where: { userId_modeId_date: { userId: req.userId, modeId, date } },
+      update: {},
+      create: { userId: req.userId, modeId, date },
+    });
 
     reply.status(201).send({ ok: true });
   });

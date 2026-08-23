@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { tasksApi } from "./api/tasks";
+import { routinesApi } from "./api/routines";
 import { getStreak } from "./lib/dailyFocusHistory";
 import { getDayLevel } from "./lib/dailyFocusDay";
 import { useTasks } from "./hooks/useTasks";
@@ -11,10 +12,13 @@ import AddTaskForm from "./components/AddTaskForm";
 import RoutineList from "./components/RoutineList";
 import RoutineHeatmap from "./components/RoutineHeatmap";
 import AddRoutineForm from "./components/AddRoutineForm";
+import RoutineTemplates from "./components/RoutineTemplates";
 import ModesPanel from "./components/ModesPanel";
 import TodayPanel from "./components/TodayPanel";
 import styles from "./App.module.css";
 import { ToastProvider } from './components/shared/Toast';
+
+const DashboardPage = lazy(() => import("./components/dashboard/DashboardPage"));
 
 const TASK_FILTERS = [
   { label: "Todas", value: "" },
@@ -37,7 +41,13 @@ const ROUTINE_FILTERS = [
 ];
 
 export default function App() {
-  const [tab, setTab] = useState("tasks");
+  const [tab, setTab] = useState(
+    () => localStorage.getItem("taskflow.activeTab") || "tasks"
+  );
+
+  useEffect(() => {
+    localStorage.setItem("taskflow.activeTab", tab);
+  }, [tab]);
 
   // UI state
   const [taskFilter, setTaskFilter] = useState("");
@@ -77,10 +87,11 @@ export default function App() {
   const tasksHook = useTasks(taskFilter, taskSort);
   const {
     tasks,
-    setTasks,
     tasksLoading,
     tasksError,
     completedToday,
+    removeTask,
+    restoreTask,
     handleCompleteTask,
     handleReopenTask,
     handleUpdateTask,
@@ -95,6 +106,8 @@ export default function App() {
     routines,
     routinesLoading,
     routinesError,
+    removeRoutine,
+    restoreRoutine,
     handleCompleteRoutine,
     handleUncompleteRoutine,
     handleDeleteRoutine,
@@ -109,16 +122,22 @@ export default function App() {
   const undoHook = useUndoDelete((id) => tasksApi.delete(id).catch(() => {}));
   const { undoTask, handleDismiss } = undoHook;
 
+  const undoRoutineHook = useUndoDelete((id) => routinesApi.delete(id).catch(() => {}));
+  const { undoTask: undoRoutine, handleDismiss: handleDismissRoutine } = undoRoutineHook;
+
   const { confirm, ConfirmUI } = useConfirm();
 
-  // Confirmação antes de deletar rotina
-  const handleDeleteRoutineConfirmed = async (id) => {
-    const ok = await confirm({
-      title: "Excluir rotina?",
-      message: "Essa ação não pode ser desfeita.",
-      confirmLabel: "Excluir",
-    });
-    if (ok) handleDeleteRoutine(id);
+  // Exclusão de rotina com undo de 5 segundos
+  const handleDeleteRoutineWithUndo = (id) => {
+    const routine = routines.find((r) => r.id === id);
+    if (!routine) return;
+    removeRoutine(id);
+    undoRoutineHook.handleDeleteTask(routine);
+  };
+
+  const handleUndoDeleteRoutine = () => {
+    const routine = undoRoutineHook.handleUndoDelete();
+    if (routine) restoreRoutine(routine);
   };
 
   // Wrappers that also manage UI state
@@ -135,16 +154,42 @@ export default function App() {
   const handleDeleteTask = (id) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    removeTask(id);
     undoHook.handleDeleteTask(task);
   };
 
   const handleUndoDelete = () => {
     const task = undoHook.handleUndoDelete();
-    if (task) {
-      setTasks((prev) => [task, ...prev]);
-    }
+    if (task) restoreTask(task);
   };
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const handleSelect = useCallback((id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleBulkComplete = useCallback(async () => {
+    const ids = [...selectedIds];
+    setSelectedIds(new Set());
+    for (const id of ids) {
+      const task = tasks.find((t) => t.id === id);
+      if (task && !task.completed) await handleCompleteTask(id);
+    }
+  }, [selectedIds, tasks, handleCompleteTask]);
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = [...selectedIds];
+    setSelectedIds(new Set());
+    for (const id of ids) handleDeleteTask(id);
+  }, [selectedIds, handleDeleteTask]);
+
+  const handleClearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   // Search filter
   const search = taskSearch.trim().toLowerCase();
@@ -216,7 +261,13 @@ export default function App() {
               onClick={() => setTab("modes")}
             >
               Modos
-              <span className={styles.tabBadge}>9</span>
+              {(() => { try { const n = JSON.parse(localStorage.getItem('taskflow.favoriteModes') || '[]').length; return n > 0 ? <span className={styles.tabBadge}>{n}</span> : null; } catch { return null; } })()}
+            </button>
+            <button
+              className={`${styles.tab} ${tab === "analytics" ? styles.tabActive : ""}`}
+              onClick={() => setTab("analytics")}
+            >
+              📊 Análises
             </button>
           </nav>
 
@@ -345,6 +396,11 @@ export default function App() {
                 onToggleChecklist={handleToggleTaskChecklist}
                 onUpdateChecklist={handleUpdateTaskChecklist}
                 onDeleteChecklist={handleDeleteTaskChecklist}
+                selectedIds={selectedIds}
+                onSelect={handleSelect}
+                onBulkComplete={handleBulkComplete}
+                onBulkDelete={handleBulkDelete}
+                onClearSelection={handleClearSelection}
               />
             )}
           </>
@@ -352,6 +408,8 @@ export default function App() {
 
         {tab === "routines" && (
           <>
+            <RoutineTemplates onCreateRoutine={handleCreateRoutine} />
+
             {showRoutineForm && (
               <div className={styles.formWrapper}>
                 <AddRoutineForm onSubmit={handleCreateRoutine} onCancel={() => setShowRoutineForm(false)} />
@@ -399,7 +457,7 @@ export default function App() {
                 onComplete={handleCompleteRoutine}
                 onUncomplete={handleUncompleteRoutine}
                 onCompleteForDate={handleCompleteRoutineForDate}
-                onDelete={handleDeleteRoutineConfirmed}
+                onDelete={handleDeleteRoutineWithUndo}
                 onUpdate={handleUpdateRoutine}
                 onAddProgress={handleAddProgress}
                 onAddChecklist={handleAddRoutineChecklist}
@@ -426,6 +484,12 @@ export default function App() {
             onToggleRoutineChecklist={handleToggleRoutineChecklist}
           />
         )}
+
+        {tab === "analytics" && (
+          <Suspense fallback={<div className={styles.loading}>Carregando análises...</div>}>
+            <DashboardPage />
+          </Suspense>
+        )}
       </main>
 
       {/* FAB mobile — Nova tarefa */}
@@ -446,6 +510,16 @@ export default function App() {
           expiresAt={undoTask.expiresAt}
           onUndo={handleUndoDelete}
           onDismiss={handleDismiss}
+        />
+      )}
+
+      {undoRoutine && (
+        <UndoToast
+          task={undoRoutine.task}
+          expiresAt={undoRoutine.expiresAt}
+          onUndo={handleUndoDeleteRoutine}
+          onDismiss={handleDismissRoutine}
+          label="Rotina"
         />
       )}
 
@@ -490,7 +564,7 @@ function DailyWidget() {
   );
 }
 
-function UndoToast({ task, expiresAt, onUndo, onDismiss }) {
+function UndoToast({ task, expiresAt, onUndo, onDismiss, label = "Tarefa" }) {
   const [pct, setPct] = useState(100);
 
   useEffect(() => {
@@ -508,7 +582,7 @@ function UndoToast({ task, expiresAt, onUndo, onDismiss }) {
       <div className={styles.undoBar} style={{ width: `${pct}%` }} />
       <div className={styles.undoContent}>
         <span className={styles.undoText}>
-          🗑 <strong>{task.title}</strong> excluída
+          🗑 <strong>{task.title}</strong> excluída{label !== "Tarefa" ? ` (${label})` : ""}
         </span>
         <div className={styles.undoActions}>
           <button className={styles.undoBtn} onClick={onUndo}>

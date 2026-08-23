@@ -234,6 +234,18 @@
   text-align: center;
 }
 
+.undoBtn {
+  padding: 8px 20px;
+  background: var(--surface-2, #f3f4f6);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.14s, border-color 0.14s;
+}
+.undoBtn:hover { background: var(--border); border-color: var(--accent); }
+
 /* ── Mobile: tudo já é compacto, pequenos ajustes ─────────── */
 @media (max-width: 420px) {
   .body { padding: 12px; gap: 14px; }

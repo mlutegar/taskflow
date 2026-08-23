@@ -69,6 +69,21 @@ async function ensureDailyReset(routine) {
   return routine;
 }
 
+const MUTATION_RATE_LIMIT = {
+  config: {
+    rateLimit: {
+      max: 100,
+      timeWindow: 5 * 60 * 1000,
+      keyGenerator: (req) => req.userId ?? req.ip,
+      errorResponseBuilder: () => ({
+        statusCode: 429,
+        error: "Too Many Requests",
+        message: "Muitas requisições. Tente novamente em alguns minutos.",
+      }),
+    },
+  },
+};
+
 export default async function routinesRoutes(fastify) {
   fastify.addHook("preHandler", authenticate);
 
@@ -90,7 +105,7 @@ export default async function routinesRoutes(fastify) {
   });
 
   // POST /routines
-  fastify.post("/", async (req, reply) => {
+  fastify.post("/", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { title, description, target_value, unit } = req.body;
     const routine = await prisma.routine.create({
       data: {
@@ -107,7 +122,7 @@ export default async function routinesRoutes(fastify) {
   });
 
   // PATCH /routines/:id
-  fastify.patch("/:id", async (req, reply) => {
+  fastify.patch("/:id", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id } = req.params;
     const existing = await prisma.routine.findFirst({ where: { id, userId: req.userId } });
     if (!existing) return reply.status(404).send({ error: "Rotina não encontrada." });
@@ -131,7 +146,7 @@ export default async function routinesRoutes(fastify) {
   });
 
   // DELETE /routines/:id
-  fastify.delete("/:id", async (req, reply) => {
+  fastify.delete("/:id", MUTATION_RATE_LIMIT, async (req, reply) => {
     const existing = await prisma.routine.findFirst({ where: { id: req.params.id, userId: req.userId } });
     if (!existing) return reply.status(404).send({ error: "Rotina não encontrada." });
     await prisma.routine.delete({ where: { id: req.params.id } });
@@ -139,7 +154,7 @@ export default async function routinesRoutes(fastify) {
   });
 
   // POST /routines/:id/complete
-  fastify.post("/:id/complete", async (req, reply) => {
+  fastify.post("/:id/complete", MUTATION_RATE_LIMIT, async (req, reply) => {
     const today = TODAY();
     const routine = await fetchRoutine(req.params.id, req.userId);
     const currentHistory = parseJson(routine.completionHistory, []);
@@ -155,7 +170,7 @@ export default async function routinesRoutes(fastify) {
   });
 
   // POST /routines/:id/uncomplete
-  fastify.post("/:id/uncomplete", async (req, reply) => {
+  fastify.post("/:id/uncomplete", MUTATION_RATE_LIMIT, async (req, reply) => {
     const today = TODAY();
     const routine = await fetchRoutine(req.params.id, req.userId);
     const currentHistory = parseJson(routine.completionHistory, []);
@@ -172,7 +187,7 @@ export default async function routinesRoutes(fastify) {
   });
 
   // POST /routines/:id/complete-date
-  fastify.post("/:id/complete-date", async (req, reply) => {
+  fastify.post("/:id/complete-date", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { date } = req.body;
     const today = TODAY();
     if (date > today) return reply.status(400).send({ error: "Não é possível marcar para data futura." });
@@ -194,7 +209,7 @@ export default async function routinesRoutes(fastify) {
   });
 
   // POST /routines/:id/progress
-  fastify.post("/:id/progress", async (req, reply) => {
+  fastify.post("/:id/progress", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { amount } = req.body;
     const today = TODAY();
     const routine = await fetchRoutine(req.params.id, req.userId);
@@ -217,7 +232,7 @@ export default async function routinesRoutes(fastify) {
   });
 
   // POST /routines/:id/checklist
-  fastify.post("/:id/checklist", async (req, reply) => {
+  fastify.post("/:id/checklist", MUTATION_RATE_LIMIT, async (req, reply) => {
     const routine = await prisma.routine.findFirst({ where: { id: req.params.id, userId: req.userId } });
     if (!routine) return reply.status(404).send({ error: "Rotina não encontrada." });
 
@@ -230,7 +245,7 @@ export default async function routinesRoutes(fastify) {
   });
 
   // PATCH /routines/:id/checklist/:itemId/toggle
-  fastify.patch("/:id/checklist/:itemId/toggle", async (req, reply) => {
+  fastify.patch("/:id/checklist/:itemId/toggle", MUTATION_RATE_LIMIT, async (req, reply) => {
     const routine = await prisma.routine.findFirst({ where: { id: req.params.id, userId: req.userId } });
     if (!routine) return reply.status(404).send({ error: "Rotina não encontrada." });
 
@@ -262,7 +277,7 @@ export default async function routinesRoutes(fastify) {
   });
 
   // DELETE /routines/:id/checklist/:itemId
-  fastify.delete("/:id/checklist/:itemId", async (req, reply) => {
+  fastify.delete("/:id/checklist/:itemId", MUTATION_RATE_LIMIT, async (req, reply) => {
     const routine = await prisma.routine.findFirst({ where: { id: req.params.id, userId: req.userId } });
     if (!routine) return reply.status(404).send({ error: "Rotina não encontrada." });
     await prisma.routineChecklistItem.delete({ where: { id: BigInt(req.params.itemId) } });

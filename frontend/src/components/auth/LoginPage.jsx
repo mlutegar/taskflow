@@ -21,7 +21,6 @@ export default function LoginPage({ signIn, signUp }) {
         await signIn(email, password);
       } else {
         await signUp(email, password);
-        setInfo("Conta criada! Verifique seu e-mail para confirmar o cadastro.");
       }
     } catch (err) {
       setError(translateError(err.message));

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { taskSchema } from "../lib/schemas";
 import styles from "./AddTaskForm.module.css";
 
 export default function AddTaskForm({ onSubmit, onCancel }) {
@@ -8,10 +9,32 @@ export default function AddTaskForm({ onSubmit, onCancel }) {
   const [dueDate, setDueDate] = useState("");
   const [recurrence, setRecurrence] = useState("");
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const result = taskSchema.safeParse({
+      title: title.trim(),
+      description: description.trim(),
+      priority: Number(priority),
+      due_date: dueDate,
+      recurrence: recurrence,
+    });
+    if (!result.success) {
+      const fieldErrors = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0];
+        if (field && !fieldErrors[field]) fieldErrors[field] = issue.message;
+      }
+      setErrors(fieldErrors);
+      return false;
+    }
+    setErrors({});
+    return true;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!validate()) return;
     setSaving(true);
     try {
       await onSubmit({
@@ -30,22 +53,27 @@ export default function AddTaskForm({ onSubmit, onCancel }) {
     <form className={styles.form} onSubmit={handleSubmit}>
       <h3 className={styles.heading}>Nova Tarefa</h3>
 
-      <input
-        className={styles.input}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Título da tarefa *"
-        required
-        autoFocus
-      />
+      <div className={styles.field}>
+        <input
+          className={`${styles.input}${errors.title ? " " + styles.inputError : ""}`}
+          value={title}
+          onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors((p) => ({ ...p, title: undefined })); }}
+          placeholder="Título da tarefa *"
+          autoFocus
+        />
+        {errors.title && <span className={styles.errorMsg}>{errors.title}</span>}
+      </div>
 
-      <textarea
-        className={styles.textarea}
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Descrição (opcional)"
-        rows={2}
-      />
+      <div className={styles.field}>
+        <textarea
+          className={`${styles.textarea}${errors.description ? " " + styles.inputError : ""}`}
+          value={description}
+          onChange={(e) => { setDescription(e.target.value); if (errors.description) setErrors((p) => ({ ...p, description: undefined })); }}
+          placeholder="Descrição (opcional)"
+          rows={2}
+        />
+        {errors.description && <span className={styles.errorMsg}>{errors.description}</span>}
+      </div>
 
       <div className={styles.row}>
         <div className={styles.field}>
@@ -66,10 +94,11 @@ export default function AddTaskForm({ onSubmit, onCancel }) {
           <label className={styles.label}>Vencimento</label>
           <input
             type="date"
-            className={styles.input}
+            className={`${styles.input}${errors.due_date ? " " + styles.inputError : ""}`}
             value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
+            onChange={(e) => { setDueDate(e.target.value); if (errors.due_date) setErrors((p) => ({ ...p, due_date: undefined })); }}
           />
+          {errors.due_date && <span className={styles.errorMsg}>{errors.due_date}</span>}
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Repetição</label>
@@ -88,7 +117,7 @@ export default function AddTaskForm({ onSubmit, onCancel }) {
       </div>
 
       <div className={styles.actions}>
-        <button type="submit" className={styles.btnSubmit} disabled={saving || !title.trim()}>
+        <button type="submit" className={styles.btnSubmit} disabled={saving}>
           {saving ? "Salvando..." : "Criar tarefa"}
         </button>
         <button type="button" className={styles.btnCancel} onClick={onCancel}>

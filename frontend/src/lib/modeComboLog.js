@@ -4,6 +4,7 @@
  */
 
 import { storageGet, storageAppend, storageSet } from "./storage";
+import { syncToBackend } from "./syncToBackend";
 
 const RETAIN_DAYS = 90;
 
@@ -37,10 +38,7 @@ export function logCombo({ modeIdA, modeIdB, worked, focusedMinutes, feeling }) 
   const entry = { modeIdA: idA, modeIdB: idB, date, hour, worked, focusedMinutes, feeling };
   storageAppend(LS_KEY, entry, MAX_ENTRIES);
 
-  // Sync com backend (fire-and-forget com retry offline)
-  import("./syncQueue").then(({ withOfflineFallback }) => {
-    withOfflineFallback("POST", "/mode-combo-log", { modeIdA: idA, modeIdB: idB, date, hour, worked, focusedMinutes, feeling });
-  });
+  syncToBackend("POST", "/mode-combo-log", { modeIdA: idA, modeIdB: idB, date, hour, worked, focusedMinutes, feeling });
 }
 
 /** Retorna todos os registros de combos. */

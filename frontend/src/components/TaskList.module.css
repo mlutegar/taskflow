@@ -4,6 +4,59 @@
   gap: 10px;
 }
 
+.bulkToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(124, 110, 245, 0.10);
+  border: 1px solid rgba(124, 110, 245, 0.25);
+  border-radius: var(--radius);
+  margin-bottom: 4px;
+  animation: slideDown 0.15s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.bulkCount {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  flex: 1;
+}
+
+.bulkBtn {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  transition: background 0.15s;
+}
+
+.bulkBtn:hover { background: var(--accent-hover); }
+
+.bulkBtnDanger {
+  background: rgba(224, 82, 82, 0.85);
+}
+
+.bulkBtnDanger:hover { background: var(--danger); }
+
+.bulkBtnCancel {
+  font-size: 13px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+
+.bulkBtnCancel:hover { color: var(--text); }
+
 /* ── Agrupamento por prioridade ── */
 .groupedList {
   display: flex;

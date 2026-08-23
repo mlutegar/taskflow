@@ -11,6 +11,7 @@ COPY . .
 # Build-time env vars are baked in by Vite
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_API_URL
 
 RUN npm run build
 

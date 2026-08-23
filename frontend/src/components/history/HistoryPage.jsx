@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getHistory } from "../../lib/dailyFocusHistory";
 import { getAllLogs } from "../../lib/modeLog";
 import { getUsageLogs } from "../../lib/sessionUsageLog";
@@ -6,7 +7,6 @@ import { getCheckinLog } from "../../lib/checkinLog";
 import { MODES } from "../../data/modes";
 import { api } from "../../lib/apiClient";
 import { mergeLocal } from "../../lib/mergeLocal";
-import { cacheGet, cacheSet } from "../../lib/historyCache";
 import styles from "./HistoryPage.module.css";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -173,9 +173,12 @@ function UsageLogsTab({ logs }) {
               <span className={styles.cardDate}>{formatDate(l.date)}{l.hour !== undefined ? ` · ${l.hour}h` : ""}</span>
             </div>
             <div className={styles.cardMeta}>
-              <span className={l.worked ? styles.tagGreen : styles.tagRed}>
-                {l.worked ? "✅ Funcionou" : "❌ Não funcionou"}
+              <span className={l.worked === true ? styles.tagGreen : l.worked === null ? styles.tagYellow : styles.tagRed}>
+                {l.worked === true ? "✅ Funcionou" : l.worked === null ? "🤔 Mais ou menos" : "❌ Não funcionou"}
               </span>
+              {l.comboWith && (
+                <span className={styles.tagBlue}>🔀 com {getModeLabel(l.comboWith)}</span>
+              )}
               {l.focusedMinutes > 0 && <span className={styles.tagMuted}>🎯 {l.focusedMinutes}min focado</span>}
               {l.idleMinutes > 0 && <span className={styles.tagMuted}>💤 {l.idleMinutes}min ocioso</span>}
               {l.feeling && l.feeling.length > 0 && (
@@ -235,96 +238,54 @@ const TABS = [
   { key: "checkins", label: "💭 Check-ins" },
 ];
 
+const SESSION_LIMIT = 50;
+
 export default function HistoryPage() {
   const [tab, setTab] = useState("sessions");
   const [modeFilter, setModeFilter] = useState("all");
+  const [sessionPage, setSessionPage] = useState(1);
 
-  // Remote state (null = loading)
-  const [remoteSessions, setRemoteSessions] = useState(null);
-  const [remoteModes, setRemoteModes] = useState(null);
-  const [remoteUsage, setRemoteUsage] = useState(null);
-  const [remoteCheckins, setRemoteCheckins] = useState(null);
+  // ── React Query: busca remota com cache automático ────────────────────────
 
-  useEffect(() => {
-    // Fetch sessions (com cache de 1 min)
-    const cachedSessions = cacheGet("sessions");
-    if (cachedSessions) {
-      setRemoteSessions(cachedSessions);
-    } else {
-      api.get("/daily-focus/sessions").then(data => {
-        const parsed = Array.isArray(data)
-          ? data.map(r => ({
-              date:        r.date,
-              level:       r.level,
-              tasks:       r.tasks,
-              completedAt: r.completed_at,
-              rushMode:    r.rush_mode,
-              tabMode:     r.tab_mode,
-              cycleCount:  r.cycle_count,
-            }))
-          : [];
-        cacheSet("sessions", parsed);
-        setRemoteSessions(parsed);
-      }).catch(() => setRemoteSessions([]));
-    }
+  const { data: sessionsData, isLoading: sessionsLoading } = useQuery({
+    queryKey: ["history", "sessions", sessionPage],
+    queryFn: () => api.get(`/daily-focus/sessions?page=${sessionPage}&limit=${SESSION_LIMIT}`),
+    staleTime: 60_000,
+    placeholderData: (prev) => prev, // mantém dados anteriores ao paginar
+  });
 
-    // Fetch mode logs (com cache)
-    const cachedModes = cacheGet("modes");
-    if (cachedModes) {
-      setRemoteModes(cachedModes);
-    } else {
-      api.get("/mode-log").then(data => {
-        const parsed = Array.isArray(data) ? data : [];
-        cacheSet("modes", parsed);
-        setRemoteModes(parsed);
-      }).catch(() => setRemoteModes([]));
-    }
+  const { data: remoteModes = [] } = useQuery({
+    queryKey: ["history", "modes"],
+    queryFn:  () => api.get("/mode-log").then(d => Array.isArray(d) ? d : []),
+    staleTime: 60_000,
+  });
 
-    // Fetch usage logs (com cache)
-    const cachedUsage = cacheGet("usage");
-    if (cachedUsage) {
-      setRemoteUsage(cachedUsage);
-    } else {
-      api.get("/session-usage-logs").then(data => {
-        const parsed = Array.isArray(data)
-          ? data.map(r => ({
-              modeId:         r.mode_id,
-              date:           r.date,
-              hour:           r.hour,
-              worked:         r.worked,
-              focusedMinutes: r.focused_minutes,
-              idleMinutes:    r.idle_minutes,
-              idleReason:     r.idle_reason || [],
-              feeling:        r.feeling || [],
-            }))
-          : [];
-        cacheSet("usage", parsed);
-        setRemoteUsage(parsed);
-      }).catch(() => setRemoteUsage([]));
-    }
+  const { data: remoteUsageRaw = [] } = useQuery({
+    queryKey: ["history", "usage"],
+    queryFn:  () => api.get("/session-usage-logs").then(d => Array.isArray(d)
+      ? d.map(r => ({
+          modeId: r.mode_id, date: r.date, hour: r.hour,
+          worked: r.worked, focusedMinutes: r.focused_minutes,
+          idleMinutes: r.idle_minutes, idleReason: r.idle_reason || [],
+          feeling: r.feeling || [], comboWith: r.combo_with ?? null,
+        }))
+      : []),
+    staleTime: 60_000,
+  });
 
-    // Fetch checkins (com cache)
-    const cachedCheckins = cacheGet("checkins");
-    if (cachedCheckins) {
-      setRemoteCheckins(cachedCheckins);
-    } else {
-      api.get("/daily-focus/checkins").then(data => {
-        const raw = Array.isArray(data) ? data : (Array.isArray(data?.checkins) ? data.checkins : []);
-        const parsed = raw.map(r => ({
-          estadoId: r.estado_id,
-          modeId:   r.mode_id,
-          date:     r.date,
-          hour:     r.hour,
-        }));
-        cacheSet("checkins", parsed);
-        setRemoteCheckins(parsed);
-      }).catch(() => setRemoteCheckins([]));
-    }
-  }, []);
+  const { data: checkinsData } = useQuery({
+    queryKey: ["history", "checkins"],
+    queryFn:  () => api.get("/daily-focus/checkins").then(d => {
+      const raw = Array.isArray(d) ? d : (Array.isArray(d?.checkins) ? d.checkins : []);
+      return raw.map(r => ({ estadoId: r.estado_id, modeId: r.mode_id, date: r.date, hour: r.hour }));
+    }),
+    staleTime: 60_000,
+  });
 
-  const isLoading = remoteSessions === null || remoteModes === null || remoteUsage === null || remoteCheckins === null;
+  const isLoading = sessionsLoading;
+  const pagination = sessionsData?.pagination ?? { page: 1, totalPages: 1, total: 0 };
 
-  // Local fallbacks
+  // Local fallbacks (não sincronizados ainda)
   const localSessions = useMemo(() => getHistory(), []);
   const localModes    = useMemo(() => getAllLogs(), []);
   const localUsage    = useMemo(() => getUsageLogs(), []);
@@ -332,19 +293,22 @@ export default function HistoryPage() {
 
   // Mescla remoto + local para não perder entradas ainda não sincronizadas.
   // Itens só locais recebem _local: true para indicação visual na UI.
+  const remoteSessions = sessionsData?.data ?? null;
+  const remoteCheckins = checkinsData ?? null;
+
   const sessions = useMemo(
-    () => mergeLocal(remoteSessions, localSessions, s => `${s.date}|${s.completedAt}`),
-    [remoteSessions, localSessions]
+    () => mergeLocal(remoteSessions, sessionPage === 1 ? localSessions : [], s => `${s.date}|${s.completedAt}`),
+    [remoteSessions, localSessions, sessionPage]
   );
 
   const modeLogs = useMemo(
-    () => mergeLocal(remoteModes, localModes, e => `${e.modeId}|${e.date}|${e.hour ?? ""}`),
+    () => mergeLocal(remoteModes.length ? remoteModes : null, localModes, e => `${e.modeId}|${e.date}|${e.hour ?? ""}`),
     [remoteModes, localModes]
   );
 
   const usageLogs = useMemo(
-    () => mergeLocal(remoteUsage, localUsage, e => `${e.modeId}|${e.date}|${e.hour ?? ""}`),
-    [remoteUsage, localUsage]
+    () => mergeLocal(remoteUsageRaw.length ? remoteUsageRaw : null, localUsage, e => `${e.modeId}|${e.date}|${e.hour ?? ""}`),
+    [remoteUsageRaw, localUsage]
   );
 
   const checkins = useMemo(
@@ -417,7 +381,33 @@ export default function HistoryPage() {
       )}
 
       <div className={styles.content}>
-        {tab === "sessions" && <SessionsTab sessions={sessions} />}
+        {tab === "sessions" && (
+          <>
+            <SessionsTab sessions={sessions} />
+            {pagination.totalPages > 1 && (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 16 }}>
+                <button
+                  className={styles.exportBtn}
+                  disabled={sessionPage <= 1}
+                  onClick={() => setSessionPage((p) => Math.max(1, p - 1))}
+                >
+                  ← Anterior
+                </button>
+                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                  Página {pagination.page} de {pagination.totalPages}
+                  <span style={{ marginLeft: 6, opacity: 0.6 }}>({pagination.total} sessões)</span>
+                </span>
+                <button
+                  className={styles.exportBtn}
+                  disabled={sessionPage >= pagination.totalPages}
+                  onClick={() => setSessionPage((p) => Math.min(pagination.totalPages, p + 1))}
+                >
+                  Próxima →
+                </button>
+              </div>
+            )}
+          </>
+        )}
         {tab === "modes"    && <ModesTab logs={filteredModes} />}
         {tab === "usage"    && <UsageLogsTab logs={filteredUsage} />}
         {tab === "checkins" && <CheckinsTab logs={checkins} />}

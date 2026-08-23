@@ -5,9 +5,11 @@
  */
 
 import { storageGet, storageAppend, storageSet } from "./storage";
+import { syncToBackend } from "./syncToBackend";
 
 const LS_KEY = "sessionUsageLog";
-const MAX_ENTRIES = 365;
+const MAX_ENTRIES = 500; // ~500 sessions ≈ ~1 session/day for 1.5 years
+const RETAIN_DAYS = 90;  // prune entries older than 90 days, same as modeLog
 
 function localIsoDate() {
   const d = new Date();
@@ -23,32 +25,49 @@ function localIsoDate() {
  * @param {number} entry.idleMinutes
  * @param {string[]} entry.idleReason
  * @param {string[]} entry.feeling
+ * @param {string} [entry.comboWith] — modeId do outro modo se foi sessão combo
  */
-export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReason, feeling }) {
-  if (!modeId) return;
-  const date = localIsoDate();
-  const hour = new Date().getHours();
-  const entry = { modeId, date, hour, worked, focusedMinutes, idleMinutes, idleReason, feeling };
-  storageAppend(LS_KEY, entry, MAX_ENTRIES);
-
-  // Sync com backend (fire-and-forget com retry offline)
-  import("./syncQueue").then(({ withOfflineFallback }) => {
-    withOfflineFallback("POST", "/session-usage-logs", {
-      mode_id:         entry.modeId,
-      date:            entry.date,
-      hour:            entry.hour,
-      worked:          entry.worked,
-      focused_minutes: entry.focusedMinutes,
-      idle_minutes:    entry.idleMinutes,
-      idle_reason:     entry.idleReason,
-      feeling:         entry.feeling,
-    });
+/** Gera um UUID v4 simples sem dependências externas. */
+function generateId() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
   });
 }
 
-/** Retorna todos os registros salvos. */
+export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReason, feeling, comboWith }) {
+  if (!modeId) return false;
+  const date = localIsoDate();
+  const hour = new Date().getHours();
+  const id = generateId();
+  const entry = { id, modeId, date, hour, worked, focusedMinutes, idleMinutes, idleReason, feeling, ...(comboWith ? { comboWith } : {}) };
+  const saved = storageAppend(LS_KEY, entry, MAX_ENTRIES);
+
+  syncToBackend("POST", "/session-usage-logs", {
+    id:              entry.id,
+    mode_id:         entry.modeId,
+    date:            entry.date,
+    hour:            entry.hour,
+    worked:          entry.worked,
+    focused_minutes: entry.focusedMinutes,
+    idle_minutes:    entry.idleMinutes,
+    idle_reason:     entry.idleReason,
+    feeling:         entry.feeling,
+    ...(entry.comboWith ? { combo_with: entry.comboWith } : {}),
+  });
+
+  return saved;
+}
+
+/** Retorna todos os registros salvos (entradas dos últimos 90 dias). */
 export function getUsageLogs() {
-  return storageGet(LS_KEY, []);
+  const all = storageGet(LS_KEY, []);
+  const cutoff = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - RETAIN_DAYS);
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  })();
+  return all.filter((e) => !e.date || e.date >= cutoff);
 }
 
 /**
@@ -65,7 +84,7 @@ export function getUsageStatsByMode(days = 30) {
   for (const e of logs) {
     if (!byMode[e.modeId]) byMode[e.modeId] = { total: 0, worked: 0, focusSum: 0, idleSum: 0 };
     byMode[e.modeId].total++;
-    if (e.worked) byMode[e.modeId].worked++;
+    if (e.worked === true) byMode[e.modeId].worked++;
     byMode[e.modeId].focusSum += e.focusedMinutes || 0;
     byMode[e.modeId].idleSum += e.idleMinutes || 0;
   }
@@ -90,7 +109,7 @@ export function getHourlySuccessMap() {
     if (!map[e.modeId]) map[e.modeId] = {};
     if (!map[e.modeId][e.hour]) map[e.modeId][e.hour] = { total: 0, worked: 0 };
     map[e.modeId][e.hour].total++;
-    if (e.worked) map[e.modeId][e.hour].worked++;
+    if (e.worked === true) map[e.modeId][e.hour].worked++;
   }
   // Calcula taxas
   for (const modeId of Object.keys(map)) {
@@ -112,8 +131,8 @@ export function getFeelingStats() {
   for (const e of logs) {
     for (const f of (e.feeling || [])) {
       if (!map[f]) map[f] = { workedCount: 0, notWorkedCount: 0 };
-      if (e.worked) map[f].workedCount++;
-      else map[f].notWorkedCount++;
+      if (e.worked === true) map[f].workedCount++;
+      else if (e.worked === false) map[f].notWorkedCount++;
     }
   }
   return Object.entries(map).map(([feeling, s]) => {
@@ -157,7 +176,7 @@ export function getBestHourForMode(modeId, minSessions = 3) {
     const b = blockForHour(e.hour);
     if (!blockMap[b.id]) blockMap[b.id] = { block: b, total: 0, worked: 0 };
     blockMap[b.id].total++;
-    if (e.worked) blockMap[b.id].worked++;
+    if (e.worked === true) blockMap[b.id].worked++;
   }
 
   const candidates = Object.values(blockMap)
@@ -175,7 +194,7 @@ export function getBestHourForMode(modeId, minSessions = 3) {
 export function getModeSuccessRate(modeId, minSessions = 3) {
   const logs = getUsageLogs().filter((e) => e.modeId === modeId);
   if (logs.length < minSessions) return null;
-  const worked = logs.filter((e) => e.worked).length;
+  const worked = logs.filter((e) => e.worked === true).length;
   return { total: logs.length, worked, successRate: Math.round((worked / logs.length) * 100) };
 }
 
@@ -273,6 +292,122 @@ export function getCorrelationByEstado() {
   return result;
 }
 
+/**
+ * Minutos focados totais por modo para os últimos N dias.
+ * Retorna: [{ modeId, totalFocusMin, totalIdleMin, sessions }] ordenado por totalFocusMin desc.
+ */
+export function getFocusedMinutesByMode(days = 30) {
+  const cutoff = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  })();
+  const map = {};
+  for (const e of getUsageLogs().filter((e) => e.date >= cutoff)) {
+    if (!map[e.modeId]) map[e.modeId] = { totalFocusMin: 0, totalIdleMin: 0, sessions: 0 };
+    map[e.modeId].totalFocusMin += e.focusedMinutes || 0;
+    map[e.modeId].totalIdleMin  += e.idleMinutes    || 0;
+    map[e.modeId].sessions++;
+  }
+  return Object.entries(map)
+    .map(([modeId, s]) => ({ modeId, ...s }))
+    .sort((a, b) => b.totalFocusMin - a.totalFocusMin);
+}
+
+/**
+ * Melhor dia da semana para foco (domingo=0 … sábado=6).
+ * Retorna: { dayIndex, dayName, avgFocusMin, totalSessions } | null
+ */
+export function getBestDayOfWeek() {
+  const PT_DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const map = {};
+  for (const e of getUsageLogs()) {
+    const [y, m, d] = e.date.split("-").map(Number);
+    const dow = new Date(y, m - 1, d).getDay();
+    if (!map[dow]) map[dow] = { focus: 0, sessions: 0 };
+    map[dow].focus += e.focusedMinutes || 0;
+    map[dow].sessions++;
+  }
+  const entries = Object.entries(map);
+  if (!entries.length) return null;
+  const [dayIndex, stats] = entries.sort((a, b) => b[1].focus - a[1].focus)[0];
+  return {
+    dayIndex: Number(dayIndex),
+    dayName: PT_DAYS[dayIndex],
+    avgFocusMin: stats.sessions > 0 ? Math.round(stats.focus / stats.sessions) : 0,
+    totalSessions: stats.sessions,
+  };
+}
+
+/**
+ * Comparação semana atual vs semana anterior em minutos focados.
+ * Retorna: { thisWeekMin, lastWeekMin, diff, pct }
+ */
+export function getWeeklyFocusComparison() {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const pad = (n) => String(n).padStart(2, "0");
+  const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  const startThis = new Date(now);
+  startThis.setDate(now.getDate() - dayOfWeek);
+  startThis.setHours(0, 0, 0, 0);
+
+  const startLast = new Date(startThis);
+  startLast.setDate(startThis.getDate() - 7);
+
+  const thisWeekStart = fmt(startThis);
+  const lastWeekStart = fmt(startLast);
+
+  let thisWeekMin = 0, lastWeekMin = 0;
+  for (const e of getUsageLogs()) {
+    if (e.date >= thisWeekStart) thisWeekMin += e.focusedMinutes || 0;
+    else if (e.date >= lastWeekStart) lastWeekMin += e.focusedMinutes || 0;
+  }
+  const diff = thisWeekMin - lastWeekMin;
+  const pct  = lastWeekMin > 0 ? Math.round((diff / lastWeekMin) * 100) : null;
+  return { thisWeekMin, lastWeekMin, diff, pct };
+}
+
+/**
+ * Minutos focados e ociosos agrupados por dia para os últimos N dias.
+ * Retorna: [{ date, label, focusedMinutes, idleMinutes }] — um item por dia,
+ * mesmo que não haja registros naquele dia (valor 0).
+ */
+export function getFocusedMinutesByDay(days = 30) {
+  const logs = getUsageLogs();
+  const map = {};
+  for (const e of logs) {
+    if (!map[e.date]) map[e.date] = { focusedMinutes: 0, idleMinutes: 0 };
+    map[e.date].focusedMinutes += e.focusedMinutes || 0;
+    map[e.date].idleMinutes   += e.idleMinutes   || 0;
+  }
+
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const iso   = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+    const label = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    result.push({ date: iso, label, ...(map[iso] || { focusedMinutes: 0, idleMinutes: 0 }) });
+  }
+  return result;
+}
+
+/**
+ * Total de minutos focados nos últimos N dias.
+ */
+export function getTotalFocusedMinutes(days = 7) {
+  const cutoff = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  })();
+  return getUsageLogs()
+    .filter((e) => e.date >= cutoff)
+    .reduce((sum, e) => sum + (e.focusedMinutes || 0), 0);
+}
+
 // ── Lembretes pendentes ───────────────────────────────────────────────────────
 const REMINDER_KEY = "sessionReminders";
 
@@ -299,6 +434,50 @@ export function clearPendingReminder(modeId) {
 }
 
 /**
+ * Melhor parceiro de combo para um modo (baseado no campo comboWith).
+ * Retorna: { modeId, total, successRate } | null  (mín. 2 sessões juntos)
+ */
+export function getBestComboPartner(modeId, minSessions = 2) {
+  const logs = getUsageLogs().filter((e) => e.modeId === modeId && e.comboWith);
+  if (!logs.length) return null;
+
+  const byPartner = {};
+  for (const e of logs) {
+    if (!byPartner[e.comboWith]) byPartner[e.comboWith] = { total: 0, worked: 0 };
+    byPartner[e.comboWith].total++;
+    if (e.worked === true) byPartner[e.comboWith].worked++;
+  }
+
+  const candidates = Object.entries(byPartner)
+    .filter(([, s]) => s.total >= minSessions)
+    .map(([partnerId, s]) => ({
+      modeId: partnerId,
+      total: s.total,
+      successRate: Math.round((s.worked / s.total) * 100),
+    }))
+    .sort((a, b) => b.successRate - a.successRate || b.total - a.total);
+
+  return candidates[0] || null;
+}
+
+/**
+ * Compara taxa de sucesso do modo solo vs. em combo.
+ * Retorna: { soloRate, comboRate, delta } | null se sem dados suficientes
+ */
+export function getComboVsSoloRate(modeId, minSessions = 2) {
+  const logs = getUsageLogs().filter((e) => e.modeId === modeId);
+  const solo  = logs.filter((e) => !e.comboWith);
+  const combo = logs.filter((e) => !!e.comboWith);
+
+  if (solo.length < minSessions || combo.length < minSessions) return null;
+
+  const rate = (arr) => Math.round((arr.filter((e) => e.worked === true).length / arr.length) * 100);
+  const soloRate  = rate(solo);
+  const comboRate = rate(combo);
+  return { soloRate, comboRate, delta: comboRate - soloRate };
+}
+
+/**
  * Carrega registros do Supabase e mescla com localStorage.
  */
 export async function loadRemoteUsageLogs() {
@@ -307,8 +486,9 @@ export async function loadRemoteUsageLogs() {
     const remote = await fetchUsageLogs();
     if (remote && remote.length) {
       const local = storageGet(LS_KEY, []);
-      const seen = new Set(local.map((e) => `${e.modeId}|${e.date}|${e.hour}`));
-      const fresh = remote.filter((e) => !seen.has(`${e.modeId}|${e.date}|${e.hour}`));
+      // Dedup por id (se disponível) ou fallback para modeId|date|hour
+      const seen = new Set(local.map((e) => e.id || `${e.modeId}|${e.date}|${e.hour}`));
+      const fresh = remote.filter((e) => !seen.has(e.id || `${e.modeId}|${e.date}|${e.hour}`));
       if (fresh.length) {
         const merged = [...local, ...fresh].slice(-MAX_ENTRIES);
         storageSet(LS_KEY, merged);

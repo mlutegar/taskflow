@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useConfirm } from "./ConfirmDialog";
 import { useToast } from './shared/Toast';
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import ModeSession from "./ModeSession";
 import ModeComboSession from "./ModeComboSession";
 import ModalOverlay from "./shared/ModalOverlay";
@@ -788,6 +789,9 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
 
   const { confirm, ConfirmUI } = useConfirm();
   const { showToast } = useToast();
+
+  // Focus trap for the active ModeSession modal (sessionRef is the container div)
+  useFocusTrap(sessionRef, !!activeSession, () => modeSessionRef.current?.triggerClose());
 
   // Registros de uso pós-sessão para insights nos cards
   const [usageLogs, setUsageLogs] = useState(() => getUsageLogs());
@@ -1909,7 +1913,12 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
       )}
 
       {activeSession && (
-        <div ref={sessionRef}>
+        <div
+          ref={sessionRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={activeSession.name ? `Sessão: ${activeSession.name}` : "Sessão ativa"}
+        >
         <ModeSession
           modeId={activeSession.id}
           mode={activeSession}

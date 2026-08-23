@@ -4,7 +4,9 @@
  * Functions are safe (try/catch) and handle missing/corrupt values gracefully.
  */
 
-const PREFIX = 'taskflow.';
+import { STORAGE_PREFIX } from "../config/constants";
+
+const PREFIX = STORAGE_PREFIX;
 
 /** Read a JSON value. Returns defaultValue if missing or unparseable. */
 export function storageGet(key, defaultValue = null) {

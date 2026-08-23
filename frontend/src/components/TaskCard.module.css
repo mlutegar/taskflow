@@ -1,4 +1,38 @@
+/* Swipe wrapper */
+.swipeWrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+
+.swipeHint {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.swipeHintComplete {
+  left: 0;
+  background: rgba(78, 204, 163, 0.2);
+  color: #4ecca3;
+}
+
+.swipeHintDelete {
+  right: 0;
+  background: rgba(224, 82, 82, 0.2);
+  color: #e05252;
+}
+
 .card {
+  position: relative;
+  z-index: 1;
   background: var(--surface);
   border: 1px solid var(--border);
   border-left-width: 3px;
@@ -8,6 +42,26 @@
 }
 
 .card:hover { border-color: #3a3a50; }
+.cardSelected { border-color: var(--accent) !important; background: rgba(124, 110, 245, 0.06); }
+
+.bulkCheck {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #fff;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.bulkCheckSelected {
+  background: var(--accent);
+  border-color: var(--accent);
+}
 
 /* Barra lateral colorida por prioridade */
 .bar_critical { border-left-color: var(--critical); }
@@ -114,6 +168,16 @@
   padding: 1px 7px;
   border-radius: 99px;
   border: 1px solid rgba(124, 110, 245, 0.20);
+  white-space: nowrap;
+}
+
+.completedAtBadge {
+  font-size: 11px;
+  color: #4ecca3;
+  background: rgba(78, 204, 163, 0.12);
+  padding: 1px 7px;
+  border-radius: 99px;
+  border: 1px solid rgba(78, 204, 163, 0.20);
   white-space: nowrap;
 }
 

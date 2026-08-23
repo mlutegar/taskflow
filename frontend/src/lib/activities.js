@@ -27,6 +27,9 @@ export const DEFAULT_ACTIVITIES = [
   "Reddit",
   "Deitar 1min",
   "Instagram",
+  "Dançar tiktok",
+  "Orbita: prompt e espera (faz tasks enquanto processa)",
+  "Orbita: all in em um projeto (máximo de prompts)",
 ];
 
 export function getActivities() {

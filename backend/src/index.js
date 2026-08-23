@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 
 // Prisma usa BigInt para IDs autoincrement — precisamos serializar corretamente
 BigInt.prototype.toJSON = function () {
@@ -19,6 +20,10 @@ const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5175";
 
 const fastify = Fastify({ logger: true });
+
+await fastify.register(rateLimit, {
+  global: false,
+});
 
 await fastify.register(cors, {
   origin: CORS_ORIGIN,

@@ -72,6 +72,17 @@
 .badgeDone { background: rgba(78,204,163,0.15); color: var(--success); }
 .badgePending { background: rgba(124,110,245,0.12); color: var(--accent); }
 
+.streakBadge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(255, 160, 50, 0.15);
+  color: #f5a623;
+  border: 1px solid rgba(255, 160, 50, 0.25);
+  white-space: nowrap;
+}
+
 /* Progress bar */
 .progressWrap {
   margin-top: 8px;

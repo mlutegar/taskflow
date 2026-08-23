@@ -10,12 +10,17 @@ services:
       - "127.0.0.1:3033:3001"
     environment:
       DATABASE_URL: file:/data/taskflow.db
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      JWT_SECRET: ${JWT_SECRET}
       PORT: 3001
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5175}
     volumes:
       - taskflow_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   litestream:
     image: litestream/litestream:latest
@@ -33,16 +38,15 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
-        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
+        VITE_API_URL: ${VITE_API_URL:-/api}
     image: taskflow:latest
     container_name: taskflow
     restart: unless-stopped
     ports:
       - "127.0.0.1:3026:80"
     depends_on:
-      - taskflow-api
+      taskflow-api:
+        condition: service_healthy
 
 volumes:
   taskflow_data:

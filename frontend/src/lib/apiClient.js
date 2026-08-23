@@ -4,9 +4,10 @@
  * Timeout de 9 segundos por requisição via AbortController.
  */
 import { supabase } from "./supabase";
+import { API_TIMEOUT_MS } from "../config/constants";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
-const TIMEOUT_MS = 9_000;
+const TIMEOUT_MS = API_TIMEOUT_MS;
 
 async function getToken() {
   const { data } = await supabase.auth.getSession();

@@ -124,6 +124,42 @@ export function getActivationsToday(modeId) {
 }
 
 /**
+ * Calcula o streak atual (dias consecutivos com pelo menos 1 ativação) de um modo.
+ * @param {string} modeId
+ * @returns {number} streak em dias (0 = sem streak)
+ */
+export function getActivityStreak(modeId) {
+  const entries = load().filter((e) => e.modeId === modeId);
+  if (entries.length === 0) return 0;
+
+  // Conjunto de datas únicas em que o modo foi ativado
+  const datesSet = new Set(entries.map((e) => e.date));
+
+  // Começa a contar do dia de hoje para trás
+  let streak = 0;
+  const today = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    if (datesSet.has(iso)) {
+      streak++;
+    } else if (i === 0) {
+      // Hoje não foi usado — verifica ontem para manter streak de ontem
+      continue;
+    } else {
+      break;
+    }
+  }
+  // Se hoje não foi usado mas ontem sim, conta o streak a partir de ontem
+  const todayIso = today.toISOString().slice(0, 10);
+  if (!datesSet.has(todayIso)) {
+    // streak já foi calculado ignorando hoje (i=0 faz continue)
+  }
+  return streak;
+}
+
+/**
  * Retorna todas as ativações agrupadas por modeId com contagem total.
  * @returns {{ modeId: string, count: number }[]}
  */

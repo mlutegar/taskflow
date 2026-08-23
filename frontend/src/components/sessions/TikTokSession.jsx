@@ -43,35 +43,63 @@ export default function TikTokSession({ preset, tasks, onCompleteTask, onToggleC
   const originalTitleRef = useRef(document.title);
 
   // ── Derivados ────────────────────────────────────────────────────────────
+
+  // Variantes alias: normaliza nomes alternativos para o núcleo de lógica
+  const effectiveVariant =
+    variant === "episode" ? "fixed"       // Netflix episódio → fixo
+    : variant === "prog"  ? "prog_videos" // Gamer/Playlist progressivo → vídeos crescem
+    : variant;
+
   const numVideos =
-    variant === "fixed"  ? baseVideos
-    : variant === "detox" ? Math.max(1, 4 - cycle) * baseVideos
+    effectiveVariant === "fixed"       ? baseVideos
+    : effectiveVariant === "detox"     ? Math.max(1, 4 - cycle) * baseVideos
+    : effectiveVariant === "prog_tasks" ? baseVideos  // WhatsApp: conteúdo fixo, tarefas crescem
     : cycle * baseVideos;
 
   const numTasks =
-    variant === "prog_both" ? cycle
-    : variant === "detox"   ? Math.max(1, 4 - cycle)
+    effectiveVariant === "prog_both"  ? cycle
+    : effectiveVariant === "prog_tasks" ? cycle       // WhatsApp: tarefas crescem
+    : effectiveVariant === "detox"    ? Math.max(1, 4 - cycle)
     : 1;
 
-  const isDetoxFinalCycle = variant === "detox" && cycle >= 3;
+  const isDetoxFinalCycle = effectiveVariant === "detox" && cycle >= 3;
 
   // Labels de plataforma
-  const platformLabel = platform === "reels" ? "Reels" : "TikTok";
-  const platformEmoji = platform === "reels" ? "🎬" : "📱";
-  const videosLabel   = platform === "reels" ? "Reels" : "vídeos";
+  const PLATFORM_META = {
+    tiktok:   { label: "TikTok",   emoji: "📱", videosLabel: "vídeos"    },
+    reels:    { label: "Reels",    emoji: "🎬", videosLabel: "Reels"     },
+    youtube:  { label: "YouTube",  emoji: "▶️",  videosLabel: "vídeos"   },
+    twitter:  { label: "Twitter",  emoji: "🐦", videosLabel: "posts"     },
+    reddit:   { label: "Reddit",   emoji: "🤖", videosLabel: "posts"     },
+    whatsapp: { label: "WhatsApp", emoji: "💬", videosLabel: "mensagens" },
+    gamer:    { label: "Gamer",    emoji: "🎮", videosLabel: "partidas"  },
+    netflix:  { label: "Netflix",  emoji: "🎬", videosLabel: "episódios" },
+    playlist: { label: "Playlist", emoji: "🎵", videosLabel: "músicas"   },
+  };
+  const meta        = PLATFORM_META[platform] ?? PLATFORM_META.tiktok;
+  const platformLabel = meta.label;
+  const platformEmoji = meta.emoji;
+  const videosLabel   = meta.videosLabel;
 
   // Passos da tela intro (reage a baseVideos)
   const variantSteps =
-    variant === "fixed"
+    effectiveVariant === "fixed"
       ? [`Todos os ciclos: ${baseVideos} ${videosLabel} → 1 tarefa`, "Repita quantas vezes quiser!"]
-    : variant === "prog_videos"
+    : effectiveVariant === "prog_videos"
       ? [
           `Ciclo 1: ${baseVideos} ${videosLabel} → 1 tarefa`,
           `Ciclo 2: ${baseVideos * 2} ${videosLabel} → 1 tarefa`,
           `Ciclo 3: ${baseVideos * 3} ${videosLabel} → 1 tarefa`,
           `Continue: n × ${baseVideos} → sempre 1 tarefa`,
         ]
-    : variant === "detox"
+    : effectiveVariant === "prog_tasks"
+      ? [
+          `Ciclo 1: ${baseVideos} ${videosLabel} → 1 tarefa`,
+          `Ciclo 2: ${baseVideos} ${videosLabel} → 2 tarefas`,
+          `Ciclo 3: ${baseVideos} ${videosLabel} → 3 tarefas`,
+          `Continue: ${baseVideos} → n tarefas`,
+        ]
+    : effectiveVariant === "detox"
       ? [
           `Ciclo 1: ${baseVideos * 3} ${videosLabel} → 3 tarefas`,
           `Ciclo 2: ${baseVideos * 2} ${videosLabel} → 2 tarefas`,

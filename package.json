@@ -1,0 +1,26 @@
+{
+  "name": "generalmast",
+  "version": "1.0.0",
+  "description": "TaskFlow é um app web para gerenciar tarefas e rotinas com **modos de execução\r gamificados** que tornam a produtividade mais divertida. Você organiza suas tarefas,\r acompanha rotinas diárias e executa o trabalho dentro de \"modos\" com mecânicas\r específicas para diferentes estados de foco.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently --names \"API,WEB\" --prefix-colors \"cyan,magenta\" \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm --prefix backend run dev",
+    "dev:web": "npm --prefix frontend run dev",
+    "setup": "npm --prefix backend run db:push"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mlutegar/taskflow.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mlutegar/taskflow/issues"
+  },
+  "homepage": "https://github.com/mlutegar/taskflow#readme",
+  "devDependencies": {
+    "concurrently": "^10.0.4"
+  }
+}
