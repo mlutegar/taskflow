@@ -38,6 +38,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       includeAssets: ["icon.svg", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "TaskFlow",
@@ -56,40 +59,8 @@ export default defineConfig({
           { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,woff2}"],
-        navigateFallback: "index.html",
-        runtimeCaching: [
-          // ── Assets estáticos com hash (JS, CSS, fontes) → CacheFirst ──────
-          {
-            urlPattern: /\.(?:js|css|woff2?)(\?.*)?$/,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "taskflow-assets",
-              expiration: {
-                maxEntries: 60,
-                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 dias
-              },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          // ── Rotas de API (NetworkFirst: tenta rede, cai no cache) ─────────
-          {
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith("/api/") ||
-              url.href.includes("/api/"),
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "taskflow-api-cache",
-              networkTimeoutSeconds: 5,
-              expiration: {
-                maxEntries: 150,
-                maxAgeSeconds: 24 * 60 * 60, // 24h
-              },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
       },
     }),
   ],

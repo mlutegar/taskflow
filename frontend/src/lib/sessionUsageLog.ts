@@ -804,6 +804,61 @@ export function getSessionEfficiencyList(days = 30): SessionEfficiencyItem[] {
     .sort((a, b) => b.date.localeCompare(a.date) || b.hour - a.hour);
 }
 
+/**
+ * Mapa de eficiência média por dia, últimos N dias.
+ * Retorna Record<"YYYY-MM-DD", avgEffPct>.
+ */
+export function getDailyEfficiencyMap(days = 365): Record<string, number> {
+  const cutoff = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  })();
+  const acc: Record<string, { sum: number; n: number }> = {};
+  for (const e of getUsageLogs()) {
+    if (e.date < cutoff || e.efficiencyPct === undefined) continue;
+    if (!acc[e.date]) acc[e.date] = { sum: 0, n: 0 };
+    acc[e.date].sum += e.efficiencyPct;
+    acc[e.date].n   += 1;
+  }
+  const result: Record<string, number> = {};
+  for (const [date, { sum, n }] of Object.entries(acc)) {
+    result[date] = Math.round(sum / n);
+  }
+  return result;
+}
+
+export interface DayOfWeekEfficiency {
+  day: number;       // 0=Dom, 1=Seg … 6=Sáb
+  dayLabel: string;  // "Dom", "Seg" …
+  avgEff: number;    // média de efficiencyPct
+  sessions: number;  // total de sessões com efficiencyPct definido
+}
+
+const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+/**
+ * Eficiência média por dia da semana, todos os dados históricos.
+ * Só inclui sessões com efficiencyPct definido.
+ * Retorna os dias ordenados Seg→Dom.
+ */
+export function getEfficiencyByDayOfWeek(): DayOfWeekEfficiency[] {
+  const acc: Record<number, { sum: number; n: number }> = {};
+  for (const e of getUsageLogs()) {
+    if (e.efficiencyPct === undefined) continue;
+    const day = new Date(e.date + "T00:00:00").getDay(); // 0=Dom
+    if (!acc[day]) acc[day] = { sum: 0, n: 0 };
+    acc[day].sum += e.efficiencyPct;
+    acc[day].n   += 1;
+  }
+  return [1, 2, 3, 4, 5, 6, 0].map((day) => ({
+    day,
+    dayLabel: DAY_LABELS[day],
+    avgEff:   acc[day] ? Math.round(acc[day].sum / acc[day].n) : 0,
+    sessions: acc[day]?.n ?? 0,
+  }));
+}
+
 export interface TwoHourBlockEfficiency {
   blockLabel: string;   // ex: "10h–12h"
   startHour: number;    // 0, 2, 4, ..., 22

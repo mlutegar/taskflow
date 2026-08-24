@@ -7,7 +7,7 @@ import { getHistory, getStreak } from "../../lib/dailyFocusHistory";
 import { usageStats, loadRemoteModeLog } from "../../lib/modeLog";
 import { getCheckinLog, getSessionFeedback } from "../../lib/checkinLog";
 import { getAllWithStatus } from "../../lib/dailyFocusAchievements";
-import { getUsageLogs, getFeelingStats, getTemporalTrend, getCorrelationByEstado, getFocusedMinutesByDay, getTotalFocusedMinutes, getFocusedMinutesByMode, getBestDayOfWeek, getWeeklyFocusComparison, loadRemoteUsageLogs, getSessionEfficiencyList, getTwoHourBlockEfficiency, getAvgEfficiencyByMode, getWeeklyEfficiencyTrend } from "../../lib/sessionUsageLog";
+import { getUsageLogs, getFeelingStats, getTemporalTrend, getCorrelationByEstado, getFocusedMinutesByDay, getTotalFocusedMinutes, getFocusedMinutesByMode, getBestDayOfWeek, getWeeklyFocusComparison, loadRemoteUsageLogs, getSessionEfficiencyList, getTwoHourBlockEfficiency, getAvgEfficiencyByMode, getWeeklyEfficiencyTrend, getDailyEfficiencyMap, getEfficiencyByDayOfWeek } from "../../lib/sessionUsageLog";
 import { getMoodModeStats } from "../../lib/moodModeCorrelation";
 import { getDistractionInsights } from "../../lib/distractionInsights";
 import WeeklyReview from "../WeeklyReview";
@@ -200,6 +200,134 @@ function ActivityHeatmap({ history, days }: ActivityHeatmapProps): JSX.Element {
           ))}
         </div>
         <span>Mais</span>
+      </div>
+    </div>
+  );
+}
+
+function EfficiencyYearHeatmap({ remoteLoaded }: { remoteLoaded: boolean }): JSX.Element | null {
+  const { cells, hasData } = useMemo(() => {
+    const effMap = getDailyEfficiencyMap(365);
+    if (!Object.keys(effMap).length) return { cells: [], hasData: false };
+
+    const pad = (d: Date) =>
+      [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+    const dayOfWeekMon = (d: Date) => (d.getDay() + 6) % 7; // Mon=0, Sun=6
+
+    const oldest = new Date();
+    oldest.setDate(oldest.getDate() - 364);
+    const padCount = dayOfWeekMon(oldest);
+
+    const pads = Array.from({ length: padCount }, (_, i) => ({
+      iso: `pad-${i}`,
+      eff: null as number | null,
+      isPad: true as const,
+    }));
+    const real: { iso: string; eff: number | null; isPad: false }[] = [];
+    for (let i = 364; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const iso = pad(d);
+      real.push({ iso, eff: effMap[iso] ?? null, isPad: false });
+    }
+    return { cells: [...pads, ...real], hasData: true };
+  }, [remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!hasData) return null;
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>🗓️ Eficiência anual (365 dias)</div>
+      <div className={styles.effYearGrid}>
+        {cells.map((c) => {
+          if (c.isPad)
+            return <div key={c.iso} className={styles.effYearCell} style={{ opacity: 0 }} />;
+          if (c.eff === null)
+            return <div key={c.iso} className={styles.effYearCell} title={c.iso} />;
+          const alpha = Math.max(0, Math.min(1, (c.eff - 20) / 80));
+          const bg = `rgba(76,175,130,${(0.15 + alpha * 0.85).toFixed(2)})`;
+          return (
+            <div
+              key={c.iso}
+              className={styles.effYearCell}
+              style={{ background: bg }}
+              title={`${c.iso} — ${c.eff}% eficiência`}
+            />
+          );
+        })}
+      </div>
+      <div className={styles.effYearLegend}>
+        <span>Menos eficiente</span>
+        <div className={styles.effYearGradientBar} />
+        <span>Mais eficiente</span>
+      </div>
+    </div>
+  );
+}
+
+function DayOfWeekEfficiencyPanel({ remoteLoaded }: { remoteLoaded: boolean }): JSX.Element | null {
+  const data = useMemo(() => getEfficiencyByDayOfWeek(), [remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const withData = data.filter((d) => d.sessions > 0);
+  if (withData.length < 2) return null;
+
+  const maxEff = Math.max(...withData.map((d) => d.avgEff), 1);
+  const best   = withData.reduce((a, b) => (b.avgEff > a.avgEff ? b : a));
+  const worst  = withData.reduce((a, b) => (b.avgEff < a.avgEff ? b : a));
+  const delta  = best.avgEff - worst.avgEff;
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>📅 Eficiência por dia da semana</div>
+
+      {delta >= 5 && (
+        <div style={{
+          fontSize: 12,
+          color: "var(--text-muted)",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-sm)",
+          padding: "8px 12px",
+          marginBottom: 14,
+          lineHeight: 1.5,
+        }}>
+          Suas <strong style={{ color: "var(--text)" }}>{best.dayLabel}s</strong> são{" "}
+          <strong style={{ color: "#4caf82" }}>{delta}%</strong> mais eficientes que suas{" "}
+          <strong style={{ color: "var(--text)" }}>{worst.dayLabel}s</strong>.
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {data.map((d) => {
+          const barPct  = maxEff > 0 ? (d.avgEff / maxEff) * 100 : 0;
+          const color   = d.avgEff >= 70 ? "#4caf82" : d.avgEff >= 40 ? "var(--accent)" : "#e05252";
+          const isBest  = d.sessions > 0 && d.avgEff === best.avgEff;
+          const isWorst = d.sessions > 0 && d.avgEff === worst.avgEff && delta >= 5;
+          return (
+            <div key={d.day} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{
+                fontSize: 12,
+                color: "var(--text)",
+                width: 30,
+                flexShrink: 0,
+                fontWeight: isBest || isWorst ? 700 : 400,
+              }}>
+                {d.dayLabel}
+              </span>
+              <div style={{ flex: 1, background: "var(--surface-2)", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                {d.sessions > 0 && (
+                  <div style={{ height: "100%", width: `${barPct}%`, background: color, borderRadius: 4, transition: "width 0.4s" }} />
+                )}
+              </div>
+              <span style={{ fontSize: 11, color: "var(--text-muted)", width: 68, textAlign: "right", flexShrink: 0 }}>
+                {d.sessions > 0 ? `${d.avgEff}% · ${d.sessions}x` : "sem dados"}
+              </span>
+              {isBest  && <span style={{ fontSize: 10, color: "#4caf82", width: 10 }}>★</span>}
+              {isWorst && <span style={{ fontSize: 10, color: "#e05252", width: 10 }}>▼</span>}
+              {!isBest && !isWorst && <span style={{ width: 10 }} />}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1890,6 +2018,8 @@ export default function DashboardPage(): JSX.Element {
 
       <HeroStats history={history} streak={streak} />
       <EfficiencyHeroRow remoteLoaded={remoteLoaded} />
+      <EfficiencyYearHeatmap remoteLoaded={remoteLoaded} />
+      <DayOfWeekEfficiencyPanel remoteLoaded={remoteLoaded} />
       <WeeklyEfficiencyTrendChart remoteLoaded={remoteLoaded} />
       <ModeEfficiencyRanking remoteLoaded={remoteLoaded} />
       <SemanaComparativo allHistory={allHistory} />

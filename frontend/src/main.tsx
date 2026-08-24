@@ -25,7 +25,7 @@ import LoginPage from "./components/auth/LoginPage.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 import { useRemoteSync } from "./hooks/useRemoteSync.js";
 import { useStreakReminder } from "./hooks/useStreakReminder.js";
-import { migrateLegacyKeys } from "./lib/storage.js";
+import { migrateLegacyKeys } from "./lib/migrateLegacyKeys";
 
 // Migra chaves legadas do localStorage (sem prefixo) para o padrão "taskflow."
 // Executado uma única vez antes do React montar.
