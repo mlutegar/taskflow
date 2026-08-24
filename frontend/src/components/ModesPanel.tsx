@@ -1414,6 +1414,19 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
               >
                 Pular
               </button>
+              <button
+                onClick={() => {
+                  setIntentionDraft(null);
+                  setPendingMultiCard(null);
+                }}
+                style={{
+                  padding: "9px 16px", borderRadius: "var(--radius-sm)", fontSize: 13,
+                  background: "none", border: "1px solid var(--border)",
+                  color: "var(--text-muted)", cursor: "pointer",
+                }}
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>

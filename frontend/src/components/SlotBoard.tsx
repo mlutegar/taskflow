@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import ModePicker from "./ModePicker";
 import ComboAnalytics from "./ComboAnalytics";
 import styles from "./SlotBoard.module.css";
@@ -27,6 +27,7 @@ type SessionMode = 'sequential' | 'parallel';
 
 interface SlotBoardProps {
   onStartSession: (cards: ModeConfig[], mode: SessionMode) => void;
+  addModeRef?: React.MutableRefObject<((mode: ModeConfig) => void) | null>;
 }
 
 const LS_KEY = "taskflow.slotBoard";
@@ -132,7 +133,7 @@ function nextSlotId(): string {
   return `slot_${++_slotIdCounter}`;
 }
 
-export default function SlotBoard({ onStartSession }: SlotBoardProps): JSX.Element {
+export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps): JSX.Element {
   const [slots, setSlotsRaw] = useState<CardSlot[]>(loadSlots);
   const [showPicker, setShowPicker] = useState<boolean>(false);
   const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
