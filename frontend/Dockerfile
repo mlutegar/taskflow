@@ -1,25 +1,10 @@
-# Stage 1: Build
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci
-
-COPY . .
-
-# Build-time env vars are baked in by Vite
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
-ARG VITE_API_URL
-
-RUN npm run build
-
-# Stage 2: Serve with nginx
+# Pre-built: dist/ is compiled locally (Windows) and sent with the deploy.
+# Reason: vite-plugin-pwa has a known buildEnd hook incompatibility on
+# Linux/Alpine when running without a Vite transform cache.
 FROM nginx:alpine
 
-# Copy built assets
-COPY --from=builder /app/dist /usr/share/nginx/html/taskflow
+# Copy pre-built assets
+COPY dist /usr/share/nginx/html/taskflow
 
 # Custom nginx config for SPA under /taskflow/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
