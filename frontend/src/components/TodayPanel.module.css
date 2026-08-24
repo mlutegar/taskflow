@@ -149,12 +149,17 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
+  width: 100%;
+  text-align: center;
 }
 
 .emptyDesc {
   font-size: 12px;
   color: var(--text-muted);
   line-height: 1.4;
+  width: 100%;
+  text-align: center;
+  word-wrap: break-word;
 }
 
 .emptyBtn {

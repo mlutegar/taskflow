@@ -9,7 +9,7 @@ import { addSession, getHistory, getMaxLevel, updateMaxLevel, getStreak, getWeek
 import { tryUnlock } from "../../lib/dailyFocusAchievements";
 import { getDayLevel, setDayLevel, getUsedModes, addUsedModes } from "../../lib/dailyFocusDay";
 import { usageStats } from "../../lib/modeLog";
-import { logCheckinUsage, getCheckinCount, getCheckinStreak, logSessionFeedback } from "../../lib/checkinLog";
+import { logCheckinUsage, getCheckinCount, getCheckinStreak, logSessionFeedback, updateLastFeedbackEstadoAfter } from "../../lib/checkinLog";
 import CheckInScreen from "./CheckInScreen";
 import styles from "./DailyFocus.module.css";
 import { MODES } from "../../data/modes";
@@ -195,6 +195,8 @@ export default function DailyFocusPage() {
 
   // Feedback de sessão (não persiste)
   const [sessionFeedback, setSessionFeedback] = useState<string | null>(null); // null | "good" | "bad"
+  const [estadoAfterSelected, setEstadoAfterSelected] = useState<string | null>(null);
+  const [showAfterPicker, setShowAfterPicker] = useState<boolean>(false);
 
   // Aba ativa no painel de helpers quando há 2+ modos (não persiste)
   const [activeHelperTab, setActiveHelperTab] = useState<string | null>(null); // modeId | null
@@ -1711,6 +1713,7 @@ export default function DailyFocusPage() {
                       onClick={() => {
                         setSessionFeedback("good");
                         logSessionFeedback(checkinEstadoId, checkinModeId, 1);
+                        setShowAfterPicker(true);
                       }}
                       style={{
                         flex: 1, padding: "6px", borderRadius: "6px", border: "1px solid var(--border)",
@@ -1721,6 +1724,7 @@ export default function DailyFocusPage() {
                       onClick={() => {
                         setSessionFeedback("bad");
                         logSessionFeedback(checkinEstadoId, checkinModeId, -1);
+                        setShowAfterPicker(true);
                       }}
                       style={{
                         flex: 1, padding: "6px", borderRadius: "6px", border: "1px solid var(--border)",
@@ -1741,6 +1745,61 @@ export default function DailyFocusPage() {
                 ✓ Anotado. Vamos ajustar as sugestões.
               </div>
             )}
+
+            {/* ── Estado emocional pós-sessão ── */}
+            {showAfterPicker && !estadoAfterSelected && (
+              <div style={{
+                marginTop: "12px",
+                padding: "10px 14px",
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "13px",
+                color: "var(--text-muted)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}>
+                <span>E agora, como você está?</span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {ESTADOS_DEFAULT.map((e) => (
+                    <button
+                      key={e.id}
+                      onClick={() => {
+                        setEstadoAfterSelected(e.id);
+                        updateLastFeedbackEstadoAfter(e.id);
+                      }}
+                      title={e.label}
+                      style={{
+                        fontSize: "20px", padding: "4px 8px", borderRadius: "8px",
+                        background: "var(--surface-2)", border: "1px solid var(--border)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {e.emoji}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setShowAfterPicker(false)}
+                    style={{
+                      fontSize: "12px", color: "var(--text-muted)", padding: "4px 10px",
+                      borderRadius: "8px", background: "none", border: "1px solid var(--border)",
+                      cursor: "pointer", alignSelf: "center",
+                    }}
+                  >
+                    Pular
+                  </button>
+                </div>
+              </div>
+            )}
+            {estadoAfterSelected && (() => {
+              const e = ESTADOS_DEFAULT.find((s) => s.id === estadoAfterSelected);
+              return e ? (
+                <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                  ✓ Estado registrado: {e.emoji} {e.label}
+                </div>
+              ) : null;
+            })()}
 
             {/* Revisões de anotações */}
             {reviewCount > 0 && (

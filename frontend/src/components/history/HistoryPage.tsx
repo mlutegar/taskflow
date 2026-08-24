@@ -8,6 +8,7 @@ import { MODES } from "../../data/modes";
 import { api } from "../../lib/apiClient";
 import { mergeLocal } from "../../lib/mergeLocal";
 import styles from "./HistoryPage.module.css";
+import EmptyState from "../shared/EmptyState";
 import { formatPtBR } from "../../lib/dateUtils";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -29,18 +30,7 @@ function downloadCSV(filename: string, headers: string[], rows: (string | number
   URL.revokeObjectURL(u);
 }
 
-interface EmptyStateProps {
-  label: string;
-}
 
-function EmptyState({ label }: EmptyStateProps): JSX.Element {
-  return (
-    <div className={styles.empty}>
-      <span className={styles.emptyIcon}>📭</span>
-      <span>Nenhum registro de {label} ainda.</span>
-    </div>
-  );
-}
 
 // ── Abas ─────────────────────────────────────────────────────────────────────
 
@@ -71,7 +61,7 @@ function SessionsTab({ sessions }: SessionsTabProps): JSX.Element {
     downloadCSV("sessoes.csv", headers, rows);
   }
 
-  if (!sessions.length) return <EmptyState label="sessões" />;
+  if (!sessions.length) return <EmptyState title="Nenhum registro de sessões ainda." />;
   return (
     <>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
@@ -120,7 +110,7 @@ function ModesTab({ logs }: ModesTabProps): JSX.Element {
     downloadCSV("modos.csv", headers, rows);
   }
 
-  if (!logs.length) return <EmptyState label="modos" />;
+  if (!logs.length) return <EmptyState title="Nenhum registro de modos ainda." />;
   return (
     <>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
@@ -159,14 +149,33 @@ interface UsageLog {
   idleMinutes?: number;
   feeling?: string[];
   comboWith?: string | null;
+  sessionDurationMinutes?: number | null;
+  efficiencyPct?: number | null;
+  note?: string | null;
   _local?: boolean;
+}
+
+const PERIOD_OPTIONS: { label: string; days: number | null }[] = [
+  { label: "7 dias",  days: 7  },
+  { label: "30 dias", days: 30 },
+  { label: "90 dias", days: 90 },
+  { label: "Tudo",    days: null },
+];
+
+interface UsageSummary {
+  total: number;
+  focusedMin: number;
+  avgEff: number | null;
 }
 
 interface UsageLogsTabProps {
   logs: UsageLog[];
+  period: number | null;
+  onPeriodChange: (d: number | null) => void;
+  summary: UsageSummary;
 }
 
-function UsageLogsTab({ logs }: UsageLogsTabProps): JSX.Element {
+function UsageLogsTab({ logs, period, onPeriodChange, summary }: UsageLogsTabProps): JSX.Element {
   function handleExport(): void {
     const headers = ["data", "hora", "modo", "funcionou", "foco_min", "idle_min", "sentimento"];
     const sorted = [...logs].sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -182,10 +191,65 @@ function UsageLogsTab({ logs }: UsageLogsTabProps): JSX.Element {
     downloadCSV("uso.csv", headers, rows);
   }
 
-  if (!logs.length) return <EmptyState label="sessões de uso" />;
+  const periodPills = (
+    <div className={styles.periodRow}>
+      {PERIOD_OPTIONS.map((opt) => (
+        <button
+          key={String(opt.days)}
+          type="button"
+          className={`${styles.periodPill} ${period === opt.days ? styles.periodPillActive : ""}`}
+          onClick={() => onPeriodChange(opt.days)}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (!logs.length) return (
+    <>
+      {periodPills}
+      <EmptyState title={period != null ? `Nenhuma sessão nos últimos ${period} dias.` : "Nenhum registro de sessões de uso ainda."} />
+    </>
+  );
+
   const sorted = [...logs].sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  const focusedMinLabel = summary.focusedMin >= 60
+    ? `${Math.floor(summary.focusedMin / 60)}h${summary.focusedMin % 60 > 0 ? ` ${summary.focusedMin % 60}min` : ""}`
+    : `${summary.focusedMin}min`;
+
   return (
     <>
+      {periodPills}
+
+      {/* Resumo do período */}
+      {summary.total > 0 && (
+        <div className={styles.usageSummary}>
+          <div className={styles.usageSummaryItem}>
+            <span className={styles.usageSummaryValue}>{summary.total}</span>
+            <span className={styles.usageSummaryLabel}>sessões</span>
+          </div>
+          {summary.focusedMin > 0 && (
+            <div className={styles.usageSummaryItem}>
+              <span className={styles.usageSummaryValue}>{focusedMinLabel}</span>
+              <span className={styles.usageSummaryLabel}>focado</span>
+            </div>
+          )}
+          {summary.avgEff !== null && (
+            <div className={styles.usageSummaryItem}>
+              <span
+                className={styles.usageSummaryValue}
+                style={{ color: summary.avgEff >= 70 ? "#4caf82" : summary.avgEff >= 40 ? "#f5c542" : "#e05c5c" }}
+              >
+                {summary.avgEff}%
+              </span>
+              <span className={styles.usageSummaryLabel}>eficiência média</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
         <button className={styles.exportBtn} onClick={handleExport}>⬇ CSV</button>
       </div>
@@ -213,14 +277,25 @@ function UsageLogsTab({ logs }: UsageLogsTabProps): JSX.Element {
               {l.comboWith && (
                 <span className={styles.tagBlue}>🔀 com {getModeLabel(l.comboWith)}</span>
               )}
+              {l.sessionDurationMinutes != null && l.sessionDurationMinutes > 0 && (
+                <span className={styles.tagMuted}>🕐 {l.sessionDurationMinutes}min total</span>
+              )}
               {l.focusedMinutes != null && l.focusedMinutes > 0 && <span className={styles.tagMuted}>🎯 {l.focusedMinutes}min focado</span>}
               {l.idleMinutes != null && l.idleMinutes > 0 && <span className={styles.tagMuted}>💤 {l.idleMinutes}min ocioso</span>}
+              {l.efficiencyPct != null && (
+                <span className={`${styles.efficiencyBadge} ${l.efficiencyPct >= 70 ? styles.efficiencyHigh : l.efficiencyPct >= 40 ? styles.efficiencyMid : styles.efficiencyLow}`}>
+                  ⚡ {l.efficiencyPct}% eficiência
+                </span>
+              )}
               {l.feeling && l.feeling.length > 0 && (
                 <span className={styles.tagMuted}>
                   {l.feeling.map((f) => `${f}`).join(", ")}
                 </span>
               )}
             </div>
+            {l.note && (
+              <p className={styles.noteText}>📝 {l.note}</p>
+            )}
           </div>
         ))}
       </div>
@@ -253,7 +328,7 @@ function CheckinsTab({ logs }: CheckinsTabProps): JSX.Element {
     downloadCSV("checkins.csv", headers, rows);
   }
 
-  if (!logs.length) return <EmptyState label="check-ins" />;
+  if (!logs.length) return <EmptyState title="Nenhum registro de check-ins ainda." />;
   const sorted = [...logs].sort((a, b) => (a.date < b.date ? 1 : -1));
   return (
     <>
@@ -297,6 +372,7 @@ export default function HistoryPage(): JSX.Element {
   const [tab, setTab] = useState<TabKey>("sessions");
   const [modeFilter, setModeFilter] = useState<string>("all");
   const [sessionPage, setSessionPage] = useState<number>(1);
+  const [usagePeriodDays, setUsagePeriodDays] = useState<number | null>(30);
 
   // ── React Query: busca remota com cache automático ────────────────────────
 
@@ -321,6 +397,9 @@ export default function HistoryPage(): JSX.Element {
           worked: r.worked, focusedMinutes: r.focused_minutes,
           idleMinutes: r.idle_minutes, idleReason: r.idle_reason || [],
           feeling: r.feeling || [], comboWith: r.combo_with ?? null,
+          sessionDurationMinutes: r.session_duration_minutes ?? null,
+          efficiencyPct: r.efficiency_pct ?? null,
+          note: r.note ?? null,
         }))
       : []),
     staleTime: 60_000,
@@ -383,7 +462,27 @@ export default function HistoryPage(): JSX.Element {
   );
 
   const filteredModes = modeFilter === "all" ? modeLogs : modeLogs.filter(l => l.modeId === modeFilter);
-  const filteredUsage = modeFilter === "all" ? usageLogs : usageLogs.filter(l => l.modeId === modeFilter);
+
+  const filteredUsageLogs = useMemo<UsageLog[]>(() => {
+    let list = modeFilter === "all" ? usageLogs : usageLogs.filter(l => l.modeId === modeFilter);
+    if (usagePeriodDays !== null) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - usagePeriodDays);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      list = list.filter(l => l.date >= cutoffStr);
+    }
+    return list;
+  }, [usageLogs, modeFilter, usagePeriodDays]);
+
+  const usageSummary: UsageSummary = useMemo(() => {
+    const total = filteredUsageLogs.length;
+    const focusedMin = filteredUsageLogs.reduce((s, l) => s + (l.focusedMinutes ?? 0), 0);
+    const withEff = filteredUsageLogs.filter(l => l.efficiencyPct != null);
+    const avgEff = withEff.length > 0
+      ? Math.round(withEff.reduce((s, l) => s + (l.efficiencyPct ?? 0), 0) / withEff.length)
+      : null;
+    return { total, focusedMin, avgEff };
+  }, [filteredUsageLogs]);
 
   const showFilterPills = (tab === "modes" || tab === "usage") && allModeIds.length > 1;
 
@@ -462,7 +561,14 @@ export default function HistoryPage(): JSX.Element {
           </>
         )}
         {tab === "modes"    && <ModesTab logs={filteredModes} />}
-        {tab === "usage"    && <UsageLogsTab logs={filteredUsage} />}
+        {tab === "usage"    && (
+          <UsageLogsTab
+            logs={filteredUsageLogs}
+            period={usagePeriodDays}
+            onPeriodChange={setUsagePeriodDays}
+            summary={usageSummary}
+          />
+        )}
         {tab === "checkins" && <CheckinsTab logs={checkins} />}
       </div>
     </div>

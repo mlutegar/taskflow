@@ -2,10 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 
-// Prisma usa BigInt para IDs autoincrement — precisamos serializar corretamente
-BigInt.prototype.toJSON = function () {
-  return this.toString();
-};
+import authRoutes from "./routes/auth.js";
 import tasksRoutes from "./routes/tasks.js";
 import routinesRoutes from "./routes/routines.js";
 import dailyTasksRoutes from "./routes/dailyTasks.js";
@@ -19,7 +16,21 @@ import modeComboLogRoutes from "./routes/modeComboLog.js";
 const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5175";
 
-const fastify = Fastify({ logger: true });
+const fastify = Fastify({
+  logger: true,
+  // Serializa BigInt como string em todas as respostas JSON,
+  // sem precisar de monkey-patch global em BigInt.prototype
+  serializerOpts: {
+    bigint: true,
+  },
+});
+
+// Hook de serialização para BigInt → string
+fastify.addHook("preSerialization", async (_req, _reply, payload) => {
+  return JSON.parse(JSON.stringify(payload, (_k, v) =>
+    typeof v === "bigint" ? v.toString() : v
+  ));
+});
 
 await fastify.register(rateLimit, {
   global: false,
@@ -35,6 +46,7 @@ await fastify.register(cors, {
 fastify.get("/health", async () => ({ ok: true }));
 
 // Rotas
+fastify.register(authRoutes, { prefix: "/auth" });
 fastify.register(tasksRoutes, { prefix: "/tasks" });
 fastify.register(routinesRoutes, { prefix: "/routines" });
 fastify.register(dailyTasksRoutes, { prefix: "/daily-tasks" });

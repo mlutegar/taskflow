@@ -7,14 +7,17 @@ import { getHistory, getStreak } from "../../lib/dailyFocusHistory";
 import { usageStats, loadRemoteModeLog } from "../../lib/modeLog";
 import { getCheckinLog, getSessionFeedback } from "../../lib/checkinLog";
 import { getAllWithStatus } from "../../lib/dailyFocusAchievements";
-import { getUsageLogs, getFeelingStats, getTemporalTrend, getCorrelationByEstado, getFocusedMinutesByDay, getTotalFocusedMinutes, getFocusedMinutesByMode, getBestDayOfWeek, getWeeklyFocusComparison, loadRemoteUsageLogs } from "../../lib/sessionUsageLog";
+import { getUsageLogs, getFeelingStats, getTemporalTrend, getCorrelationByEstado, getFocusedMinutesByDay, getTotalFocusedMinutes, getFocusedMinutesByMode, getBestDayOfWeek, getWeeklyFocusComparison, loadRemoteUsageLogs, getSessionEfficiencyList, getTwoHourBlockEfficiency, getAvgEfficiencyByMode, getWeeklyEfficiencyTrend } from "../../lib/sessionUsageLog";
 import { getMoodModeStats } from "../../lib/moodModeCorrelation";
 import { getDistractionInsights } from "../../lib/distractionInsights";
 import WeeklyReview from "../WeeklyReview";
+import { tasksApi } from "../../api/tasks";
+import { routinesApi } from "../../api/routines";
 import { storageGet, storageSet } from "../../lib/storage";
 import { MODES } from "../../data/modes";
 import { ESTADOS_DEFAULT } from "../daily-focus/stateToMode";
 import styles from "./Dashboard.module.css";
+import EmptyState from "../shared/EmptyState";
 import { parsePtBR, ptBRtoISO, todayISO, daysAgoISO, formatISOShort } from "../../lib/dateUtils";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -219,7 +222,7 @@ function SessionsBarChart({ history, days }: SessionsBarChartProps): JSX.Element
     const n = Math.min(days, 30);
     for (let i = n - 1; i >= 0; i--) {
       const iso = daysAgoIso(i);
-      const d = daysAgo(i);
+      const d = new Date(iso + "T00:00:00");
       const label = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
       result.push({ label, sessões: map[iso] || 0 });
     }
@@ -399,7 +402,10 @@ function FocusedMinutesByModeChart({ days, remoteLoaded }: FocusedMinutesByModeC
     );
   };
 
-  const maxVal = Math.max(...data.map((d: { foco: number; idle: number }) => d.foco + d.idle));
+  const maxVal = useMemo(
+    () => Math.max(...data.map((d: { foco: number; idle: number }) => d.foco + d.idle), 1),
+    [data]
+  );
 
   return (
     <div className={styles.section}>
@@ -611,11 +617,14 @@ function EstadosSection({ days }: EstadosSectionProps): JSX.Element {
     return { freq, best: bestEstado };
   }, [days]);
 
-  const maxFreq = Math.max(...Object.values(freq), 1);
-  const sorted = ESTADOS_DEFAULT
-    .map((e: { id: string; emoji: string; label: string }) => ({ ...e, count: freq[e.id] || 0 }))
-    .filter((e: { count: number }) => e.count > 0)
-    .sort((a: { count: number }, b: { count: number }) => b.count - a.count);
+  const { maxFreq, sorted } = useMemo(() => {
+    const maxFreq = Math.max(...Object.values(freq), 1);
+    const sorted = ESTADOS_DEFAULT
+      .map((e: { id: string; emoji: string; label: string }) => ({ ...e, count: freq[e.id] || 0 }))
+      .filter((e: { count: number }) => e.count > 0)
+      .sort((a: { count: number }, b: { count: number }) => b.count - a.count);
+    return { maxFreq, sorted };
+  }, [freq]);
 
   return (
     <div className={styles.section}>
@@ -683,42 +692,46 @@ function UsageInsights({ remoteLoaded }: UsageInsightsProps): JSX.Element {
   }
 
   // ── Estatísticas por modo ──────────────────────────────────────────────────
-  const byMode: Record<string, { total: number; worked: number; focusSum: number }> = {};
-  for (const log of logs) {
-    if (!byMode[log.modeId]) byMode[log.modeId] = { total: 0, worked: 0, focusSum: 0 };
-    byMode[log.modeId].total++;
-    if (log.worked) byMode[log.modeId].worked++;
-    byMode[log.modeId].focusSum += log.focusedMinutes || 0;
-  }
-  const modeStats = Object.entries(byMode)
-    .map(([modeId, s]) => {
-      const mode = MODES.find((m) => m.id === modeId);
-      return {
-        modeId,
-        name: mode ? `${mode.emoji} ${mode.name}` : modeId,
-        total: s.total,
-        successRate: Math.round((s.worked / s.total) * 100),
-        avgFocus: Math.round(s.focusSum / s.total),
-      };
-    })
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 6);
+  const modeStats = useMemo(() => {
+    const byMode: Record<string, { total: number; worked: number; focusSum: number }> = {};
+    for (const log of logs) {
+      if (!byMode[log.modeId]) byMode[log.modeId] = { total: 0, worked: 0, focusSum: 0 };
+      byMode[log.modeId].total++;
+      if (log.worked) byMode[log.modeId].worked++;
+      byMode[log.modeId].focusSum += log.focusedMinutes || 0;
+    }
+    return Object.entries(byMode)
+      .map(([modeId, s]) => {
+        const mode = MODES.find((m) => m.id === modeId);
+        return {
+          modeId,
+          name: mode ? `${mode.emoji} ${mode.name}` : modeId,
+          total: s.total,
+          successRate: Math.round((s.worked / s.total) * 100),
+          avgFocus: Math.round(s.focusSum / s.total),
+        };
+      })
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [logs]);
 
   // ── Melhor horário geral (por bloco de dia) ───────────────────────────────
-  const blockStats = HOUR_BLOCKS.map((block) => {
-    const blockLogs = logs.filter((l: { hour: number }) => l.hour >= block.range[0] && l.hour <= block.range[1]);
-    if (!blockLogs.length) return { ...block, total: 0, successRate: 0 };
-    const worked = blockLogs.filter((l: { worked: boolean }) => l.worked).length;
-    return {
-      ...block,
-      total: blockLogs.length,
-      successRate: Math.round((worked / blockLogs.length) * 100),
-    };
-  });
-  const bestBlock = [...blockStats].sort((a, b) => (b.total > 0 ? b.successRate : -1) - (a.total > 0 ? a.successRate : -1))[0];
+  const { blockStats, bestBlock } = useMemo(() => {
+    const stats = HOUR_BLOCKS.map((block) => {
+      const blockLogs = logs.filter((l: { hour: number }) => l.hour >= block.range[0] && l.hour <= block.range[1]);
+      if (!blockLogs.length) return { ...block, total: 0, successRate: 0 };
+      const worked = blockLogs.filter((l: { worked: boolean }) => l.worked).length;
+      return { ...block, total: blockLogs.length, successRate: Math.round((worked / blockLogs.length) * 100) };
+    });
+    const best = [...stats].sort(
+      (a, b) => (b.total > 0 ? b.successRate : -1) - (a.total > 0 ? a.successRate : -1)
+    )[0];
+    return { blockStats: stats, bestBlock: best };
+  }, [logs]);
 
   // ── Sentimentos ───────────────────────────────────────────────────────────
-  const feelingStats = getFeelingStats().slice(0, 5);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const feelingStats = useMemo(() => getFeelingStats().slice(0, 5), [remoteLoaded]);
 
   // ── Feature 2: Tendência temporal ────────────────────────────────────────
   const trend = useMemo(() => getTemporalTrend(), [remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -950,7 +963,7 @@ function AvgTime({ history }: AvgTimeProps): JSX.Element {
     <div className={styles.section}>
       <div className={styles.sectionTitle}>Tempo médio por tarefa</div>
       {avg === null ? (
-        <div className={styles.empty}>Sem dados de tempo ainda.</div>
+        <EmptyState title="Sem dados de tempo ainda." />
       ) : (
         <div className={styles.avgRow}>
           <div className={styles.avgBig}>{avg}min</div>
@@ -1120,26 +1133,27 @@ function MoodModeChart({ remoteLoaded }: MoodModeChartProps): JSX.Element {
     return (
       <div className={styles.section}>
         <div className={styles.sectionTitle}>🧠 Humor × Modo Eficaz</div>
-        <div className={styles.empty}>
-          📊 Dados insuficientes ainda — use mais modos após seus check-ins para ver correlações aqui.
-        </div>
+        <EmptyState icon="📊" title="Dados insuficientes ainda — use mais modos após seus check-ins para ver correlações aqui." />
       </div>
     );
   }
 
-  const topModes = [...new Set(moodModeData.map((d: { modeId: string }) => d.modeId))].slice(0, 8);
-  const estados = [...new Set(moodModeData.map((d: { estado: string }) => d.estado))];
-  const chartData = topModes.map((modeId) => {
-    const entry: Record<string, unknown> = {
-      modeId,
-      modeName: moodModeData.find((d: { modeId: string }) => d.modeId === modeId)?.modeName || modeId,
-    };
-    for (const estado of estados) {
-      const match = moodModeData.find((d: { modeId: string; estado: string }) => d.modeId === modeId && d.estado === estado);
-      entry[estado as string] = match?.successRate || 0;
-    }
-    return entry;
-  });
+  const { estados, chartData } = useMemo(() => {
+    const topModes = [...new Set(moodModeData.map((d: { modeId: string }) => d.modeId))].slice(0, 8);
+    const estados = [...new Set(moodModeData.map((d: { estado: string }) => d.estado))];
+    const chartData = topModes.map((modeId) => {
+      const entry: Record<string, unknown> = {
+        modeId,
+        modeName: moodModeData.find((d: { modeId: string }) => d.modeId === modeId)?.modeName || modeId,
+      };
+      for (const estado of estados) {
+        const match = moodModeData.find((d: { modeId: string; estado: string }) => d.modeId === modeId && d.estado === estado);
+        entry[estado as string] = match?.successRate || 0;
+      }
+      return entry;
+    });
+    return { estados, chartData };
+  }, [moodModeData]);
 
   return (
     <div className={styles.section}>
@@ -1156,6 +1170,102 @@ function MoodModeChart({ remoteLoaded }: MoodModeChartProps): JSX.Element {
             ))}
           </BarChart>
         </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// ── Emotion Transform Chart ───────────────────────────────────────────────────
+
+type FeedbackEntry = {
+  estadoId?: string;
+  modeId?: string;
+  estadoAfter?: string;
+  rating?: number;
+  date?: string;
+};
+
+function EmotionTransformChart(): JSX.Element {
+  const data = useMemo((): { modeId: string; transitions: { before: string; after: string; count: number }[] }[] => {
+    const feedbacks = (getSessionFeedback() as FeedbackEntry[]).filter(
+      (f) => f.estadoId && f.modeId && f.estadoAfter
+    );
+    if (!feedbacks.length) return [];
+
+    const byMode: Record<string, Record<string, number>> = {};
+    for (const f of feedbacks) {
+      const key = `${f.estadoId}→${f.estadoAfter}`;
+      if (!byMode[f.modeId!]) byMode[f.modeId!] = {};
+      byMode[f.modeId!][key] = (byMode[f.modeId!][key] || 0) + 1;
+    }
+
+    return Object.entries(byMode)
+      .filter(([, pairs]) => Object.values(pairs).reduce((s, v) => s + v, 0) >= 2)
+      .map(([modeId, pairs]) => ({
+        modeId,
+        transitions: Object.entries(pairs)
+          .map(([key, count]) => {
+            const [before, after] = key.split("→");
+            return { before, after, count };
+          })
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 3),
+      }))
+      .sort((a, b) => {
+        const totalA = a.transitions.reduce((s, t) => s + t.count, 0);
+        const totalB = b.transitions.reduce((s, t) => s + t.count, 0);
+        return totalB - totalA;
+      });
+  }, []);
+
+  if (!data.length) {
+    return (
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>🔄 Transformações emocionais por modo</div>
+        <EmptyState icon="💡" title="Complete sessões no Daily Focus e registre como você se sente depois para ver como cada modo transforma seu estado emocional." />
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>🔄 Transformações emocionais por modo</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {data.map(({ modeId, transitions }) => {
+          const modeName = modeId;
+          return (
+            <div key={modeId} style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              padding: "10px 14px",
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
+                {modeName}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {transitions.map(({ before, after, count }) => {
+                  const beforeEstado = ESTADOS_DEFAULT.find((e: { id: string }) => e.id === before);
+                  const afterEstado = ESTADOS_DEFAULT.find((e: { id: string }) => e.id === after);
+                  return (
+                    <div key={`${before}→${after}`} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                      <span title={beforeEstado?.label || before}>
+                        {beforeEstado?.emoji || before}
+                      </span>
+                      <span style={{ color: "var(--text-muted)", fontSize: 11 }}>→</span>
+                      <span title={afterEstado?.label || after}>
+                        {afterEstado?.emoji || after}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto" }}>
+                        {count}×
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1234,9 +1344,7 @@ function FocusBudget({ remoteLoaded }: FocusBudgetProps): JSX.Element {
           )}
         </>
       ) : (
-        <div className={styles.empty}>
-          Defina uma meta semanal de horas de foco para acompanhar seu progresso.
-        </div>
+        <EmptyState title="Defina uma meta semanal de horas de foco para acompanhar seu progresso." />
       )}
     </div>
   );
@@ -1255,9 +1363,7 @@ function DistractionInsights({ remoteLoaded }: DistractionInsightsProps): JSX.El
     return (
       <div className={styles.section}>
         <div className={styles.sectionTitle}>📱 Padrões de distração</div>
-        <div className={styles.empty}>
-          Registre ao menos 5 sessões com tempo ocioso para ver padrões aqui.
-        </div>
+        <EmptyState title="Registre ao menos 5 sessões com tempo ocioso para ver padrões aqui." />
       </div>
     );
   }
@@ -1306,13 +1412,379 @@ function DistractionInsights({ remoteLoaded }: DistractionInsightsProps): JSX.El
   );
 }
 
+// ── Dashboard de eficiência consolidado ──────────────────────────────────────
+
+function EfficiencyHeroRow({ remoteLoaded }: { remoteLoaded: boolean }): JSX.Element | null {
+  const { globalAvg, bestModeEntry, bestBlock } = useMemo(() => {
+    const logs = getUsageLogs().filter((e: any) => e.efficiencyPct !== undefined);
+    if (!logs.length) return { globalAvg: null, bestModeEntry: null, bestBlock: null };
+
+    const globalAvg = Math.round(logs.reduce((s: number, e: any) => s + e.efficiencyPct, 0) / logs.length);
+
+    const avgByMode = getAvgEfficiencyByMode(90, 2);
+    const bestModeId = Object.entries(avgByMode).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null;
+    const bestModeEntry = bestModeId
+      ? { mode: MODES.find((m: any) => m.id === bestModeId), avg: avgByMode[bestModeId] }
+      : null;
+
+    const blocks = getTwoHourBlockEfficiency().filter((b) => b.sessions > 0);
+    const bestBlock = blocks.sort((a, b) => b.avgEfficiency - a.avgEfficiency)[0] ?? null;
+
+    return { globalAvg, bestModeEntry, bestBlock };
+  }, [remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (globalAvg === null) return null;
+
+  const effColor = globalAvg >= 70 ? "#4caf82" : globalAvg >= 40 ? "#f5c542" : "#e05c5c";
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>⚡ Eficiência pessoal</div>
+      <div className={styles.heroGrid}>
+        <div className={styles.statCard}>
+          <div className={styles.statValue} style={{ color: effColor }}>{globalAvg}%</div>
+          <div className={styles.statLabel}>Média geral</div>
+        </div>
+        {bestModeEntry?.mode && (
+          <div className={styles.statCard}>
+            <div className={styles.statValue} style={{ fontSize: 22 }}>
+              {(bestModeEntry.mode as any).emoji}
+            </div>
+            <div className={styles.statLabel}>
+              🏆 {(bestModeEntry.mode as any).name}
+              <br />
+              <span style={{ color: "#4caf82", fontWeight: 700 }}>{bestModeEntry.avg}% avg</span>
+            </div>
+          </div>
+        )}
+        {bestBlock && bestBlock.sessions > 0 && (
+          <div className={styles.statCard}>
+            <div className={styles.statValue} style={{ fontSize: 16, color: "#4caf82" }}>
+              {bestBlock.blockLabel}
+            </div>
+            <div className={styles.statLabel}>
+              🕐 Melhor horário
+              <br />
+              <span style={{ color: "#4caf82", fontWeight: 700 }}>{bestBlock.avgEfficiency}% avg</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WeeklyEfficiencyTrendChart({ remoteLoaded }: { remoteLoaded: boolean }): JSX.Element | null {
+  const data = useMemo(() => getWeeklyEfficiencyTrend(10), [remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (data.length < 2) return null;
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>📈 Tendência semanal de eficiência</div>
+      <div className={styles.chartWrap}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#2e2e3e" />
+            <XAxis dataKey="weekLabel" tick={{ fill: "#7a7a9a", fontSize: 10 }} tickLine={false} />
+            <YAxis
+              tick={{ fill: "#7a7a9a", fontSize: 10 }}
+              tickLine={false}
+              domain={[0, 100]}
+              tickFormatter={(v: number) => `${v}%`}
+            />
+            <Tooltip
+              contentStyle={TOOLTIP_STYLE}
+              formatter={(value: number, _: string, entry: any) =>
+                [`${value}% (${entry.payload.sessions} sessões)`, "Eficiência média"]
+              }
+            />
+            <ReferenceLine
+              y={70}
+              stroke="rgba(76,175,130,0.4)"
+              strokeDasharray="4 4"
+              label={{ value: "70%", position: "right", fill: "#4caf82", fontSize: 10 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="avgEfficiency"
+              stroke="#7c6ef5"
+              strokeWidth={2.5}
+              dot={{ fill: "#7c6ef5", r: 4 }}
+              activeDot={{ r: 6 }}
+              name="Eficiência média"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function ModeEfficiencyRanking({ remoteLoaded }: { remoteLoaded: boolean }): JSX.Element | null {
+  const ranked = useMemo(() => {
+    const avgByMode = getAvgEfficiencyByMode(90, 2);
+    return Object.entries(avgByMode)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 8)
+      .map(([modeId, avg]) => {
+        const mode = MODES.find((m: any) => m.id === modeId);
+        return { modeId, avg, mode };
+      });
+  }, [remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!ranked.length) return null;
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>🏅 Ranking de modos por eficiência</div>
+      <div className={styles.effRankingList}>
+        {ranked.map(({ modeId, avg, mode }, i) => {
+          const label = mode ? `${(mode as any).emoji} ${(mode as any).name}` : modeId;
+          const color = avg >= 70 ? "#4caf82" : avg >= 40 ? "#f5c542" : "#e05c5c";
+          return (
+            <div key={modeId} className={styles.effRankRow}>
+              <span className={styles.effRankPos}>#{i + 1}</span>
+              <span className={styles.effRankLabel}>{label}</span>
+              <div className={styles.effRankTrack}>
+                <div className={styles.effRankFill} style={{ width: `${avg}%`, background: color }} />
+              </div>
+              <span className={styles.effRankPct} style={{ color }}>{avg}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Eficiência por sessão ─────────────────────────────────────────────────────
+
+function SessionEfficiencyChart({ days, remoteLoaded }: { days: number; remoteLoaded: boolean }): JSX.Element {
+  const data = useMemo(() => {
+    const list = getSessionEfficiencyList(days);
+    if (!list.length) return [];
+    return list.slice(0, 30).reverse().map((e) => ({
+      label:      `${e.date.slice(5).replace("-", "/")} ${e.hour}h`,
+      duração:    e.sessionDurationMinutes,
+      focado:     e.focusedMinutes,
+      eficiência: e.efficiencyPct,
+    }));
+  }, [days, remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const lastItem = data[data.length - 1];
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>⚡ Eficiência por sessão</div>
+      {lastItem && (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10, padding: "8px 12px", background: "var(--surface-2)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <span>Última sessão:</span>
+          <span>🕐 Duração: <strong style={{ color: "var(--text)" }}>{lastItem.duração}min</strong></span>
+          <span>⚡ Focado: <strong style={{ color: "#7c6ef5" }}>{lastItem.focado}min</strong></span>
+          <span>🎯 Eficiência: <strong style={{ color: lastItem.eficiência >= 70 ? "#4caf82" : lastItem.eficiência >= 40 ? "#f5c542" : "#e05c5c" }}>{lastItem.eficiência}%</strong></span>
+        </div>
+      )}
+      {data.length === 0 ? (
+        <EmptyState title="Sem dados de eficiência ainda." description="Finalize uma sessão para ver o rastreamento automático." />
+      ) : (
+        <div className={styles.chartWrap}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} barSize={10} barCategoryGap="30%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#2e2e3e" />
+              <XAxis dataKey="label" tick={{ fill: "#7a7a9a", fontSize: 10 }} tickLine={false} />
+              <YAxis tick={{ fill: "#7a7a9a", fontSize: 10 }} tickLine={false} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number, n: string) => [`${v}${n === "eficiência" ? "%" : "min"}`, n]} />
+              <Legend />
+              <Bar dataKey="duração"    name="duração"    fill="#3a3a5e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="focado"     name="focado"     fill="#7c6ef5" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="eficiência" name="eficiência%" fill="#4caf82" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Heatmap de blocos de 2h ───────────────────────────────────────────────────
+
+function TimeBlockEfficiencyHeatmap({ remoteLoaded }: { remoteLoaded: boolean }): JSX.Element {
+  const blocks = useMemo(() => getTwoHourBlockEfficiency(), [remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hasData = blocks.some((b) => b.sessions > 0);
+
+  return (
+    <div className={styles.section}>
+      <div className={styles.sectionTitle}>🕐 Em que horário você é mais eficiente?</div>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+        Blocos de 2h — média de eficiência (tempo focado ÷ duração total da sessão)
+      </div>
+      {!hasData ? (
+        <EmptyState title="Sem dados de blocos ainda." description="Os horários aparecerão conforme você usar o app." />
+      ) : (
+        <div className={styles.blockGrid}>
+          {blocks.map((b) => {
+            const level = b.sessions === 0 ? "none" : b.avgEfficiency >= 70 ? "high" : b.avgEfficiency >= 40 ? "mid" : "low";
+            return (
+              <div
+                key={b.startHour}
+                className={styles.blockCell}
+                data-efficiency={level}
+                title={b.sessions > 0 ? `${b.blockLabel}: ${b.avgEfficiency}% de eficiência (${b.sessions} sessão${b.sessions > 1 ? "ões" : ""})` : `${b.blockLabel}: sem dados`}
+              >
+                <span className={styles.blockHour}>{b.blockLabel}</span>
+                {b.sessions > 0 && <span className={styles.blockPct}>{b.avgEfficiency}%</span>}
+                {b.sessions === 0 && <span className={styles.blockPct} style={{ opacity: 0.3 }}>—</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TasksTrendChart ───────────────────────────────────────────────────────────
+
+interface RawTask {
+  id: string;
+  created_at?: string | null;
+  completed_at?: string | null;
+  done?: boolean;
+  completed?: boolean;
+}
+
+interface DayPoint {
+  label: string;
+  criadas: number;
+  concluídas: number;
+}
+
+function TasksTrendChart({ days }: { days: number }): JSX.Element | null {
+  const [data, setData] = useState<DayPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    tasksApi.list({}).then((res) => {
+      const tasks = (res as RawTask[]) ?? [];
+      const n = Math.min(days >= 9999 ? 90 : days, 90);
+      const points: DayPoint[] = [];
+
+      for (let i = n - 1; i >= 0; i--) {
+        const iso = daysAgoIso(i);
+        const label = formatIsoToPtBR(iso);
+        const criadas = tasks.filter((t) => t.created_at?.slice(0, 10) === iso).length;
+        const concluídas = tasks.filter((t) => t.completed_at?.slice(0, 10) === iso).length;
+        points.push({ label, criadas, concluídas });
+      }
+
+      setData(points);
+    }).catch(() => setData([])).finally(() => setLoading(false));
+  }, [days]);
+
+  if (loading) return <EmptyState icon="⏳" title="Carregando…" />;
+  const hasData = data.some((d) => d.criadas > 0 || d.concluídas > 0);
+  if (!hasData) return <EmptyState title="Nenhuma tarefa encontrada no período." />;
+
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#2e2e3e" vertical={false} />
+        <XAxis dataKey="label" tick={{ fill: "#7a7a9a", fontSize: 10 }} interval="preserveStartEnd" />
+        <YAxis allowDecimals={false} tick={{ fill: "#7a7a9a", fontSize: 10 }} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} />
+        <Legend wrapperStyle={{ fontSize: 11, color: "#7a7a9a" }} />
+        <Bar dataKey="criadas" name="Criadas" fill="#4a4a70" radius={[3, 3, 0, 0]} maxBarSize={24} />
+        <Bar dataKey="concluídas" name="Concluídas" fill="#4ecca3" radius={[3, 3, 0, 0]} maxBarSize={24} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// ── RoutinesAdherenceChart ────────────────────────────────────────────────────
+
+interface RawRoutine {
+  id: string;
+  completion_history?: string[];
+}
+
+interface AdherencePoint {
+  label: string;
+  adesao: number;
+}
+
+function RoutinesAdherenceChart({ days }: { days: number }): JSX.Element | null {
+  const [data, setData] = useState<AdherencePoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    routinesApi.list({}).then((res) => {
+      const routines = (res as RawRoutine[]) ?? [];
+      if (!routines.length) { setData([]); setLoading(false); return; }
+
+      const n = Math.min(days >= 9999 ? 90 : days, 90);
+      const points: AdherencePoint[] = [];
+
+      for (let i = n - 1; i >= 0; i--) {
+        const iso = daysAgoIso(i);
+        const label = formatIsoToPtBR(iso);
+        const completed = routines.filter((r) => (r.completion_history ?? []).includes(iso)).length;
+        const adesao = Math.round((completed / routines.length) * 100);
+        points.push({ label, adesao });
+      }
+
+      setData(points);
+    }).catch(() => setData([])).finally(() => setLoading(false));
+  }, [days]);
+
+  if (loading) return <EmptyState icon="⏳" title="Carregando…" />;
+  if (!data.length) return null; // sem rotinas cadastradas
+
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <LineChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#2e2e3e" vertical={false} />
+        <XAxis dataKey="label" tick={{ fill: "#7a7a9a", fontSize: 10 }} interval="preserveStartEnd" />
+        <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fill: "#7a7a9a", fontSize: 10 }} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [`${v}%`, "Adesão"]} />
+        <Line
+          type="monotone"
+          dataKey="adesao"
+          stroke="var(--accent)"
+          strokeWidth={2}
+          dot={false}
+          activeDot={{ r: 4, fill: "var(--accent)" }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
+
+const REVIEW_AUTO_KEY = "taskflow.weeklyReviewLastShown";
 
 export default function DashboardPage(): JSX.Element {
   const [periodIdx, setPeriodIdx] = useState<number>(1); // 30d default
   const [loaded, setLoaded] = useState<boolean>(false);
   const [showReview, setShowReview] = useState<boolean>(false);
   const [remoteLoaded, setRemoteLoaded] = useState<boolean>(false);
+
+  // Auto-abrir revisão semanal na primeira visita de cada semana
+  useEffect(() => {
+    const lastShown = localStorage.getItem(REVIEW_AUTO_KEY) ?? "";
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0=Dom, 1=Seg…
+    const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + daysToMonday);
+    const mondayISO = monday.toISOString().split("T")[0];
+    if (lastShown < mondayISO) {
+      const t = setTimeout(() => setShowReview(true), 1200);
+      return () => clearTimeout(t);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1399,7 +1871,10 @@ export default function DashboardPage(): JSX.Element {
         </button>
       </div>
 
-      {showReview && <WeeklyReview onClose={() => setShowReview(false)} />}
+      {showReview && <WeeklyReview onClose={() => {
+        localStorage.setItem(REVIEW_AUTO_KEY, localIsoDate());
+        setShowReview(false);
+      }} />}
 
       <div className={styles.periodRow}>
         {PERIOD_OPTS.map((opt, i) => (
@@ -1414,16 +1889,40 @@ export default function DashboardPage(): JSX.Element {
       </div>
 
       <HeroStats history={history} streak={streak} />
+      <EfficiencyHeroRow remoteLoaded={remoteLoaded} />
+      <WeeklyEfficiencyTrendChart remoteLoaded={remoteLoaded} />
+      <ModeEfficiencyRanking remoteLoaded={remoteLoaded} />
       <SemanaComparativo allHistory={allHistory} />
+
+      {/* ── Tarefas & Rotinas ── */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>📋 Tarefas & Rotinas</div>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 10 }}>
+            Tarefas criadas vs. concluídas por dia
+          </div>
+          <TasksTrendChart days={days} />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 10 }}>
+            Adesão às rotinas (%)
+          </div>
+          <RoutinesAdherenceChart days={days} />
+        </div>
+      </div>
+
       <ActivityHeatmap history={history} days={days} />
       <SessionsBarChart history={history} days={days} />
       <FocusedMinutesChart days={days} remoteLoaded={remoteLoaded} />
+      <SessionEfficiencyChart days={days} remoteLoaded={remoteLoaded} />
+      <TimeBlockEfficiencyHeatmap remoteLoaded={remoteLoaded} />
       <FocusedMinutesByModeChart days={days} remoteLoaded={remoteLoaded} />
       <LevelLineChart history={history} days={days} allHistory={allHistory} />
       <TopModes days={days} remoteLoaded={remoteLoaded} />
       <EstadosSection days={days} />
       <FocusBudget remoteLoaded={remoteLoaded} />
       <MoodModeChart remoteLoaded={remoteLoaded} />
+      <EmotionTransformChart />
       <UsageInsights remoteLoaded={remoteLoaded} />
       <DistractionInsights remoteLoaded={remoteLoaded} />
       <Achievements />

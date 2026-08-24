@@ -1,0 +1,99 @@
+/* ── Shimmer animation ───────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.bone {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--surface-2, #e5e7eb) 25%,
+    var(--border, #d1d5db)    50%,
+    var(--surface-2, #e5e7eb) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  flex-shrink: 0;
+}
+
+/* ── Page wrapper ─────────────────────────────────────────────────────────────── */
+.page {
+  padding: 20px 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.centered {
+  align-items: center;
+  padding-top: 40px;
+}
+
+/* ── Task rows ────────────────────────────────────────────────────────────────── */
+.taskRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+/* ── Routine cards ────────────────────────────────────────────────────────────── */
+.routineCard {
+  padding: 14px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius, 10px);
+  margin-bottom: 10px;
+  background: var(--surface, #f9fafb);
+}
+
+/* ── Mode cards ───────────────────────────────────────────────────────────────── */
+.modeCard {
+  padding: 14px 16px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius, 10px);
+  margin-bottom: 8px;
+  background: var(--surface, #f9fafb);
+}
+
+/* ── Analytics: stat grid ─────────────────────────────────────────────────────── */
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.statCard {
+  padding: 14px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius, 10px);
+  background: var(--surface, #f9fafb);
+}
+
+/* ── Analytics: chart area ────────────────────────────────────────────────────── */
+.chartCard {
+  padding: 16px 20px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius, 10px);
+  background: var(--surface, #f9fafb);
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 100px;
+}
+
+/* ── Profile rows ─────────────────────────────────────────────────────────────── */
+.profileRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  width: 100%;
+  max-width: 400px;
+}

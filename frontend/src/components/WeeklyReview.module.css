@@ -94,6 +94,14 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+  /* quando há 4 cards, o último quebra para linha nova centrado */
+}
+
+/* 4º card (eficiência) fica centralizado abaixo dos 3 primeiros */
+.statsGrid > *:nth-child(4) {
+  grid-column: 1 / -1;
+  max-width: calc(33.33% - 4px);
+  margin: 0 auto;
 }
 
 .statCard {
@@ -115,6 +123,13 @@
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 4px;
+}
+
+.statCompare {
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 4px;
+  opacity: 0.9;
 }
 
 .emptyNote {

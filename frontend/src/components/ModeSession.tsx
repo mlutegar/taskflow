@@ -3,6 +3,8 @@ import styles from "./ModeSession.module.css";
 import ModalOverlay from "./shared/ModalOverlay";
 import { useDialog } from "../lib/useDialog";
 import { logActivation } from "../lib/modeActivations";
+import { storageGet, storageSet, storageRemove } from "../lib/storage";
+import { SK } from "../lib/storageKeys";
 import PostSessionForm from "./sessions/PostSessionForm";
 import SessionSummary from "./shared/SessionSummary";
 import MusicSession from "./sessions/MusicSession";
@@ -38,7 +40,7 @@ const TIKTOK_LIKE_PLATFORMS: Record<string, string[]> = {
   playlist: ["fixed", "prog"],
 };
 
-const SESSION_MAP: Record<string, React.ComponentType<any>> = {
+export const SESSION_MAP: Record<string, React.ComponentType<any>> = {
   music:    MusicSession,
   tiktok:   TikTokSession,  // entrada raiz sem variante
   splite:   SpliteSession,
@@ -87,6 +89,7 @@ interface ModeSessionProps {
   mode: Record<string, any> | null | undefined;
   tasks: any[];
   routines?: any[];
+  intention?: string;
   onCompleteTask: (id: string) => Promise<void>;
   onCompleteRoutine?: (id: string) => Promise<void>;
   onAddTask: (task: { title: string; priority: number }) => Promise<void>;
@@ -102,7 +105,7 @@ export interface ModeSessionHandle {
   triggerClose: () => void;
 }
 
-const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function ModeSession({ modeId, mode, tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }, ref) {
+const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function ModeSession({ modeId, mode, tasks, routines = [], intention, onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }, ref) {
   const [quickAdd, setQuickAdd] = useState<boolean>(false);
   const [confirmingClose, setConfirmingClose] = useState<boolean>(false);
   const [showPostForm, setShowPostForm] = useState<boolean>(false);
@@ -157,9 +160,16 @@ const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function Mod
   // Intercepta o fechamento para mostrar confirmação (quando o usuário clica X no meio)
   const handleClose = useCallback(() => setConfirmingClose(true), []);
 
-  // Registra ativação do modo ao abrir a sessão
+  // Registra ativação do modo ao abrir a sessão e captura timestamp de início
   useEffect(() => {
-    if (modeId) logActivation(modeId);
+    if (modeId) {
+      logActivation(modeId);
+      storageSet(SK.SESSION_STARTED_AT, new Date().toISOString());
+    }
+    return () => {
+      // Limpa chave se a sessão for encerrada sem passar pelo PostSessionForm
+      storageRemove(SK.SESSION_STARTED_AT);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [qaMode, setQaMode] = useState<string>("task"); // "task" | "subtask"
   const [qaTitle, setQaTitle] = useState<string>("");
@@ -278,10 +288,25 @@ const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function Mod
             modeId={modeId}
             modeName={mode?.name}
             suggestedMinutes={summaryData?.durationMinutes ?? 0}
-            onDone={onClose}
+            sessionStartedAt={storageGet<string | null>(SK.SESSION_STARTED_AT, null)}
+            intention={intention}
+            onDone={() => { storageRemove(SK.SESSION_STARTED_AT); onClose(); }}
           />
         ) : (
           <>
+            {/* ── Lembrete de intenção ─── */}
+            {intention && (
+              <div style={{
+                fontSize: 12, color: "var(--text-muted)", fontStyle: "italic",
+                padding: "6px 12px", background: "var(--surface-2)",
+                borderBottom: "1px solid var(--border)",
+                display: "flex", alignItems: "center", gap: 6,
+              }}>
+                <span>🎯</span>
+                <span>{intention}</span>
+              </div>
+            )}
+
             {/* ── Confirmação de encerramento ─── */}
             {confirmingClose && (
               <div style={{
@@ -298,7 +323,7 @@ const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function Mod
                   onClick={() => handleSessionDone(0)}
                   style={{
                     padding: "7px 12px", borderRadius: "var(--radius-sm)", border: "none",
-                    background: "#e05252", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                    background: "var(--danger)", color: "var(--text-inverse)", fontWeight: 700, fontSize: 12, cursor: "pointer",
                   }}
                 >
                   📝 Registrar e sair

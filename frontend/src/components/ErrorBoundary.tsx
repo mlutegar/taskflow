@@ -88,10 +88,10 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           style={{
             marginTop: "8px",
             padding: "10px 24px",
-            background: "var(--accent, #6366f1)",
-            color: "#fff",
+            background: "var(--accent)",
+            color: "var(--text-inverse)",
             border: "none",
-            borderRadius: "var(--radius-sm, 6px)",
+            borderRadius: "var(--radius-sm)",
             cursor: "pointer",
             fontWeight: 600,
             fontSize: "14px",

@@ -22,12 +22,22 @@ export function logCheckinUsage(estadoId: string, modeId: string): void {
 const FEEDBACK_KEY = "checkinFeedback";
 const MAX_FEEDBACK = 200;
 
-export function logSessionFeedback(estadoId: string, modeId: string, rating: number): void {
+export function logSessionFeedback(estadoId: string, modeId: string, rating: number, estadoAfter?: string): void {
   if (!estadoId && !modeId) return;
   const date = localIsoDate();
-  storageAppend(FEEDBACK_KEY, { estadoId, modeId, rating, date }, MAX_FEEDBACK);
+  const entry: Record<string, unknown> = { estadoId, modeId, rating, date };
+  if (estadoAfter) entry.estadoAfter = estadoAfter;
+  storageAppend(FEEDBACK_KEY, entry, MAX_FEEDBACK);
   // Sincroniza com Supabase (fire-and-forget)
-  updateCheckinFeedback(estadoId, modeId, date, rating).catch(() => {});
+  updateCheckinFeedback(estadoId, modeId, date, rating, estadoAfter).catch(() => {});
+}
+
+/** Atualiza o último entry de feedback com o estado emocional pós-sessão. */
+export function updateLastFeedbackEstadoAfter(estadoAfter: string): void {
+  const feedbacks = storageGet<Array<Record<string, unknown>>>(FEEDBACK_KEY, []);
+  if (!feedbacks.length) return;
+  feedbacks[feedbacks.length - 1] = { ...feedbacks[feedbacks.length - 1], estadoAfter };
+  storageSet(FEEDBACK_KEY, feedbacks);
 }
 
 export function getSessionFeedback(): unknown[] {

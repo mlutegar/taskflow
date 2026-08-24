@@ -143,6 +143,26 @@
   color: #fff;
 }
 
+/* Active session dot on Modos tab */
+.activeSessionDot {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  animation: sessionPulse 2s infinite;
+  display: block;
+}
+
+@keyframes sessionPulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
 /* Add button */
 .addBtnWrap {
   display: flex;
@@ -494,7 +514,7 @@
   .addBtn { padding: 6px 10px; font-size: 12px; gap: 4px; }
   .reloadBtn { padding: 5px 8px; font-size: 11px; }
 
-  .main { padding: 14px 12px; }
+  .main { padding: 14px 12px; overflow-x: hidden; }
 
   .controls { gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 
@@ -514,7 +534,7 @@
   .filterBtn { padding: 5px 12px; font-size: 12px; white-space: nowrap; }
 
   /* Sort compacto — esconder label de texto */
-  .sortWrapper { gap: 5px; flex-shrink: 0; overflow: hidden; max-width: 160px; }
+  .sortWrapper { gap: 5px; flex-shrink: 1; min-width: 0; overflow: hidden; max-width: 120px; }
   .sortLabel { display: none; }
   .sortSelect { font-size: 12px; padding: 5px 8px; width: 100%; max-width: 100%; }
 

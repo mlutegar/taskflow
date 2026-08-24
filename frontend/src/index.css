@@ -19,6 +19,15 @@
   --radius: 10px;
   --radius-sm: 6px;
 
+  /* ── Semitransparentes para badges e banners ──────────────────────────────── */
+  --success-bg:     rgba(78, 204, 163, 0.14);
+  --warning-bg:     rgba(240, 165,  64, 0.14);
+  --danger-bg:      rgba(224,  82,  82, 0.14);
+  --success-border: rgba(78, 204, 163, 0.30);
+  --warning-border: rgba(240, 165,  64, 0.30);
+  --danger-border:  rgba(224,  82,  82, 0.25);
+  --text-inverse:   #ffffff;
+
   /* ── Tipografia responsiva ────────────────────────────────────────────────
      Use estas variáveis nos componentes ao invés de px fixos.
      Em telas pequenas (≤480px) os valores diminuem automaticamente. */
@@ -42,6 +51,8 @@
 html {
   /* Ocupa a altura real da janela no mobile (exclui barra do browser) */
   height: -webkit-fill-available;
+  /* Impede scroll horizontal no nível raiz */
+  overflow-x: hidden;
 }
 
 body {
@@ -55,6 +66,8 @@ body {
   overscroll-behavior: none;
   /* Espaço para o indicador de home (bottom bar) do iPhone */
   padding-bottom: env(safe-area-inset-bottom);
+  /* Impede scroll horizontal no nível raiz */
+  overflow-x: hidden;
 }
 
 button {

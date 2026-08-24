@@ -15,8 +15,20 @@ import AddRoutineForm from "./components/AddRoutineForm";
 import RoutineTemplates from "./components/RoutineTemplates";
 import ModesPanel from "./components/ModesPanel";
 import TodayPanel from "./components/TodayPanel";
+import WeeklyReview from "./components/WeeklyReview";
 import styles from "./App.module.css";
 import { ToastProvider } from './components/shared/Toast';
+import { storageGet, storageSet } from "./lib/storage";
+import { SK } from "./lib/storageKeys";
+import { getUsageLogs } from "./lib/sessionUsageLog";
+
+/** Retorna a chave ISO da semana atual, ex: "2026-W34". */
+function getCurrentWeekKey(): string {
+  const now = new Date();
+  const jan1 = new Date(now.getFullYear(), 0, 1);
+  const week = Math.ceil(((now.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+  return `${now.getFullYear()}-W${String(week).padStart(2, "0")}`;
+}
 
 const DashboardPage = lazy(() => import("./components/dashboard/DashboardPage"));
 
@@ -42,18 +54,86 @@ const ROUTINE_FILTERS: { label: string; value: string }[] = [
 
 export default function App(): JSX.Element {
   const [tab, setTab] = useState<string>(
-    () => localStorage.getItem("taskflow.activeTab") || "tasks"
+    () => storageGet<string>(SK.ACTIVE_TAB, "tasks")
   );
 
   useEffect(() => {
-    localStorage.setItem("taskflow.activeTab", tab);
+    storageSet(SK.ACTIVE_TAB, tab);
   }, [tab]);
 
-  // UI state
-  const [taskFilter, setTaskFilter] = useState<string>("");
-  const [taskSort, setTaskSort] = useState<string>("due_date_asc");
-  const [taskSearch, setTaskSearch] = useState<string>("");
+  // ── Resumo semanal automático ──────────────────────────────────────────────
+  const [showWeeklySummary, setShowWeeklySummary] = useState<boolean>(false);
+
+  useEffect(() => {
+    const lastShown = storageGet<string>(SK.WEEKLY_SUMMARY_LAST_SHOWN, "");
+    const currentWeek = getCurrentWeekKey();
+    // Só exibe se: semana nova E pelo menos 1 sessão registrada (evita tela vazia)
+    if (lastShown !== currentWeek && getUsageLogs().length > 0) {
+      setShowWeeklySummary(true);
+      storageSet(SK.WEEKLY_SUMMARY_LAST_SHOWN, currentWeek);
+    }
+  }, []);
+
+  const ACTIVE_SESSION_KEY = "taskflow." + SK.ACTIVE_MULTI_CARD_SESSION;
+  const [hasActiveSession, setHasActiveSession] = useState<boolean>(
+    () => !!localStorage.getItem(ACTIVE_SESSION_KEY)
+  );
+
+  useEffect(() => {
+    const sync = (): void =>
+      setHasActiveSession(!!localStorage.getItem(ACTIVE_SESSION_KEY));
+
+    const handleStorage = (e: StorageEvent): void => {
+      if (e.key === ACTIVE_SESSION_KEY || e.key === null) sync();
+    };
+    const handleVisibility = (): void => {
+      if (document.visibilityState === "visible") sync();
+    };
+
+    window.addEventListener("storage", handleStorage);                    // cross-tab
+    window.addEventListener("multiCardSessionChanged", sync);             // same-tab
+    document.addEventListener("visibilitychange", handleVisibility);      // fallback
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("multiCardSessionChanged", sync);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
+  // UI state — inicializados a partir da query string para persistência via URL
+  const [taskFilter, setTaskFilter] = useState<string>(() =>
+    new URLSearchParams(window.location.search).get("filter") ?? ""
+  );
+  const [taskSort, setTaskSort] = useState<string>(() =>
+    new URLSearchParams(window.location.search).get("sort") ?? "due_date_asc"
+  );
+  const [taskSearch, setTaskSearch] = useState<string>(() =>
+    new URLSearchParams(window.location.search).get("q") ?? ""
+  );
   const [grouped, setGrouped] = useState<boolean>(false);
+
+  // Sincronizar filtros na URL (replaceState — não cria entrada no histórico)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (taskSearch)                              params.set("q",      taskSearch);
+    else                                         params.delete("q");
+
+    if (taskFilter)                              params.set("filter", taskFilter);
+    else                                         params.delete("filter");
+
+    if (taskSort && taskSort !== "due_date_asc") params.set("sort",   taskSort);
+    else                                         params.delete("sort");
+
+    const qs = params.toString();
+    const newUrl =
+      window.location.pathname +
+      (qs ? `?${qs}` : "") +
+      window.location.hash;
+
+    window.history.replaceState(null, "", newUrl);
+  }, [taskSearch, taskFilter, taskSort]);
 
   // Pull-to-refresh
   const pullStartY = useRef<number>(0);
@@ -260,9 +340,16 @@ export default function App(): JSX.Element {
             <button
               className={`${styles.tab} ${tab === "modes" ? styles.tabActive : ""}`}
               onClick={() => setTab("modes")}
+              style={{ position: "relative" }}
             >
               Modos
-              {(() => { try { const n = JSON.parse(localStorage.getItem('taskflow.favoriteModes') || '[]').length; return n > 0 ? <span className={styles.tabBadge}>{n}</span> : null; } catch { return null; } })()}
+              {hasActiveSession && (
+                <span
+                  className={styles.activeSessionDot}
+                  title="Sessão ativa"
+                />
+              )}
+              {(() => { const n = storageGet<string[]>(SK.MODES_FAVORITE, []).length; return n > 0 ? <span className={styles.tabBadge}>{n}</span> : null; })()}
             </button>
             <button
               className={`${styles.tab} ${tab === "analytics" ? styles.tabActive : ""}`}
@@ -525,6 +612,10 @@ export default function App(): JSX.Element {
       )}
 
       {ConfirmUI}
+
+      {showWeeklySummary && (
+        <WeeklyReview onClose={() => setShowWeeklySummary(false)} />
+      )}
     </div>
     </ToastProvider>
   );

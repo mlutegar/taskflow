@@ -8,9 +8,11 @@ export async function saveCheckin(estadoId: string, modeId: string, date: string
   }
 }
 
-export async function updateCheckinFeedback(estadoId: string, modeId: string, date: string, rating: number): Promise<void> {
+export async function updateCheckinFeedback(estadoId: string, modeId: string, date: string, rating: number, estadoAfter?: string): Promise<void> {
   try {
-    await api.patch("/daily-focus/checkins/feedback", { estadoId, modeId, date, rating });
+    const body: Record<string, unknown> = { estadoId, modeId, date, rating };
+    if (estadoAfter) body.estadoAfter = estadoAfter;
+    await api.patch("/daily-focus/checkins/feedback", body);
   } catch {
     // fire-and-forget
   }

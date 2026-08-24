@@ -278,3 +278,98 @@
   border-color: var(--accent);
   color: #fff;
 }
+
+
+/* ── Efficiency badge ────────────────────────────────── */
+.efficiencyBadge {
+  font-size: var(--font-xs);
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 1px solid;
+}
+.efficiencyHigh {
+  color: var(--success);
+  background: var(--success-bg);
+  border-color: var(--success-border);
+}
+.efficiencyMid {
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+}
+.efficiencyLow {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+
+/* ── Nota pós-sessão ─────────────────────────────────── */
+.noteText {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 6px 0 0;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* ── Filtro de período ───────────────────────────────────── */
+.periodRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.periodPill {
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+
+.periodPill:hover { border-color: var(--accent); color: var(--text); }
+
+.periodPillActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Resumo do período ───────────────────────────────────── */
+.usageSummary {
+  display: flex;
+  gap: 20px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.usageSummaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.usageSummaryValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+
+.usageSummaryLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

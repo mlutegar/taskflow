@@ -246,10 +246,142 @@
 }
 .undoBtn:hover { background: var(--border); border-color: var(--accent); }
 
+/* ── Session context banner ──────────────────────────────── */
+.sessionContextBanner {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  line-height: 1.5;
+}
+.sessionContextBanner strong { color: var(--text); }
+
+/* ── Efficiency result card ──────────────────────────────── */
+.efficiencyCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 32px 20px 28px;
+  text-align: center;
+}
+
+.efficiencyIcon {
+  font-size: 38px;
+  line-height: 1;
+  animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.efficiencyTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  opacity: 0.85;
+}
+
+.efficiencyGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.efficiencyMetric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 6px;
+}
+
+.efficiencyValue {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cores por nível de eficiência */
+.eff_high { color: #4caf82; }
+.eff_mid  { color: #f5c542; }
+.eff_low  { color: #e05c5c; }
+
+.efficiencyLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.efficiencyBadge {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 18px;
+  border-radius: 20px;
+  animation: fadeSlideUp 0.4s ease both;
+  animation-delay: 0.15s;
+}
+
+.badge_high {
+  background: rgba(76, 175, 130, 0.15);
+  border: 1px solid rgba(76, 175, 130, 0.35);
+  color: #4caf82;
+}
+
+.badge_mid {
+  background: rgba(245, 197, 66, 0.13);
+  border: 1px solid rgba(245, 197, 66, 0.32);
+  color: #d4a80a;
+}
+
+.badge_low {
+  background: rgba(224, 92, 92, 0.12);
+  border: 1px solid rgba(224, 92, 92, 0.28);
+  color: #e05c5c;
+}
+
+@keyframes popIn {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes fadeSlideUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
 /* ── Mobile: tudo já é compacto, pequenos ajustes ─────────── */
 @media (max-width: 420px) {
   .body { padding: 12px; gap: 14px; }
   .minutesInput { width: 46px; font-size: 18px; }
   .chip { padding: 7px 10px; font-size: 12px; }
   .workedBtn { font-size: 13px; padding: 10px 8px; }
+  .efficiencyValue { font-size: 20px; }
+  .efficiencyGrid { gap: 6px; }
+}
+
+/* ── Nota rápida ───────────────────────────────────── */
+.noteTextarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.5;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.noteTextarea:focus {
+  outline: none;
+  border-color: var(--accent);
 }

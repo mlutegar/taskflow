@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  overflow-x: hidden;
+  overflow-x: clip; /* clip não cria scroll container (diferente de hidden) */
   max-width: 100%;
 }
 
@@ -2037,4 +2037,160 @@
 @keyframes seqPulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* ── Eficiência média histórica badge ─────────────────────── */
+.effAvgBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.effAvgHigh {
+  background: rgba(76, 175, 130, 0.15);
+  border: 1px solid rgba(76, 175, 130, 0.35);
+  color: #4caf82;
+}
+
+.effAvgMid {
+  background: rgba(245, 197, 66, 0.13);
+  border: 1px solid rgba(245, 197, 66, 0.32);
+  color: #c49a00;
+}
+
+.effAvgLow {
+  background: rgba(224, 92, 92, 0.12);
+  border: 1px solid rgba(224, 92, 92, 0.28);
+  color: #e05c5c;
+}
+
+/* Destaque sutil para modos com alta eficiência consistente (≥ 70%) */
+.cardHighEff {
+  box-shadow: 0 0 0 1.5px rgba(76, 175, 130, 0.3), 0 2px 10px rgba(76, 175, 130, 0.08);
+}
+
+/* ── Histórico de eficiência por modo (sparkline) ────────── */
+.effHistoryBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.effHistoryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.effHistoryTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.effHistoryTrend {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.effHistorySvg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.effHistoryAxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+  opacity: 0.65;
+}
+
+/* ── Notas pessoais no card expandido ───────────────────────────────────── */
+.modeNotesBlock { display:flex; flex-direction:column; gap:6px; padding:10px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); }
+.modeNotesTitle { font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:2px; }
+.modeNoteItem  { display:flex; gap:8px; align-items:flex-start; }
+.modeNoteDate  { font-size:10px; color:var(--text-muted); white-space:nowrap; padding-top:2px; flex-shrink:0; }
+.modeNoteText  { font-size:12px; color:var(--text); line-height:1.5; font-style:italic; }
+
+/* ── Comparativo entre modos ────────────────────────────────────────────── */
+.compBlock { display:flex; align-items:flex-start; gap:8px; padding:9px 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); }
+.compIcon  { font-size:14px; flex-shrink:0; padding-top:1px; }
+.compText  { font-size:12px; color:var(--text-muted); line-height:1.5; }
+.compText strong { color:var(--text); }
+.compMode  { color:var(--accent); font-weight:600; }
+
+/* ── Feeling filter bar ─────────────────────────────────────────────────── */
+.feelingBar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 6px 0 2px;
+  border-top: 1px solid var(--border);
+}
+
+.feelingLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-right: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.feelingBtn {
+  font-size: 18px;
+  padding: 2px 5px;
+  border-radius: 6px;
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1;
+}
+
+.feelingBtn:hover {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.feelingActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(124, 110, 245, 0.1);
+  border: 1px solid rgba(124, 110, 245, 0.3);
+  border-radius: 99px;
+  padding: 3px 10px;
+}
+
+.feelingClear {
+  font-size: 15px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+
+.feelingClear:hover {
+  color: var(--text);
 }

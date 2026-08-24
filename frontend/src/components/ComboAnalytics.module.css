@@ -1,0 +1,104 @@
+.root {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text, #e8eaf0);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0;
+  color: var(--text-muted, #9aa0b2);
+  font-size: 13px;
+  text-align: center;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  background: var(--surface, #1a1e2e);
+}
+
+.rank {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-muted, #9aa0b2);
+  min-width: 28px;
+  padding-top: 2px;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid;
+}
+
+.barRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.barTrack {
+  flex: 1;
+  height: 6px;
+  border-radius: 100px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 100px;
+  background: #4ecca3;
+  transition: width 0.3s ease;
+}
+
+.pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4ecca3;
+  min-width: 36px;
+  text-align: right;
+}
+
+.meta {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted, #9aa0b2);
+}

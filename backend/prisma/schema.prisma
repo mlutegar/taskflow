@@ -180,18 +180,23 @@ model UserPreferences {
 }
 
 model SessionUsageLog {
-  id             Int      @id @default(autoincrement())
-  userId         String   @map("user_id")
-  modeId         String   @map("mode_id")
-  date           String   // YYYY-MM-DD
-  hour           Int
-  worked         Boolean?                  // null = "mais ou menos"
-  focusedMinutes Int      @default(0) @map("focused_minutes")
-  idleMinutes    Int      @default(0) @map("idle_minutes")
-  idleReason     String   @default("[]") @map("idle_reason")   // JSON array
-  feeling        String   @default("[]")                        // JSON array
-  comboWith      String?  @map("combo_with")                   // modeId do parceiro se foi sessão combo
-  createdAt      DateTime @default(now()) @map("created_at")
+  id                    Int       @id @default(autoincrement())
+  userId                String    @map("user_id")
+  modeId                String    @map("mode_id")
+  date                  String    // YYYY-MM-DD
+  hour                  Int
+  worked                Boolean?                  // null = "mais ou menos"
+  focusedMinutes        Int       @default(0) @map("focused_minutes")
+  idleMinutes           Int       @default(0) @map("idle_minutes")
+  idleReason            String    @default("[]") @map("idle_reason")   // JSON array
+  feeling               String    @default("[]")                        // JSON array
+  comboWith             String?   @map("combo_with")                   // modeId do parceiro se foi sessão combo
+  startedAt             DateTime? @map("started_at")                   // timestamp automático de início
+  endedAt               DateTime? @map("ended_at")                     // timestamp automático de fim
+  sessionDurationMinutes Int?     @map("session_duration_minutes")     // endedAt - startedAt em minutos
+  efficiencyPct         Int?      @map("efficiency_pct")               // focusedMinutes / sessionDurationMinutes * 100
+  note                  String?   @map("note")                         // anotação livre pós-sessão
+  createdAt             DateTime  @default(now()) @map("created_at")
 
   @@unique([userId, modeId, date, hour])
   @@index([userId, date])

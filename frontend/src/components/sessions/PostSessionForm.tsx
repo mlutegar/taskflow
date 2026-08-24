@@ -80,19 +80,34 @@ interface PostSessionFormProps {
   modeId: string;
   modeName?: string;
   suggestedMinutes?: number;
+  sessionStartedAt?: string | null;
+  intention?: string;
   onDone: () => void;
 }
 
-export default function PostSessionForm({ modeId, modeName, suggestedMinutes, onDone }: PostSessionFormProps): JSX.Element {
+interface SavedResult {
+  sessionDurationMinutes: number | null;
+  efficiencyPct: number | null;
+  focusedMinutes: number;
+  worked: boolean;
+}
+
+export default function PostSessionForm({ modeId, modeName, suggestedMinutes, sessionStartedAt, intention, onDone }: PostSessionFormProps): JSX.Element {
   const { showToast } = useToast();
   const [worked,         setWorked]         = useState<boolean | null>(null);
   const [focusedMinutes, setFocusedMinutes] = useState<number>(() => suggestedMinutes ?? 0);
   const [idleMinutes,    setIdleMinutes]    = useState<number>(0);
   const [idleReason,     setIdleReason]     = useState<string[]>([]);
   const [feeling,        setFeeling]        = useState<string[]>([]);
-  const [phase,          setPhase]          = useState<"form" | "saving" | "saved">("form");
-  const [undoTimer,      setUndoTimer]      = useState<number>(5);
+  const [note,           setNote]           = useState<string>("");
+  const [phase,       setPhase]       = useState<"form" | "saved">("form");
+  const [savedResult, setSavedResult] = useState<SavedResult | null>(null);
   const ivRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Duração estimada ao vivo (usada no banner do formulário)
+  const sessionDurationNow: number | null = sessionStartedAt
+    ? Math.max(1, Math.round((Date.now() - new Date(sessionStartedAt).getTime()) / 60000))
+    : null;
 
   // Fix #9 — reseta campos se o modeId mudar (reutilização do componente sem desmontagem)
   useEffect(() => {
@@ -101,8 +116,9 @@ export default function PostSessionForm({ modeId, modeName, suggestedMinutes, on
     setIdleMinutes(0);
     setIdleReason([]);
     setFeeling([]);
+    setNote("");
     setPhase("form");
-    setUndoTimer(5);
+    setSavedResult(null);
   }, [modeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleArr = (setArr: React.Dispatch<React.SetStateAction<string[]>>, id: string): void => {
@@ -110,33 +126,33 @@ export default function PostSessionForm({ modeId, modeName, suggestedMinutes, on
   };
 
   const handleSubmit = (): void => {
-    // Fix #4 — avisa (soft) se ambos os tempos estão zerados
     if (focusedMinutes === 0 && idleMinutes === 0) {
       showToast("💡 Preencha ao menos o tempo focado ou ocioso para um registro mais preciso.", "info");
     }
-    setPhase("saving");
-    let count = 5;
-    setUndoTimer(count);
-    ivRef.current = setInterval(() => {
-      count -= 1;
-      setUndoTimer(count);
-      if (count <= 0) {
-        clearInterval(ivRef.current!);
-        const saved = logUsage({ modeId, worked: worked ?? false, focusedMinutes, idleMinutes, idleReason, feeling });
-        logCompletion(modeId);
-        if (!saved) {
-          showToast("⚠️ Não foi possível salvar localmente (armazenamento cheio). Os dados foram enviados ao servidor.", "error");
-        }
-        setPhase("saved");
-        setTimeout(onDone, 900);
-      }
-    }, 1000);
-  };
 
-  const handleUndo = (): void => {
-    clearInterval(ivRef.current!);
-    setPhase("form");
-    setUndoTimer(5);
+    const endedAt = new Date().toISOString();
+
+    // Calcula eficiência para exibir no card pós-sessão
+    let sessionDurationMinutes: number | null = null;
+    let efficiencyPct: number | null = null;
+    if (sessionStartedAt) {
+      const diffMs = new Date(endedAt).getTime() - new Date(sessionStartedAt).getTime();
+      if (diffMs > 0) {
+        sessionDurationMinutes = Math.max(1, Math.round(diffMs / 60000));
+        if (focusedMinutes > 0) {
+          efficiencyPct = Math.min(100, Math.round((focusedMinutes / sessionDurationMinutes) * 100));
+        }
+      }
+    }
+
+    const saved = logUsage({ modeId, worked: worked ?? false, focusedMinutes, idleMinutes, idleReason, feeling, sessionStartedAt: sessionStartedAt ?? undefined, sessionEndedAt: endedAt, note: note.trim() || undefined, intention: intention || undefined });
+    logCompletion(modeId);
+    if (!saved) {
+      showToast("⚠️ Não foi possível salvar localmente (armazenamento cheio). Os dados foram enviados ao servidor.", "error");
+    }
+    setSavedResult({ sessionDurationMinutes, efficiencyPct, focusedMinutes, worked: worked ?? false });
+    setPhase("saved");
+    setTimeout(onDone, 3200);
   };
 
   useEffect(() => () => clearInterval(ivRef.current!), []);
@@ -146,25 +162,63 @@ export default function PostSessionForm({ modeId, modeName, suggestedMinutes, on
     onDone();
   };
 
-  if (phase === "saving") {
-    return (
-      <div className={styles.root}>
-        <div className={styles.savedState}>
-          <span className={styles.savedEmoji}>💾</span>
-          <p className={styles.savedText}>Salvando em {undoTimer}s…</p>
-          <button className={styles.undoBtn} onClick={handleUndo} type="button">↩ Desfazer</button>
-        </div>
-      </div>
-    );
-  }
-
   if (phase === "saved") {
+    const r = savedResult;
+    const effLevel = r?.efficiencyPct != null
+      ? r.efficiencyPct >= 70 ? "high" : r.efficiencyPct >= 40 ? "mid" : "low"
+      : null;
+
     return (
       <div className={styles.root}>
-        <div className={styles.savedState}>
-          <span className={styles.savedEmoji}>✅</span>
-          <p className={styles.savedText}>Registrado!</p>
-        </div>
+        {r?.sessionDurationMinutes != null ? (
+          <div className={styles.efficiencyCard}>
+            <div className={styles.efficiencyIcon}>
+              {r.worked ? "✅" : "📝"}
+            </div>
+            <div className={styles.efficiencyTitle}>
+              {modeName || modeId} — registrado!
+            </div>
+
+            <div className={styles.efficiencyGrid}>
+              <div className={styles.efficiencyMetric}>
+                <span className={styles.efficiencyValue}>{r.sessionDurationMinutes}</span>
+                <span className={styles.efficiencyLabel}>🕐 min total</span>
+              </div>
+              <div className={styles.efficiencyMetric}>
+                <span className={styles.efficiencyValue}>{r.focusedMinutes}</span>
+                <span className={styles.efficiencyLabel}>⚡ min focado</span>
+              </div>
+              <div className={styles.efficiencyMetric}>
+                {effLevel ? (
+                  <>
+                    <span className={`${styles.efficiencyValue} ${styles[`eff_${effLevel}`]}`}>
+                      {r.efficiencyPct}%
+                    </span>
+                    <span className={styles.efficiencyLabel}>🎯 eficiência</span>
+                  </>
+                ) : (
+                  <>
+                    <span className={styles.efficiencyValue} style={{ color: "var(--text-muted)" }}>—</span>
+                    <span className={styles.efficiencyLabel}>🎯 eficiência</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {effLevel && (
+              <div className={`${styles.efficiencyBadge} ${styles[`badge_${effLevel}`]}`}>
+                {effLevel === "high" && "🔥 Sessão muito eficiente!"}
+                {effLevel === "mid"  && "👍 Sessão razoável"}
+                {effLevel === "low"  && "💡 Pode melhorar"}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className={styles.savedState}>
+            <span className={styles.savedEmoji}>✅</span>
+            <p className={styles.savedText}>Registrado!</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -251,6 +305,29 @@ export default function PostSessionForm({ modeId, modeName, suggestedMinutes, on
             ))}
           </div>
         </div>
+
+        {/* 6. Nota rápida */}
+        <div className={styles.section}>
+          <span className={styles.fieldLabel}>
+            📝 O que você aprendeu ou quer lembrar?{" "}
+            <span style={{ fontWeight: 400, opacity: 0.6 }}>(opcional)</span>
+          </span>
+          <textarea
+            className={styles.noteTextarea}
+            placeholder="Ex: Funcionou bem de manhã, mas perdi foco depois de 20min..."
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={500}
+            rows={3}
+          />
+        </div>
+
+        {/* Banner de contexto: duração automática da sessão */}
+        {sessionDurationNow != null && (
+          <div className={styles.sessionContextBanner}>
+            🕐 Sessão ativa por <strong>{sessionDurationNow} min</strong> — insira abaixo o tempo que você realmente ficou focado
+          </div>
+        )}
 
         <button
           type="button"

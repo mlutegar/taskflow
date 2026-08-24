@@ -10,7 +10,10 @@ export default async function sessionUsageLogsRoutes(fastify) {
 
   // POST /session-usage-logs
   fastify.post("/", async (req, reply) => {
-    const { mode_id, date, hour, worked, focused_minutes, idle_minutes, idle_reason, feeling, combo_with } = req.body ?? {};
+    const {
+      mode_id, date, hour, worked, focused_minutes, idle_minutes, idle_reason, feeling, combo_with,
+      started_at, ended_at, session_duration_minutes, efficiency_pct, note,
+    } = req.body ?? {};
 
     if (!mode_id || !date) {
       return reply.status(400).send({ error: "mode_id e date são obrigatórios." });
@@ -19,12 +22,17 @@ export default async function sessionUsageLogsRoutes(fastify) {
     await prisma.sessionUsageLog.upsert({
       where: { userId_modeId_date_hour: { userId: req.userId, modeId: mode_id, date, hour: hour ?? 0 } },
       update: {
-        worked:         worked !== undefined ? worked : null,
-        focusedMinutes: focused_minutes ?? 0,
-        idleMinutes:    idle_minutes ?? 0,
-        idleReason:     JSON.stringify(idle_reason ?? []),
-        feeling:        JSON.stringify(feeling ?? []),
-        comboWith:      combo_with ?? null,
+        worked:                worked !== undefined ? worked : null,
+        focusedMinutes:        focused_minutes ?? 0,
+        idleMinutes:           idle_minutes ?? 0,
+        idleReason:            JSON.stringify(idle_reason ?? []),
+        feeling:               JSON.stringify(feeling ?? []),
+        comboWith:             combo_with ?? null,
+        ...(started_at              ? { startedAt: new Date(started_at) }                                  : {}),
+        ...(ended_at                ? { endedAt:   new Date(ended_at)   }                                  : {}),
+        ...(session_duration_minutes !== undefined ? { sessionDurationMinutes: session_duration_minutes }  : {}),
+        ...(efficiency_pct           !== undefined ? { efficiencyPct:          efficiency_pct }            : {}),
+        ...(note                     !== undefined ? { note }                                              : {}),
       },
       create: {
         userId:         req.userId,
@@ -37,6 +45,11 @@ export default async function sessionUsageLogsRoutes(fastify) {
         idleReason:     JSON.stringify(idle_reason ?? []),
         feeling:        JSON.stringify(feeling ?? []),
         comboWith:      combo_with ?? null,
+        ...(started_at              ? { startedAt: new Date(started_at) }                                  : {}),
+        ...(ended_at                ? { endedAt:   new Date(ended_at)   }                                  : {}),
+        ...(session_duration_minutes !== undefined ? { sessionDurationMinutes: session_duration_minutes }  : {}),
+        ...(efficiency_pct           !== undefined ? { efficiencyPct:          efficiency_pct }            : {}),
+        ...(note                     !== undefined ? { note }                                              : {}),
       },
     });
 
@@ -65,15 +78,20 @@ export default async function sessionUsageLogsRoutes(fastify) {
 
     return {
       items: items.map((r) => ({
-        mode_id:          r.modeId,
-        date:             r.date,
-        hour:             r.hour,
-        worked:           r.worked,
-        focused_minutes:  r.focusedMinutes,
-        idle_minutes:     r.idleMinutes,
-        idle_reason:      parseJson(r.idleReason, []),
-        feeling:          parseJson(r.feeling, []),
-        combo_with:       r.comboWith ?? null,
+        mode_id:                  r.modeId,
+        date:                     r.date,
+        hour:                     r.hour,
+        worked:                   r.worked,
+        focused_minutes:          r.focusedMinutes,
+        idle_minutes:             r.idleMinutes,
+        idle_reason:              parseJson(r.idleReason, []),
+        feeling:                  parseJson(r.feeling, []),
+        combo_with:               r.comboWith               ?? null,
+        started_at:               r.startedAt?.toISOString() ?? null,
+        ended_at:                 r.endedAt?.toISOString()   ?? null,
+        session_duration_minutes: r.sessionDurationMinutes  ?? null,
+        efficiency_pct:           r.efficiencyPct           ?? null,
+        note:                     r.note                    ?? null,
       })),
       nextCursor,
     };

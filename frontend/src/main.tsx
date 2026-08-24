@@ -1,4 +1,4 @@
-import { StrictMode, useState, useEffect, useRef, lazy, Suspense } from "react";
+import { StrictMode, useState, useEffect, lazy, Suspense } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
 import "./index.css";
@@ -20,25 +20,24 @@ import { queryClient, setMutationErrorHandler } from "./lib/queryClient.js";
 // onFCP(reportVital);
 // onTTFB(reportVital);
 import AppShell from "./components/layout/AppShell.jsx";
+import PageSkeleton from "./components/shared/PageSkeleton.jsx";
 import LoginPage from "./components/auth/LoginPage.jsx";
 import { useAuth } from "./hooks/useAuth.js";
-import { loadRemoteSessions } from "./lib/dailyFocusHistory.js";
-import { loadRemoteTodayState } from "./lib/dailyFocusDay.js";
-import { loadRemoteAchievements } from "./lib/dailyFocusAchievements.js";
-import { loadRemoteCheckins } from "./lib/checkinLog.js";
-import { loadRemotePreferences } from "./lib/userPreferences.js";
-import { loadRemoteModeActivations } from "./lib/modeActivations.js";
-import { loadRemoteUsageLogs } from "./lib/sessionUsageLog.js";
-import { loadRemoteModeLog } from "./lib/modeLog.js";
-import { loadRemoteModeComboLog } from "./lib/modeComboLog.js";
+import { useRemoteSync } from "./hooks/useRemoteSync.js";
 import { useStreakReminder } from "./hooks/useStreakReminder.js";
+import { migrateLegacyKeys } from "./lib/storage.js";
+
+// Migra chaves legadas do localStorage (sem prefixo) para o padrão "taskflow."
+// Executado uma única vez antes do React montar.
+migrateLegacyKeys();
 
 // ── Lazy loading de rotas (reduz chunk inicial) ───────────────────────────────
-const App           = lazy(() => import("./App.jsx"));
+const TasksPage     = lazy(() => import("./pages/TasksPage.jsx"));
+const RoutinesPage  = lazy(() => import("./pages/RoutinesPage.jsx"));
+const ModesPage     = lazy(() => import("./pages/ModesPage.jsx"));
 const DailyFocusApp = lazy(() => import("./DailyFocusApp.jsx"));
-const DashboardPage = lazy(() => import("./components/dashboard/DashboardPage.jsx"));
+const AnalyticsPage = lazy(() => import("./components/analytics/AnalyticsPage.jsx"));
 const ProfilePage   = lazy(() => import("./components/auth/ProfilePage.jsx"));
-const HistoryPage   = lazy(() => import("./components/history/HistoryPage.jsx"));
 
 // ── 404 page ─────────────────────────────────────────────────────────────────
 function NotFoundPage(): JSX.Element {
@@ -48,7 +47,7 @@ function NotFoundPage(): JSX.Element {
       <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text)" }}>Página não encontrada</div>
       <div style={{ fontSize: "13px" }}>A rota <code style={{ background: "var(--surface-2)", padding: "2px 6px", borderRadius: "4px" }}>{window.location.hash}</code> não existe.</div>
       <button
-        onClick={() => { window.location.hash = "/daily-focus"; }}
+        onClick={() => { window.location.hash = "/tasks"; }}
         style={{ padding: "10px 20px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer", fontWeight: 600, fontSize: "13px" }}
       >
         Ir para Daily Focus
@@ -119,8 +118,6 @@ function QueryErrorHandler(): null {
 function Root(): JSX.Element {
   const [hash, setHash] = useState<string>(window.location.hash || "#/");
   const { user, loading, signIn, signUp, signOut } = useAuth();
-  const syncedRef = useRef<boolean>(false);
-
   useEffect(() => {
     const handler = (): void => setHash(window.location.hash || "#/");
     window.addEventListener("hashchange", handler);
@@ -128,49 +125,34 @@ function Root(): JSX.Element {
   }, []);
 
   // Sincroniza dados com backend após login
-  useEffect(() => {
-    if (!user || syncedRef.current) return;
-    syncedRef.current = true;
-
-    const loaders: Array<{ name: string; fn: () => Promise<unknown> }> = [
-      { name: "sessions",       fn: loadRemoteSessions },
-      { name: "todayState",     fn: loadRemoteTodayState },
-      { name: "achievements",   fn: loadRemoteAchievements },
-      { name: "checkins",       fn: loadRemoteCheckins },
-      { name: "preferences",    fn: loadRemotePreferences },
-      { name: "modeActivations",fn: loadRemoteModeActivations },
-      { name: "usageLogs",      fn: loadRemoteUsageLogs },
-      { name: "modeLog",        fn: loadRemoteModeLog },
-      { name: "modeComboLog",   fn: loadRemoteModeComboLog },
-    ];
-
-    Promise.allSettled(loaders.map(({ fn }) => fn())).then((results) => {
-      results.forEach((result, i) => {
-        if (result.status === "rejected") {
-          console.warn(`[sync] Falha ao carregar "${loaders[i].name}":`, result.reason);
-        }
-      });
-    });
-  }, [user]);
+  useRemoteSync(user);
 
   useStreakReminder();
 
   if (loading) return <LoadingScreen />;
   if (!user)   return <LoginPage signIn={signIn} signUp={signUp} />;
 
+  // Redirecionar raiz para /tasks
+  if (hash === "#/" || hash === "#") {
+    window.location.replace("#/tasks");
+  }
+
+  const skeletonType = hash.includes("tasks") ? "tasks" : hash.includes("routines") ? "routines" : hash.includes("modes") ? "modes" : hash.includes("daily-focus") ? "daily-focus" : hash.includes("dashboard") || hash.includes("history") ? "analytics" : hash.includes("profile") ? "profile" : "generic" as const;
   let Page: JSX.Element;
-  if (hash === "#/daily-focus")       Page = <DailyFocusApp />;
-  else if (hash === "#/dashboard")    Page = <DashboardPage />;
+  if (hash === "#/tasks")             Page = <TasksPage />;
+  else if (hash === "#/routines")     Page = <RoutinesPage />;
+  else if (hash === "#/modes")        Page = <ModesPage />;
+  else if (hash === "#/daily-focus")  Page = <DailyFocusApp />;
+  else if (hash === "#/dashboard")    Page = <AnalyticsPage />;
+  else if (hash === "#/history")      Page = <AnalyticsPage />;
   else if (hash === "#/profile")      Page = <ProfilePage onSignOut={signOut} />;
-  else if (hash === "#/history")      Page = <HistoryPage />;
-  else if (hash === "#/" || hash === "#") Page = <App />;
   else Page = <NotFoundPage />;
 
   return (
     <>
       <OfflineBanner />
       <AppShell currentHash={hash} onSignOut={signOut}>
-        <Suspense fallback={<LoadingScreen />}>
+        <Suspense fallback={<PageSkeleton type={skeletonType} />}>
           {Page}
         </Suspense>
       </AppShell>

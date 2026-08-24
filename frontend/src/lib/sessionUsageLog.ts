@@ -5,6 +5,7 @@
  */
 
 import { storageGet, storageAppend, storageSet } from "./storage";
+import { SK } from "./storageKeys";
 import { syncToBackend } from "./syncToBackend";
 
 const LS_KEY = "sessionUsageLog";
@@ -22,6 +23,12 @@ interface SessionUsageEntry {
   idleReason: string[];
   feeling: string[];
   comboWith?: string;
+  startedAt?: string;              // ISO datetime de início (capturado automaticamente)
+  endedAt?: string;                // ISO datetime de fim (capturado automaticamente)
+  sessionDurationMinutes?: number; // endedAt - startedAt em minutos
+  efficiencyPct?: number;          // focusedMinutes / sessionDurationMinutes * 100 (max 100)
+  note?: string;                   // anotação livre pós-sessão
+  intention?: string;              // intenção declarada antes de iniciar a sessão
 }
 
 interface HourBlock {
@@ -151,7 +158,7 @@ function generateId(): string {
   });
 }
 
-export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReason, feeling, comboWith }: {
+export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReason, feeling, comboWith, sessionStartedAt, sessionEndedAt, note, intention }: {
   modeId: string;
   worked: boolean;
   focusedMinutes: number;
@@ -159,25 +166,57 @@ export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReas
   idleReason: string[];
   feeling: string[];
   comboWith?: string;
+  sessionStartedAt?: string;
+  sessionEndedAt?: string;
+  note?: string;
+  intention?: string;
 }): unknown {
   if (!modeId) return false;
   const date = localIsoDate();
   const hour = new Date().getHours();
   const id = generateId();
-  const entry: SessionUsageEntry = { id, modeId, date, hour, worked, focusedMinutes, idleMinutes, idleReason, feeling, ...(comboWith ? { comboWith } : {}) };
+
+  // Calcula duração e eficiência automaticamente a partir dos timestamps
+  let sessionDurationMinutes: number | undefined;
+  let efficiencyPct: number | undefined;
+  if (sessionStartedAt && sessionEndedAt) {
+    const diffMs = new Date(sessionEndedAt).getTime() - new Date(sessionStartedAt).getTime();
+    if (diffMs > 0) {
+      sessionDurationMinutes = Math.max(1, Math.round(diffMs / 60000));
+      if (focusedMinutes > 0) {
+        efficiencyPct = Math.min(100, Math.round((focusedMinutes / sessionDurationMinutes) * 100));
+      }
+    }
+  }
+
+  const entry: SessionUsageEntry = {
+    id, modeId, date, hour, worked, focusedMinutes, idleMinutes, idleReason, feeling,
+    ...(comboWith            ? { comboWith }            : {}),
+    ...(sessionStartedAt    ? { startedAt: sessionStartedAt }                  : {}),
+    ...(sessionEndedAt      ? { endedAt: sessionEndedAt }                      : {}),
+    ...(sessionDurationMinutes !== undefined ? { sessionDurationMinutes }       : {}),
+    ...(efficiencyPct          !== undefined ? { efficiencyPct }                : {}),
+    ...(note                   ? { note }                                       : {}),
+    ...(intention              ? { intention }                                  : {}),
+  };
   const saved = storageAppend(LS_KEY, entry, MAX_ENTRIES);
 
   syncToBackend("POST", "/session-usage-logs", {
-    id:              entry.id,
-    mode_id:         entry.modeId,
-    date:            entry.date,
-    hour:            entry.hour,
-    worked:          entry.worked,
-    focused_minutes: entry.focusedMinutes,
-    idle_minutes:    entry.idleMinutes,
-    idle_reason:     entry.idleReason,
-    feeling:         entry.feeling,
-    ...(entry.comboWith ? { combo_with: entry.comboWith } : {}),
+    id:                       entry.id,
+    mode_id:                  entry.modeId,
+    date:                     entry.date,
+    hour:                     entry.hour,
+    worked:                   entry.worked,
+    focused_minutes:          entry.focusedMinutes,
+    idle_minutes:             entry.idleMinutes,
+    idle_reason:              entry.idleReason,
+    feeling:                  entry.feeling,
+    ...(entry.comboWith                 ? { combo_with:               entry.comboWith }            : {}),
+    ...(entry.startedAt                 ? { started_at:               entry.startedAt }            : {}),
+    ...(entry.endedAt                   ? { ended_at:                 entry.endedAt }              : {}),
+    ...(entry.sessionDurationMinutes !== undefined ? { session_duration_minutes: entry.sessionDurationMinutes } : {}),
+    ...(entry.efficiencyPct          !== undefined ? { efficiency_pct:           entry.efficiencyPct }         : {}),
+    ...(entry.note                               ? { note:                      entry.note }                  : {}),
   });
 
   return saved;
@@ -533,27 +572,24 @@ export function getTotalFocusedMinutes(days = 7): number {
 }
 
 // ── Lembretes pendentes ───────────────────────────────────────────────────────
-const REMINDER_KEY = "sessionReminders";
 
 export function addPendingReminder(modeId: string, modeName: string): void {
   try {
-    const existing: PendingReminder[] = JSON.parse(localStorage.getItem("taskflow." + REMINDER_KEY) || "[]");
-    const already = existing.some((r) => r.modeId === modeId);
-    if (already) return;
+    const existing: PendingReminder[] = storageGet<PendingReminder[]>(SK.SESSION_REMINDERS, []);
+    if (existing.some((r) => r.modeId === modeId)) return;
     existing.push({ modeId, modeName, skippedAt: new Date().toISOString() });
-    localStorage.setItem("taskflow." + REMINDER_KEY, JSON.stringify(existing));
+    storageSet(SK.SESSION_REMINDERS, existing);
   } catch {}
 }
 
 export function getPendingReminders(): PendingReminder[] {
-  try { return JSON.parse(localStorage.getItem("taskflow." + REMINDER_KEY) || "[]"); }
-  catch { return []; }
+  return storageGet<PendingReminder[]>(SK.SESSION_REMINDERS, []);
 }
 
 export function clearPendingReminder(modeId: string): void {
   try {
-    const existing: PendingReminder[] = JSON.parse(localStorage.getItem("taskflow." + REMINDER_KEY) || "[]");
-    localStorage.setItem("taskflow." + REMINDER_KEY, JSON.stringify(existing.filter((r) => r.modeId !== modeId)));
+    const existing = storageGet<PendingReminder[]>(SK.SESSION_REMINDERS, []);
+    storageSet(SK.SESSION_REMINDERS, existing.filter((r) => r.modeId !== modeId));
   } catch {}
 }
 
@@ -600,6 +636,236 @@ export function getComboVsSoloRate(modeId: string, minSessions = 2): ComboVsSolo
   const soloRate  = rate(solo);
   const comboRate = rate(combo);
   return { soloRate, comboRate, delta: comboRate - soloRate };
+}
+
+// ── Analytics de eficiência ───────────────────────────────────────────────────
+
+export interface WeeklyEfficiencyPoint {
+  weekLabel: string;    // ex: "W32"
+  avgEfficiency: number;
+  sessions: number;
+}
+
+/**
+ * Média de eficiência agrupada por semana ISO, últimas `weeks` semanas.
+ * Só inclui semanas com ao menos 1 sessão com efficiencyPct definido.
+ */
+export function getWeeklyEfficiencyTrend(weeks = 8): WeeklyEfficiencyPoint[] {
+  const map: Record<string, { sum: number; count: number }> = {};
+  for (const e of getUsageLogs()) {
+    if (e.efficiencyPct === undefined) continue;
+    const [y, m, d] = e.date.split("-").map(Number);
+    const jan1 = new Date(y, 0, 1);
+    const date = new Date(y, m - 1, d);
+    const week = Math.ceil(((date.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+    const key = `${y}-W${String(week).padStart(2, "0")}`;
+    if (!map[key]) map[key] = { sum: 0, count: 0 };
+    map[key].sum   += e.efficiencyPct;
+    map[key].count += 1;
+  }
+  return Object.entries(map)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-weeks)
+    .map(([key, s]) => ({
+      weekLabel: key.split("-")[1],   // "W32"
+      avgEfficiency: Math.round(s.sum / s.count),
+      sessions: s.count,
+    }));
+}
+
+/**
+ * Histórico de eficiência das últimas `limit` sessões de um modo específico,
+ * ordenado do mais antigo para o mais recente (esq → dir no gráfico).
+ */
+export function getModeEfficiencyHistory(modeId: string, limit = 10): SessionEfficiencyItem[] {
+  return getSessionEfficiencyList(365)
+    .filter((e) => e.modeId === modeId)
+    .slice(0, limit)
+    .reverse(); // mais recente último → esquerda=antigo, direita=recente
+}
+
+/**
+ * Retorna as últimas `limit` anotações (note) de sessões de um modo específico,
+ * ordenadas da mais recente para a mais antiga.
+ */
+export function getModeNotes(modeId: string, limit = 5): Array<{ date: string; note: string }> {
+  return getUsageLogs()
+    .filter((e) => e.modeId === modeId && e.note)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, limit)
+    .map((e) => ({ date: e.date, note: e.note! }));
+}
+
+export interface ModeEfficiencyComparison {
+  compareModeId: string;
+  thisAvg: number;        // média deste modo nos blocos compartilhados (ou global)
+  compareAvg: number;     // média do modo comparado
+  delta: number;          // thisAvg - compareAvg (positivo = este modo é melhor)
+  sharedSessions: number; // sessões do modo comparado nos blocos compartilhados
+  context: "shared_blocks" | "global";
+}
+
+/**
+ * Compara a eficiência média deste modo com a do modo mais contrastante,
+ * filtrando pelos mesmos blocos de 2h onde ambos foram usados.
+ * Fallback para comparação global se não houver blocos compartilhados.
+ * Retorna null se não houver dados suficientes.
+ */
+export function getModeEfficiencyComparison(modeId: string, minSessions = 2): ModeEfficiencyComparison | null {
+  const logsWithEff = getUsageLogs().filter((e) => e.efficiencyPct !== undefined);
+  const thisModeLogs = logsWithEff.filter((e) => e.modeId === modeId);
+
+  if (thisModeLogs.length < minSessions) return null;
+
+  const getBlock = (hour: number): number => Math.floor(hour / 2) * 2;
+  const thisBlockSet = new Set(thisModeLogs.map((e) => getBlock(e.hour)));
+
+  // Agrupa logs dos outros modos que ocorreram nos mesmos blocos de 2h
+  const otherMap: Record<string, number[]> = {};
+  for (const log of logsWithEff) {
+    if (log.modeId === modeId) continue;
+    if (!thisBlockSet.has(getBlock(log.hour))) continue;
+    if (!otherMap[log.modeId]) otherMap[log.modeId] = [];
+    otherMap[log.modeId].push(log.efficiencyPct as number);
+  }
+
+  const buildCandidates = (
+    map: Record<string, number[]>,
+    thisAvgFn: (compareModeId: string) => number,
+    context: "shared_blocks" | "global"
+  ): ModeEfficiencyComparison[] =>
+    Object.entries(map)
+      .filter(([, v]) => v.length >= minSessions)
+      .map(([compareModeId, effs]) => {
+        const compareAvg = Math.round(effs.reduce((s, e) => s + e, 0) / effs.length);
+        const thisAvg = thisAvgFn(compareModeId);
+        const delta = thisAvg - compareAvg;
+        return { compareModeId, thisAvg, compareAvg, delta, sharedSessions: effs.length, context };
+      })
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+  // Tentativa 1: blocos compartilhados
+  const sharedCandidates = buildCandidates(otherMap, (compareModeId) => {
+    const compareBlocks = new Set(
+      logsWithEff.filter((e) => e.modeId === compareModeId).map((e) => getBlock(e.hour))
+    );
+    const thisInShared = thisModeLogs.filter((e) => compareBlocks.has(getBlock(e.hour)));
+    const src = thisInShared.length >= 1 ? thisInShared : thisModeLogs;
+    return Math.round(src.reduce((s, e) => s + (e.efficiencyPct as number), 0) / src.length);
+  }, "shared_blocks");
+
+  if (sharedCandidates.length) return sharedCandidates[0];
+
+  // Fallback: comparação global (qualquer horário)
+  const globalMap: Record<string, number[]> = {};
+  for (const log of logsWithEff) {
+    if (log.modeId === modeId) continue;
+    if (!globalMap[log.modeId]) globalMap[log.modeId] = [];
+    globalMap[log.modeId].push(log.efficiencyPct as number);
+  }
+  const thisGlobalAvg = Math.round(
+    thisModeLogs.reduce((s, e) => s + (e.efficiencyPct as number), 0) / thisModeLogs.length
+  );
+  const globalCandidates = buildCandidates(globalMap, () => thisGlobalAvg, "global");
+  return globalCandidates[0] ?? null;
+}
+
+export interface SessionEfficiencyItem {
+  id: string;
+  date: string;
+  hour: number;
+  modeId: string;
+  sessionDurationMinutes: number;
+  focusedMinutes: number;
+  efficiencyPct: number;
+}
+
+/**
+ * Lista de sessões com eficiência calculada (últimos N dias), mais recente primeiro.
+ * Só inclui sessões que têm sessionDurationMinutes registrado (captura automática ativa).
+ */
+export function getSessionEfficiencyList(days = 30): SessionEfficiencyItem[] {
+  const cutoff = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  })();
+  return getUsageLogs()
+    .filter((e) => e.date >= cutoff && e.sessionDurationMinutes !== undefined)
+    .map((e) => ({
+      id:                    e.id,
+      date:                  e.date,
+      hour:                  e.hour,
+      modeId:                e.modeId,
+      sessionDurationMinutes: e.sessionDurationMinutes as number,
+      focusedMinutes:        e.focusedMinutes,
+      efficiencyPct:         e.efficiencyPct ?? 0,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.hour - a.hour);
+}
+
+export interface TwoHourBlockEfficiency {
+  blockLabel: string;   // ex: "10h–12h"
+  startHour: number;    // 0, 2, 4, ..., 22
+  avgEfficiency: number;
+  sessions: number;
+}
+
+/**
+ * Média de eficiência por bloco de 2 horas do dia (0h–2h … 22h–0h).
+ * Usa o campo `hour` já salvo em cada registro.
+ * Só considera sessões com efficiencyPct definido.
+ */
+export function getTwoHourBlockEfficiency(): TwoHourBlockEfficiency[] {
+  const logs = getUsageLogs().filter((e) => e.efficiencyPct !== undefined);
+  const map: Record<number, { sum: number; count: number }> = {};
+
+  for (const e of logs) {
+    const blockStart = Math.floor(e.hour / 2) * 2;
+    if (!map[blockStart]) map[blockStart] = { sum: 0, count: 0 };
+    map[blockStart].sum   += e.efficiencyPct as number;
+    map[blockStart].count += 1;
+  }
+
+  // Gera todos os 12 blocos (0–22 de 2 em 2), com ou sem dados
+  return Array.from({ length: 12 }, (_, i) => i * 2).map((startHour) => {
+    const endHour = startHour + 2;
+    const s = map[startHour];
+    return {
+      blockLabel:    `${String(startHour).padStart(2, "0")}h–${String(endHour).padStart(2, "0")}h`,
+      startHour,
+      avgEfficiency: s ? Math.round(s.sum / s.count) : 0,
+      sessions:      s ? s.count : 0,
+    };
+  });
+}
+
+export interface AvgEfficiencyByMode {
+  [modeId: string]: number;
+}
+
+/**
+ * Média de efficiencyPct por modo (últimos N dias).
+ * Só inclui modos com pelo menos `minSessions` sessões com eficiência registrada.
+ */
+export function getAvgEfficiencyByMode(days = 90, minSessions = 2): AvgEfficiencyByMode {
+  const cutoff = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  })();
+  const map: Record<string, { sum: number; count: number }> = {};
+  for (const e of getUsageLogs()) {
+    if (e.date < cutoff || e.efficiencyPct === undefined) continue;
+    if (!map[e.modeId]) map[e.modeId] = { sum: 0, count: 0 };
+    map[e.modeId].sum   += e.efficiencyPct;
+    map[e.modeId].count += 1;
+  }
+  const result: AvgEfficiencyByMode = {};
+  for (const [modeId, s] of Object.entries(map)) {
+    if (s.count >= minSessions) result[modeId] = Math.round(s.sum / s.count);
+  }
+  return result;
 }
 
 /**

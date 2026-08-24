@@ -431,3 +431,124 @@
   font-size: 13px;
   padding: 24px 0;
 }
+
+/* ── Time-block efficiency heatmap ───────────────── */
+.blockGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .blockGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.blockCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  gap: 4px;
+  cursor: default;
+  transition: transform 0.15s;
+}
+
+.blockCell:hover {
+  transform: translateY(-2px);
+}
+
+.blockCell[data-efficiency="high"] {
+  background: rgba(76, 175, 130, 0.15);
+  border-color: rgba(76, 175, 130, 0.35);
+}
+
+.blockCell[data-efficiency="mid"] {
+  background: rgba(245, 197, 66, 0.12);
+  border-color: rgba(245, 197, 66, 0.30);
+}
+
+.blockCell[data-efficiency="low"] {
+  background: rgba(224, 92, 92, 0.12);
+  border-color: rgba(224, 92, 92, 0.28);
+}
+
+.blockCell[data-efficiency="none"] {
+  opacity: 0.45;
+}
+
+.blockHour {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.blockPct {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.blockCell[data-efficiency="high"] .blockPct { color: #4caf82; }
+.blockCell[data-efficiency="mid"]  .blockPct { color: #f5c542; }
+.blockCell[data-efficiency="low"]  .blockPct { color: #e05c5c; }
+
+/* ── Mode efficiency ranking ─────────────────────── */
+.effRankingList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.effRankRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.effRankPos {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  width: 22px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.effRankLabel {
+  font-size: 13px;
+  color: var(--text);
+  width: 160px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.effRankTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.effRankFill {
+  height: 100%;
+  border-radius: 20px;
+  transition: width 0.4s ease;
+}
+
+.effRankPct {
+  font-size: 12px;
+  font-weight: 700;
+  width: 38px;
+  text-align: right;
+  flex-shrink: 0;
+}

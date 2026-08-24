@@ -77,3 +77,55 @@ export function storageAppend<T = unknown>(key: string, item: T, maxLen: number 
     // silently fail
   }
 }
+
+/**
+ * Migra chaves legadas (sem prefixo ou com prefixo diferente) para o padrão
+ * "taskflow.<sufixo>". Deve ser chamada UMA VEZ no boot da aplicação (main.tsx).
+ * Só migra se a chave nova ainda não existir, para não sobrescrever dados atuais.
+ */
+export function migrateLegacyKeys(): void {
+  // [chave antiga, sufixo novo]
+  const migrations: [string, string][] = [
+    // Sem prefixo
+    ["customModes",           "customModes"],
+    ["modeStats",             "modeStats"],
+    ["modeLog",               "modeLog"],
+    ["modeComboLogs",         "modeComboLogs"],
+    ["modeActivations",       "modeActivations"],
+    ["activities",            "activities"],
+    ["estadosCustom",         "estadosCustom"],
+    ["sessionUsageLog",       "sessionUsageLog"],
+    ["checkinLog",            "checkinLog"],
+    ["checkinFeedback",       "checkinFeedback"],
+    ["splitePinned",          "splite.pinned"],
+    ["spliteDismissed",       "splite.dismissed"],
+    ["splitePinnedOrder",     "splite.pinnedOrder"],
+    ["singableSongs",         "singableSongs"],
+    ["singList",              "singList"],
+    ["multiCardSessionLog",   "multiCardSessionLog"],
+    ["activeMultiCardSession","activeMultiCardSession"],
+    // Underscore (formato legado)
+    ["taskflow_rpg_save",         "rpgSave"],
+    ["taskflow_notification_pref","notificationPref"],
+    ["taskflow_lazyfal_saved",    "lazyfalSaved"],
+    // Underscore sem prefixo
+    ["todayPanel_collapsed",   "todayPanel.collapsed"],
+    ["daily_focus_history",    "dailyFocus.history"],
+    ["daily_focus_achievements","dailyFocus.achievements"],
+    ["daily_focus_max_level",  "dailyFocus.maxLevel"],
+    ["daily_focus_max_cycles", "dailyFocus.maxCycles"],
+  ];
+
+  for (const [oldKey, newSuffix] of migrations) {
+    try {
+      const newKey = PREFIX + newSuffix;
+      if (localStorage.getItem(newKey) !== null) continue; // já migrado
+      const value = localStorage.getItem(oldKey);
+      if (value === null) continue; // não existe
+      localStorage.setItem(newKey, value);
+      localStorage.removeItem(oldKey);
+    } catch {
+      // silently fail
+    }
+  }
+}

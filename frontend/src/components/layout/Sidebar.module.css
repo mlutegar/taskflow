@@ -1,4 +1,6 @@
-/* ── Sidebar (desktop) ──────────────────────────────── */
+/* ════════════════════════════════════════════════════
+   DESKTOP — sidebar vertical colapsável
+   ════════════════════════════════════════════════════ */
 .sidebar {
   position: fixed;
   left: 0;
@@ -83,7 +85,7 @@
   font-size: 18px;
 }
 
-/* Badge pequeno sobre o ícone (visível mesmo recolhido) */
+/* Badge pequeno sobre o ícone */
 .streakBadge {
   position: absolute;
   top: -6px;
@@ -99,7 +101,7 @@
   text-align: center;
 }
 
-/* Versão inline visível quando sidebar está expandida */
+/* Versão inline (sidebar expandida) */
 .streakBadgeInline {
   font-size: 11px;
   color: var(--warning);
@@ -123,45 +125,7 @@
   opacity: 1;
 }
 
-/* ── Botão Sair ─────────────────────────────────────── */
-.signOutBtn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  transition: background 0.15s, color 0.15s;
-  border: none;
-  background: none;
-  width: 100%;
-  text-align: left;
-  margin-top: auto;
-  flex-shrink: 0;
-}
-
-.signOutBtn:hover {
-  background: rgba(224, 82, 82, 0.1);
-  color: var(--danger);
-}
-
-/* ── Shell (layout wrapper) ────────────────────────── */
-.shell {
-  display: flex;
-  min-height: 100vh;
-}
-
-.pageArea {
-  flex: 1;
-  margin-left: 56px;
-  min-height: 100vh;
-}
-
-/* ── Build date (versão) ─────────────────────────────── */
+/* ── Build date ─────────────────────────────────────── */
 .buildDate {
   margin-top: auto;
   padding: 12px 0 4px;
@@ -184,52 +148,76 @@
   opacity: 0.4;
 }
 
-/* ── Mobile: bottom tab bar ────────────────────────── */
-@media (max-width: 640px) {
-  .sidebar {
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100% !important;
-    height: 64px;
-    flex-direction: row;
-    border-right: none;
-    border-top: 1px solid var(--border);
-    padding: 0 0 env(safe-area-inset-bottom);
-    justify-content: space-around;
-    overflow: visible;
-    /* Sombra sutil para separar do conteúdo */
-    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);
-  }
+/* ── Shell (layout wrapper) ─────────────────────────── */
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
 
-  .logo {
+.pageArea {
+  flex: 1;
+  margin-left: 56px;
+  min-height: 100vh;
+  min-width: 0;
+  overflow-x: clip; /* clip não cria scroll container (diferente de hidden) */
+}
+
+/* ════════════════════════════════════════════════════
+   MOBILE — bottom nav + drawer
+   ════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Esconde sidebar desktop */
+  .sidebar {
     display: none;
   }
 
-  .nav {
-    flex-direction: row;
-    justify-content: space-around;
-    align-items: center;
-    flex: 1;
-    height: 100%;
-    gap: 0;
+  .pageArea {
+    margin-left: 0;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 
-  .navItem {
+  /* ── Bottom nav bar ───────────────────────────────── */
+  .bottomNav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: stretch;
+    z-index: 100;
+  }
+
+  .bottomNavItem {
+    flex: 1;
+    display: flex;
     flex-direction: column;
-    gap: 3px;
-    padding: 6px 8px;
     align-items: center;
-    flex: 1;
     justify-content: center;
+    gap: 3px;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px 4px;
     position: relative;
-    border-radius: 0;
+    transition: color 0.15s;
   }
 
+  .bottomNavItem:hover {
+    color: var(--text);
+  }
 
-  /* Indicador ativo: barra no topo do item */
-  .navItem.active::before {
+  .bottomNavItem.active {
+    color: var(--accent);
+  }
+
+  /* Indicador ativo: barra no topo */
+  .bottomNavItem.active::before {
     content: '';
     position: absolute;
     top: 0;
@@ -241,38 +229,124 @@
     border-radius: 0 0 3px 3px;
   }
 
-  .navIcon { font-size: 22px; }
-
-  .navLabel {
-    opacity: 1;
+  .bottomNavLabel {
     font-size: 11px;
     font-weight: 500;
+    white-space: nowrap;
   }
 
-  .sidebar:hover .navLabel {
-    opacity: 1;
+  /* ── Drawer overlay ───────────────────────────────── */
+  .drawerOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 200;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.2s ease;
   }
 
-  .sidebar:hover {
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* ── Drawer panel ─────────────────────────────────── */
+  .drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(80vw, 280px);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    z-index: 201;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .drawerOpen {
+    transform: translateX(0);
+  }
+
+  .drawerHeader {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .drawerClose {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .drawerClose:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+
+  .drawerNav {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .drawerNavItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-align: left;
     width: 100%;
+    transition: background 0.15s, color 0.15s;
   }
 
-  .streakBadgeInline {
-    display: none;
+  .drawerNavItem:hover {
+    background: var(--surface-2);
+    color: var(--text);
   }
 
+  .drawerNavItem.active {
+    color: var(--accent);
+    background: rgba(124, 110, 245, 0.1);
+  }
+
+  /* ── Badge no drawer ──────────────────────────────── */
   .streakBadge {
-    top: -4px;
-    right: -6px;
+    top: -5px;
+    right: -7px;
     font-size: 9px;
   }
+}
 
-  .pageArea {
-    margin-left: 0;
-    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+/* Em desktop: esconder elementos exclusivos do mobile */
+@media (min-width: 641px) {
+  .bottomNav,
+  .drawerOverlay,
+  .drawer {
+    display: none !important;
   }
+}
 
-  .buildDate {
-    display: none;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .drawer { transition: none !important; }
+  .drawerOverlay { animation: none !important; }
 }

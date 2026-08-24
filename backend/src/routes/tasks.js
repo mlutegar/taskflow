@@ -1,6 +1,29 @@
+import { z } from "zod";
 import prisma from "../prisma.js";
 import { authenticate } from "../auth.js";
 
+// ── Zod schemas ───────────────────────────────────────────────────────────────
+const ALLOWED_SORTS = new Set(["due_date_asc", "due_date", "due_date_desc", "created", "priority"]);
+
+const createTaskSchema = z.object({
+  title:       z.string().min(1, "Título obrigatório.").max(255),
+  description: z.string().max(2000).optional().nullable(),
+  priority:    z.number().int().min(1).max(4).optional(),
+  due_date:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida (YYYY-MM-DD).").optional().nullable(),
+  recurrence:  z.enum(["daily", "weekly", "biweekly", "monthly"]).optional().nullable(),
+});
+
+const updateTaskSchema = z.object({
+  title:        z.string().min(1).max(255).optional(),
+  description:  z.string().max(2000).optional().nullable(),
+  priority:     z.number().int().min(1).max(4).optional(),
+  completed:    z.boolean().optional(),
+  completed_at: z.string().optional().nullable(),
+  due_date:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  recurrence:   z.enum(["daily", "weekly", "biweekly", "monthly"]).optional().nullable(),
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const RECURRENCE_DAYS = { daily: 1, weekly: 7, biweekly: 14 };
 
 function computeNextDueDate(currentDueDate, recurrence) {
@@ -23,15 +46,6 @@ function shapeTask(task) {
   };
 }
 
-async function fetchWithChecklist(id, userId) {
-  const task = await prisma.task.findFirst({
-    where: { id, userId },
-    include: { checklist: true },
-  });
-  if (!task) throw new Error("Tarefa não encontrada.");
-  return shapeTask({ ...task, checklist: task.checklist });
-}
-
 const MUTATION_RATE_LIMIT = {
   config: {
     rateLimit: {
@@ -52,8 +66,11 @@ export default async function tasksRoutes(fastify) {
 
   // GET /tasks
   fastify.get("/", async (req) => {
-    const { status, sort } = req.query;
+    const { status, sort: rawSort } = req.query;
     const userId = req.userId;
+
+    // Whitelist de valores permitidos para sort
+    const sort = ALLOWED_SORTS.has(rawSort) ? rawSort : "priority";
 
     const where = { userId };
     if (status === "active") where.completed = false;
@@ -81,7 +98,15 @@ export default async function tasksRoutes(fastify) {
 
   // POST /tasks
   fastify.post("/", MUTATION_RATE_LIMIT, async (req, reply) => {
-    const { title, description, priority, due_date, recurrence } = req.body;
+    const parsed = createTaskSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: "Dados inválidos.",
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+    const { title, description, priority, due_date, recurrence } = parsed.data;
+
     const task = await prisma.task.create({
       data: {
         userId: req.userId,
@@ -100,7 +125,15 @@ export default async function tasksRoutes(fastify) {
   // PATCH /tasks/:id
   fastify.patch("/:id", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id } = req.params;
-    const body = req.body;
+
+    const parsed = updateTaskSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: "Dados inválidos.",
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+    const body = parsed.data;
 
     // Mapeia campos snake_case → camelCase do Prisma
     const data = {};
@@ -205,9 +238,12 @@ export default async function tasksRoutes(fastify) {
   // POST /tasks/:id/checklist
   fastify.post("/:id/checklist", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id: taskId } = req.params;
-    const { description, parent_id: parentId = null } = req.body;
+    const { description, parent_id: parentId = null } = req.body ?? {};
 
-    // Verifica que a tarefa pertence ao usuário
+    if (!description || typeof description !== "string" || !description.trim()) {
+      return reply.status(400).send({ error: "Descrição do item é obrigatória." });
+    }
+
     const task = await prisma.task.findFirst({ where: { id: taskId, userId: req.userId } });
     if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });
 
@@ -216,7 +252,7 @@ export default async function tasksRoutes(fastify) {
     });
 
     const item = await prisma.checklistItem.create({
-      data: { taskId, parentId, description, order: count },
+      data: { taskId, parentId, description: description.trim(), order: count },
     });
     reply.status(201);
     return item;
@@ -225,7 +261,7 @@ export default async function tasksRoutes(fastify) {
   // PATCH /tasks/:id/checklist/:itemId
   fastify.patch("/:id/checklist/:itemId", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id: taskId, itemId } = req.params;
-    const { description, note } = req.body;
+    const { description, note } = req.body ?? {};
 
     const task = await prisma.task.findFirst({ where: { id: taskId, userId: req.userId } });
     if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { getHistory } from "../lib/dailyFocusHistory";
-import { getUsageLogs } from "../lib/sessionUsageLog";
+import { getUsageLogs, getWeeklyFocusComparison } from "../lib/sessionUsageLog";
 import { usageStats } from "../lib/modeLog";
 import { MODES } from "../data/modes";
 import { storageGet, storageSet } from "../lib/storage";
@@ -19,7 +19,7 @@ interface WeeklyReviewProps {
 export default function WeeklyReview({ onClose }: WeeklyReviewProps): JSX.Element {
   const cutoff = daysAgoIso(7);
 
-  const { weekSessions, topMode, bestMode, totalTasks, totalFocusMin } = useMemo(() => {
+  const { weekSessions, topMode, bestMode, totalTasks, totalFocusMin, avgEfficiency, weekComp } = useMemo(() => {
     const allHistory = getHistory();
     const weekSessions = allHistory.filter((e: any) => toIso(e.date) >= cutoff);
     const totalTasks = weekSessions.reduce((s: number, e: any) => s + e.tasks.length, 0);
@@ -44,7 +44,16 @@ export default function WeeklyReview({ onClose }: WeeklyReviewProps): JSX.Elemen
       .sort((a, b) => b.rate - a.rate)[0];
     const bestMode = bestEntry ? MODES.find((m: any) => m.id === bestEntry.id) : null;
 
-    return { weekSessions, topMode, bestMode, totalTasks, totalFocusMin };
+    // Eficiência média da semana (só sessões com efficiencyPct)
+    const effLogs = logs.filter((l: any) => l.efficiencyPct !== undefined);
+    const avgEfficiency = effLogs.length > 0
+      ? Math.round(effLogs.reduce((s: number, l: any) => s + l.efficiencyPct, 0) / effLogs.length)
+      : null;
+
+    // Comparação com semana anterior (minutos focados)
+    const weekComp = getWeeklyFocusComparison();
+
+    return { weekSessions, topMode, bestMode, totalTasks, totalFocusMin, avgEfficiency, weekComp };
   }, []);
 
   const [intentions, setIntentions] = useState<string[]>(() => {
@@ -85,7 +94,28 @@ export default function WeeklyReview({ onClose }: WeeklyReviewProps): JSX.Elemen
               <div className={styles.statCard}>
                 <div className={styles.statValue}>{focusHours}h</div>
                 <div className={styles.statLabel}>Foco registrado</div>
+                {weekComp.pct !== null && (
+                  <div
+                    className={styles.statCompare}
+                    style={{ color: weekComp.pct >= 0 ? "#4caf82" : "#e05c5c" }}
+                  >
+                    {weekComp.pct >= 0 ? "↑" : "↓"} {Math.abs(weekComp.pct)}% vs sem. ant.
+                  </div>
+                )}
               </div>
+              {avgEfficiency !== null && (
+                <div className={styles.statCard}>
+                  <div
+                    className={styles.statValue}
+                    style={{
+                      color: avgEfficiency >= 70 ? "#4caf82" : avgEfficiency >= 40 ? "#f5c542" : "#e05c5c",
+                    }}
+                  >
+                    {avgEfficiency}%
+                  </div>
+                  <div className={styles.statLabel}>⚡ Eficiência média</div>
+                </div>
+              )}
             </div>
 
             {weekSessions.length === 0 && (

@@ -21,6 +21,8 @@ interface TaskData {
   checklist: ChecklistNodeItem[];
   checklist_count?: number;
   checklist_completed_count?: number;
+  created_at?: string | null;  // snake_case (caso o backend transforme)
+  createdAt?: string | null;   // camelCase (direto do Prisma)
   updatedAt?: string;
   updated_at?: string;
 }
@@ -35,6 +37,21 @@ interface ChecklistNodeProps {
   onUpdate: (taskId: number | string, itemId: number | string, updates: Record<string, unknown>) => Promise<void>;
   onDelete: (taskId: number | string, itemId: number | string) => void;
   onAdd: (taskId: number | string, text: string, parentId?: number | string | null) => Promise<void>;
+}
+
+// Conta em quantos dias a tarefa apareceu no TodayPanel (chaves todayTasks_YYYY-MM-DD)
+function countTodayPanelAppearances(taskId: string | number): number {
+  let count = 0;
+  const prefix = "todayTasks_";
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith(prefix)) continue;
+    try {
+      const ids: string[] = JSON.parse(localStorage.getItem(key) ?? "[]");
+      if (ids.includes(String(taskId))) count++;
+    } catch { /* ignora chaves corrompidas */ }
+  }
+  return count;
 }
 
 // Item de checklist recursivo: permite subtarefas dentro de subtarefas.
@@ -511,6 +528,65 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
 
       {expanded && (
         <div className={styles.detail}>
+          {/* ── Estatísticas inline ── */}
+          {(() => {
+            // API pode retornar created_at (snake_case) ou createdAt (camelCase do Prisma)
+            const t = task as unknown as Record<string, unknown>;
+            const rawCreatedAt = (task.created_at ?? t.createdAt) as string | null | undefined;
+            const daysOpen = rawCreatedAt
+              ? Math.floor((Date.now() - new Date(rawCreatedAt).getTime()) / 86_400_000)
+              : null;
+
+            const appearances  = countTodayPanelAppearances(task.id);
+            const hasChecklist = (task.checklist_count ?? 0) > 0;
+            const checklistPct = hasChecklist
+              ? Math.round(((task.checklist_completed_count ?? 0) / task.checklist_count!) * 100)
+              : null;
+
+            const PRIO: Record<number, string> = { 1: "🔴 Crítica", 2: "🟠 Alta", 3: "🟡 Média", 4: "🟢 Baixa" };
+
+            const stats: { icon: string; label: string }[] = [];
+
+            // Prioridade — sempre disponível
+            if (PRIO[task.priority]) stats.push({ icon: "", label: PRIO[task.priority] });
+
+            // Dias em aberto
+            if (daysOpen !== null && daysOpen >= 0)
+              stats.push({ icon: "📅", label: daysOpen === 0 ? "criada hoje" : `aberta há ${daysOpen}d` });
+
+            // Vezes no painel (só se > 0)
+            if (appearances > 0)
+              stats.push({ icon: "🎯", label: `${appearances}× no painel` });
+
+            // Checklist %
+            if (checklistPct !== null)
+              stats.push({ icon: "☑️", label: `${checklistPct}% da checklist` });
+
+            return (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                {stats.map((s) => (
+                  <span
+                    key={s.label}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: s.icon ? 4 : 0,
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: "var(--text-muted)",
+                      background: "var(--surface-2)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 99,
+                      padding: "2px 8px",
+                    }}
+                  >
+                    {s.icon}{s.icon ? " " : ""}{s.label}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
+
           {task.description && <p className={styles.description}>{task.description}</p>}
 
           {pace && (
