@@ -165,3 +165,115 @@
   font-size: 14px;
   padding: 40px 0;
 }
+
+/* ── Random mode button ──────────────────────────────── */
+.randomBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px dashed var(--border, rgba(255,255,255,0.15));
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted, #9aa0b2);
+  font-size: 14px;
+  transition: all 0.14s;
+  text-align: left;
+}
+.randomBtn:hover {
+  border-color: rgba(255,255,255,0.3);
+  color: var(--text, #e8eaf0);
+  background: var(--surface-2, rgba(255,255,255,0.04));
+}
+.randomBtnIcon {
+  font-size: 22px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  flex-shrink: 0;
+}
+.randomBtnText {
+  font-weight: 500;
+}
+
+/* ── Resumo "Hoje você já realizou…" ─────────────────── */
+.todaySummary {
+  margin: 4px 16px 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  background: rgba(78, 204, 163, 0.12);
+  color: var(--success, #4ecca3);
+  border: 1px solid rgba(78, 204, 163, 0.25);
+}
+.todaySummary strong {
+  font-weight: 700;
+}
+.todaySummaryEmpty {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── Filtro rápido "só não feitos hoje" ──────────────── */
+.filterRow {
+  display: flex;
+  padding: 0 16px 4px;
+}
+.toggleBtn {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.toggleBtnActive {
+  color: var(--success, #4ecca3);
+  background: rgba(78, 204, 163, 0.14);
+  border-color: rgba(78, 204, 163, 0.4);
+}
+
+/* Modo já feito hoje: levemente esmaecido */
+.modeCardUsed {
+  opacity: 0.72;
+}
+
+/* ── Chips de tipo/categoria no card ─────────────────── */
+.modeTypes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+.typeBadge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.65);
+  letter-spacing: 0.02em;
+}
+
+/* ── Badge "hoje" ────────────────────────────────────── */
+.todayBadge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(78, 204, 163, 0.15);
+  color: var(--success, #4ecca3);
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+}

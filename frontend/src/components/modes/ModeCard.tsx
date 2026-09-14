@@ -242,7 +242,7 @@ function ModeCard({
               <button
                 className={`${styles.comboBtn} ${isComboSelected ? styles.comboBtnActive : ""}`}
                 onClick={() => onCombo(mode.id)}
-                title={isComboSelected ? "Remover do combo" : "Adicionar ao combo"}
+                title="Adicionar à sessão"
               >
                 {isComboSelected ? "✓" : "+"}
               </button>

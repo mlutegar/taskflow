@@ -4,6 +4,11 @@ import ComboAnalytics from "./ComboAnalytics";
 import styles from "./SlotBoard.module.css";
 import { getMultiCardSessions } from "../lib/multiCardSessionLog";
 import { getUsageLogs } from "../lib/sessionUsageLog";
+import { todayISO } from "../lib/dateUtils";
+
+function getTodayStr(): string {
+  return todayISO();
+}
 
 interface ModeConfig {
   id: string;
@@ -175,6 +180,19 @@ export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps
     });
   }, []);
 
+  // Expose addMode externally so parent can add a mode directly to this board
+  useEffect(() => {
+    if (addModeRef) {
+      addModeRef.current = (mode: ModeConfig) => {
+        knownModes.current.set(mode.id, mode);
+        setSlots((prev) => [...prev, { slotId: nextSlotId(), mode }]);
+      };
+    }
+    return () => {
+      if (addModeRef) addModeRef.current = null;
+    };
+  }, [addModeRef, setSlots]);
+
   // ── Mode picker ────────────────────────────────────────────────────────────
   const openPicker = (slotId?: string): void => {
     setPickerSlotId(slotId || null);
@@ -326,12 +344,20 @@ export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps
 
   const selectedIds = slots.map((s) => s.mode.id);
 
+  const usedTodayIds = useMemo<string[]>(() => {
+    const today = getTodayStr();
+    return getUsageLogs()
+      .filter((l: any) => l.date === today)
+      .map((l: any) => l.modeId as string);
+  }, [showPicker]); // recalcula toda vez que o picker abre
+
   if (showPicker) {
     return (
       <ModePicker
         onSelect={handleSelectMode}
         onClose={() => { setShowPicker(false); setPickerSlotId(null); }}
         selectedIds={selectedIds}
+        usedTodayIds={usedTodayIds}
       />
     );
   }

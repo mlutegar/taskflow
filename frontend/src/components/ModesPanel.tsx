@@ -231,6 +231,8 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const [pendingIntention, setPendingIntention] = useState<string>("");
   const [pendingMultiCard, setPendingMultiCard] = useState<{ cards: ModeConfig[]; sessionMode: 'sequential' | 'parallel' } | null>(null);
   const sessionRef = useRef<HTMLDivElement>(null);
+  const slotBoardContainerRef = useRef<HTMLDivElement>(null);
+  const slotBoardAddRef = useRef<((mode: ModeConfig) => void) | null>(null);
 
   // ── Sequência aleatória ─────────────────────────────────────────────────────
   // #4 Progresso: IDs já iniciados na sequência atual
@@ -747,9 +749,31 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     });
   }, []);
 
-  const handleStart = useCallback((mode: ModeConfig) => {
-    setIntentionDraft({ mode, text: "" });
+  const handleAddToSession = useCallback((id: string) => {
+    // Look up the full ModeConfig by id (modeById is computed during render, capture via ref-like approach)
+    // We use a functional pattern: call the SlotBoard adder with the mode looked up from allModes
+    const allM: ModeConfig[] = [...(MODES as ModeConfig[]).filter((m: ModeConfig) => m.id !== "splite"), ...getCustomModes()];
+    const mode = allM.find((m) => m.id === id);
+    if (!mode) return;
+    slotBoardAddRef.current?.(mode);
+    slotBoardContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
+
+  const handleStart = useCallback(async (mode: ModeConfig) => {
+    const todayStr = new Intl.DateTimeFormat("en-CA").format(new Date());
+    const alreadyUsed = usageLogs.some(
+      (l: any) => l.modeId === mode.id && l.date === todayStr
+    );
+    if (alreadyUsed) {
+      const ok = await confirm({
+        title: `${mode.emoji} ${mode.name} já foi feito hoje`,
+        message: "Você já usou esse modo hoje. Quer usar de novo mesmo assim?",
+        confirmLabel: "Usar de novo",
+      });
+      if (!ok) return;
+    }
+    setIntentionDraft({ mode, text: "" });
+  }, [usageLogs, confirm]);
 
   const confirmIntention = (): void => {
     if (!intentionDraft) return;
@@ -846,7 +870,9 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         </div>
       )}
 
-      <SlotBoard onStartSession={handleStartMultiCard} />
+      <div ref={slotBoardContainerRef}>
+        <SlotBoard onStartSession={handleStartMultiCard} addModeRef={slotBoardAddRef} />
+      </div>
 
       {/* ── Panel header ── */}
       <div className={styles.panelHeader}>
@@ -1171,7 +1197,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
             flashingCard,
             onToggle: handleToggle,
             onFavorite: handleFavorite,
-            onCombo: handleCombo,
+            onCombo: handleAddToSession,
             onStart: handleStart,
             onDelete: handleDelete,
             onUnpin: handleUnpin,
