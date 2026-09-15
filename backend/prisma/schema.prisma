@@ -168,6 +168,7 @@ model UserPreferences {
   userId          String   @id @map("user_id")
   customModes     String   @default("[]")  @map("custom_modes")     // JSON array
   deletedModeIds  String   @default("[]")  @map("deleted_mode_ids") // JSON array — modos que o usuário deletou
+  hiddenModeIds   String   @default("[]")  @map("hidden_mode_ids")  // JSON array — modos que o usuário ocultou (reversível)
   weeklyGoal      Int      @default(5)     @map("weekly_goal")
   activities      String   @default("[]")  @map("activities")       // JSON array
   estadosCustom   String   @default("[]")  @map("estados_custom")   // JSON array

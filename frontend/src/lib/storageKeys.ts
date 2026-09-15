@@ -37,6 +37,7 @@ export const SK = {
   // Custom modes
   CUSTOM_MODES:         "customModes",
   DELETED_MODE_IDS:     "deletedModeIds",
+  HIDDEN_MODE_IDS:      "hiddenModeIds",
 
   // Check-in / Daily Focus
   CHECKIN_LAST_ESTADO:  "checkin.lastEstado",

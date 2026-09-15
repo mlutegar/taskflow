@@ -26,6 +26,7 @@ export default async function preferencesRoutes(fastify) {
     return {
       customModes:    parseJson(row?.customModes,    []),
       deletedModeIds: parseJson(row?.deletedModeIds, []),
+      hiddenModeIds:  parseJson(row?.hiddenModeIds,  []),
       weeklyGoal:     row?.weeklyGoal ?? 5,
       activities:     parseJson(row?.activities,     []),
       estadosCustom:  parseJson(row?.estadosCustom,  []),
@@ -38,7 +39,7 @@ export default async function preferencesRoutes(fastify) {
   // PUT /preferences  — aceita patch parcial (campos omitidos não são alterados)
   fastify.put("/", async (req, reply) => {
     const {
-      customModes, deletedModeIds, weeklyGoal, activities,
+      customModes, deletedModeIds, hiddenModeIds, weeklyGoal, activities,
       estadosCustom, paperReminders, lastEstadoId, onboarded,
     } = req.body ?? {};
 
@@ -49,6 +50,7 @@ export default async function preferencesRoutes(fastify) {
     const updateData = {};
     if (customModes    !== undefined) updateData.customModes    = JSON.stringify(customModes);
     if (deletedModeIds !== undefined) updateData.deletedModeIds = JSON.stringify(deletedModeIds);
+    if (hiddenModeIds  !== undefined) updateData.hiddenModeIds  = JSON.stringify(hiddenModeIds);
     if (weeklyGoal     !== undefined) updateData.weeklyGoal     = weeklyGoal;
     if (activities     !== undefined) updateData.activities     = JSON.stringify(activities);
     if (estadosCustom  !== undefined) updateData.estadosCustom  = JSON.stringify(estadosCustom);
@@ -67,6 +69,7 @@ export default async function preferencesRoutes(fastify) {
           userId:         req.userId,
           customModes:    updateData.customModes    ?? "[]",
           deletedModeIds: updateData.deletedModeIds ?? "[]",
+          hiddenModeIds:  updateData.hiddenModeIds  ?? "[]",
           weeklyGoal:     updateData.weeklyGoal     ?? 5,
           activities:     updateData.activities     ?? "[]",
           estadosCustom:  updateData.estadosCustom  ?? "[]",

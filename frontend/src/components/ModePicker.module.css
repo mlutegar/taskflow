@@ -100,6 +100,20 @@
   gap: 8px;
 }
 
+/* Divisor de subgrupo dentro de uma categoria (ex.: "Ouvir", "Cantar", "Playlist") */
+.groupDivider {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted, #9aa0b2);
+  padding: 6px 2px 0;
+  margin-top: 2px;
+}
+.groupDivider:first-child {
+  margin-top: 0;
+}
+
 .modeCard {
   display: flex;
   align-items: center;
@@ -133,19 +147,25 @@
 .modeMeta {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .modeName {
+  display: block;
+  max-width: 100%;
   font-size: 14px;
   font-weight: 700;
   color: var(--text, #e8eaf0);
-  margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .modeTagline {
+  display: block;
+  max-width: 100%;
   font-size: 12px;
   color: var(--text-muted, #9aa0b2);
   white-space: nowrap;
@@ -204,11 +224,11 @@
 
 /* ── Resumo "Hoje você já realizou…" ─────────────────── */
 .todaySummary {
-  margin: 4px 16px 8px;
-  padding: 8px 12px;
+  margin: 6px 16px 2px;
+  padding: 6px 10px;
   border-radius: 8px;
-  font-size: 0.8rem;
-  line-height: 1.4;
+  font-size: 0.76rem;
+  line-height: 1.35;
   background: rgba(78, 204, 163, 0.12);
   color: var(--success, #4ecca3);
   border: 1px solid rgba(78, 204, 163, 0.25);
@@ -220,22 +240,34 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
-/* ── Filtro rápido "só não feitos hoje" ──────────────── */
-.filterRow {
+/* ── Barra de ferramentas: filtro + ordenação ─────────── */
+.toolbar {
   display: flex;
-  padding: 0 16px 4px;
+  gap: 6px;
+  padding: 4px 16px 8px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
 }
-.toggleBtn {
+.toolbar::-webkit-scrollbar { display: none; }
+.toolBtn {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 0.75rem;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
   cursor: pointer;
   color: rgba(255, 255, 255, 0.7);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.15s;
 }
-.toggleBtnActive {
+.toolBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text, #e8eaf0);
+}
+.toolBtnActive {
   color: var(--success, #4ecca3);
   background: rgba(78, 204, 163, 0.14);
   border-color: rgba(78, 204, 163, 0.4);
@@ -246,12 +278,46 @@
   opacity: 0.72;
 }
 
+/* Wrapper que permite sobrepor o botão de ocultar sobre o card */
+.modeCardWrap {
+  position: relative;
+}
+.modeCardHidden .modeCard {
+  opacity: 0.45;
+}
+
+/* Botão de ocultar/reexibir no canto do card */
+.hideBtn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  border: 1px solid var(--border, rgba(255,255,255,0.07));
+  border-radius: 8px;
+  background: var(--surface-2, rgba(255,255,255,0.06));
+  color: var(--text-muted, #9aa0b2);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.14s, background 0.14s;
+}
+.hideBtn:hover {
+  opacity: 1;
+  background: var(--surface-3, rgba(255,255,255,0.12));
+}
+
 /* ── Chips de tipo/categoria no card ─────────────────── */
 .modeTypes {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 3px;
+  overflow: hidden;
 }
 .typeBadge {
   display: inline-block;
@@ -277,3 +343,163 @@
   vertical-align: middle;
   letter-spacing: 0.02em;
 }
+
+/* ── Badge de uso (7 dias) ───────────────────────────── */
+.usageBadge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(96, 165, 250, 0.14);
+  color: #93c5fd;
+  letter-spacing: 0.02em;
+}
+
+/* ── Botão de densidade (header) ─────────────────────── */
+.densityBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted, #9aa0b2);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 6px;
+  line-height: 1;
+}
+.densityBtn:hover { color: var(--text, #e8eaf0); }
+
+/* ── Contador de resultados ──────────────────────────── */
+.resultRow {
+  padding: 0 16px 4px;
+  font-size: 0.72rem;
+  color: var(--text-muted, #9aa0b2);
+  flex-shrink: 0;
+}
+.resultHint { opacity: 0.75; }
+
+/* Alvos de toque maiores na toolbar (mobile) */
+.toolBtn { min-height: 34px; }
+
+/* ── Dica de descoberta (long-press) ─────────────────── */
+.detailHint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #cbb26b;
+  background: rgba(251, 191, 36, 0.10);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  flex-shrink: 0;
+}
+.detailHintClose {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* ── Botão de favorito ───────────────────────────────── */
+.favBtn {
+  position: absolute;
+  top: 6px;
+  right: 38px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  border: 1px solid var(--border, rgba(255,255,255,0.07));
+  border-radius: 8px;
+  background: var(--surface-2, rgba(255,255,255,0.06));
+  color: var(--text-muted, #9aa0b2);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.14s, color 0.14s, background 0.14s;
+}
+.favBtn:hover { opacity: 1; background: var(--surface-3, rgba(255,255,255,0.12)); }
+.favBtnActive {
+  opacity: 1;
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.12);
+}
+
+/* ── Densidade compacta ──────────────────────────────── */
+.listCompact { gap: 5px; }
+.listCompact .modeCard { padding: 8px 12px; }
+
+/* ── Rodapé "+N modos ocultos" ───────────────────────── */
+.hiddenFooter {
+  margin-top: 4px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--border, rgba(255,255,255,0.15));
+  background: transparent;
+  color: var(--text-muted, #9aa0b2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.14s;
+}
+.hiddenFooter:hover {
+  border-color: rgba(255,255,255,0.3);
+  color: var(--text, #e8eaf0);
+  background: var(--surface-2, rgba(255,255,255,0.04));
+}
+
+/* ── Barra "Desfazer" ────────────────────────────────── */
+.undoBar {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100% - 32px);
+  padding: 10px 12px 10px 16px;
+  border-radius: 10px;
+  background: #22283a;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  font-size: 0.82rem;
+  color: var(--text, #e8eaf0);
+  animation: undoIn 0.18s ease;
+}
+.undoMsg {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.undoBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--success, #4ecca3);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.undoBtn:hover { text-decoration: underline; }
+
+@keyframes undoIn {
+  from { transform: translate(-50%, 8px); opacity: 0; }
+  to   { transform: translate(-50%, 0);   opacity: 1; }
+}
+.listCompact .modeEmoji { width: 32px; height: 32px; font-size: 22px; }
+.listCompact .modeTypes { display: none; }

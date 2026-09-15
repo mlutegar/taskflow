@@ -19,6 +19,7 @@ import PomodoroHelper, { DEFAULT_STATE as pomodoroDefault } from "./PomodoroHelp
 import DiarioFaladoHelper, { DEFAULT_STATE as diarioFaladoDefault } from "./DiarioFaladoHelper";
 import CantarHelper, { DEFAULT_STATE as cantarDefault } from "./CantarHelper";
 import UmaCoisaHelper, { DEFAULT_STATE as umaCoisaDefault } from "./UmaCoisaHelper";
+import { MUSIC_VARIANTS } from "../../../data/musicVariants";
 
 export interface HelperEntry {
   Component: React.ComponentType<any>;
@@ -30,7 +31,13 @@ export interface HelperEntry {
  * Each entry maps a mode ID (or prefix) to its component and default state.
  */
 export const HELPER_REGISTRY: Record<string, HelperEntry> = {
-  music: { Component: MusicHelper, defaultState: musicDefault },
+  // Cards de música — gerados a partir da fonte única MUSIC_VARIANTS.
+  ...Object.fromEntries(
+    MUSIC_VARIANTS.map((v) => [
+      v.id,
+      { Component: MusicHelper, defaultState: { ...musicDefault, variant: v.variant } } as HelperEntry,
+    ])
+  ),
   sing_one: { Component: SingHelper, defaultState: { ...singDefault, variant: "one" } },
   sing_ten: { Component: SingHelper, defaultState: { ...singDefault, variant: "ten" } },
   tiktok: { Component: TikTokHelper, defaultState: tiktokDefault },

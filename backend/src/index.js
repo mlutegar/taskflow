@@ -1,3 +1,4 @@
+import "./loadEnv.js"; // DEVE ser o primeiro import (carrega .env antes do prisma)
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
@@ -12,6 +13,7 @@ import preferencesRoutes from "./routes/preferences.js";
 import sessionUsageLogsRoutes from "./routes/sessionUsageLogs.js";
 import modeLogRoutes from "./routes/modeLog.js";
 import modeComboLogRoutes from "./routes/modeComboLog.js";
+import aiRoutes from "./routes/ai.js";
 
 const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5175";
@@ -56,6 +58,7 @@ fastify.register(preferencesRoutes, { prefix: "/preferences" });
 fastify.register(sessionUsageLogsRoutes, { prefix: "/session-usage-logs" });
 fastify.register(modeLogRoutes, { prefix: "/mode-log" });
 fastify.register(modeComboLogRoutes, { prefix: "/mode-combo-log" });
+fastify.register(aiRoutes, { prefix: "/ai" });
 
 // Erro global
 fastify.setErrorHandler((error, request, reply) => {

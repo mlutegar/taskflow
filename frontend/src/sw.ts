@@ -4,8 +4,14 @@ import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, NetworkFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import { clientsClaim } from 'workbox-core';
 
 declare const self: ServiceWorkerGlobalScope;
+
+// Ativa imediatamente o novo SW e assume o controle das abas abertas,
+// garantindo que correções cheguem ao dispositivo sem precisar fechar o PWA.
+self.skipWaiting();
+clientsClaim();
 
 cleanupOutdatedCaches();
 

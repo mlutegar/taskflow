@@ -6,24 +6,14 @@ import WorkingTask from "./WorkingTask";
 import styles from "./session.module.css";
 import { useModeSession } from "../../hooks/useModeSession";
 import type { Task } from "../../types/index";
-
-interface MusicMode {
-  id: string;
-  emoji: string;
-  title: string;
-  desc: string;
-}
-
-const MUSIC_MODES: MusicMode[] = [
-  { id: "hundred",  emoji: "🎧", title: "100 Músicas",         desc: "Passe por ~100 músicas no Spotify, encontre UMA que ressoa e faça uma tarefa enquanto ouve." },
-  { id: "album",    emoji: "💿", title: "Escolher um Álbum",   desc: "Escolha um álbum completo e faça suas tarefas enquanto ele toca do início ao fim." },
-  { id: "playlist", emoji: "✨", title: "Playlist Perfeita de 10", desc: "Curade 10 músicas especiais, uma a uma. A cada música encontrada, faça uma tarefa." },
-];
+import { MUSIC_STEP_BY_VARIANT, MUSIC_HEADER_BY_VARIANT } from "../../data/musicVariants";
 
 const PLAYLIST_SIZE = 10;
+const DEFAULT_VARIANT = "hundred";
 
 interface MusicSessionProps {
   tasks: Task[];
+  preset?: { variant?: string };
   onCompleteTask: (id: string) => Promise<void>;
   onToggleChecklist?: (taskId: string, itemId: string) => Promise<void>;
   onAddChecklist?: (taskId: string, text: string) => Promise<void>;
@@ -31,7 +21,12 @@ interface MusicSessionProps {
   onComplete?: () => void;
 }
 
-export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }: MusicSessionProps) {
+export default function MusicSession({ tasks, preset, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }: MusicSessionProps) {
+  // Variante vem do card (preset). Cada card de música (music_hundred/_album/_playlist)
+  // envia sua variante; sem preset válido, cai no fluxo padrão (100 Músicas).
+  const variant = (preset?.variant && MUSIC_STEP_BY_VARIANT[preset.variant]) ? preset.variant : DEFAULT_VARIANT;
+  const header = MUSIC_HEADER_BY_VARIANT[variant];
+
   const {
     persist, clearSaved, saved,
     completed, setCompleted,
@@ -39,10 +34,10 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
     selectedTask, setSelectedTask,
     wasRestored, setWasRestored,
     available,
-  } = useModeSession("music", tasks);
+  } = useModeSession(`music:${variant}`, tasks);
 
-  const [mode,       setMode]       = useState<string | null>(saved?.mode      ?? null);
-  const [step,       setStep]       = useState<string>(saved?.step      ?? "choose_mode");
+  const [mode]                      = useState<string>(saved?.mode ?? variant);
+  const [step,       setStep]       = useState<string>(saved?.step ?? MUSIC_STEP_BY_VARIANT[variant]);
   const [albumInput, setAlbumInput] = useState<string>("");
   const [albumName,  setAlbumName]  = useState<string>(saved?.albumName ?? "");
   const [playlist,   setPlaylist]   = useState<string[]>(saved?.playlist  ?? []);
@@ -55,19 +50,8 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
 
   const handleClose = (): void => { clearSaved(); onClose(); };
 
-  const selectMode = (modeId: string): void => {
-    setMode(modeId);
-    if (modeId === "hundred")  setStep("hundred_finding");
-    else if (modeId === "album")    setStep("album_choose");
-    else if (modeId === "playlist") setStep("playlist_hunt");
-  };
-
-  const getMusicStep = (): string => {
-    if (mode === "hundred")  return "hundred_finding";
-    if (mode === "album")    return "album_choose";
-    if (mode === "playlist") return "playlist_hunt";
-    return "choose_mode";
-  };
+  // Passo "de volta ao início" do fluxo da variante atual (após concluir uma tarefa).
+  const getMusicStep = (): string => MUSIC_STEP_BY_VARIANT[variant] ?? "hundred_finding";
 
   const finishTask = async (): Promise<void> => {
     await onCompleteTask(selectedTask.id);
@@ -107,36 +91,20 @@ export default function MusicSession({ tasks, onCompleteTask, onToggleChecklist,
 
   return (
     <div className={styles.root}>
-      <SessionHeader emoji="🎵" title="Music Mode" sub={`${completed} concluída(s)`} onClose={handleClose} />
+      <SessionHeader
+        emoji={header?.emoji ?? "🎵"}
+        title={header?.title ?? "Music Mode"}
+        sub={`${completed} concluída(s)`}
+        onClose={handleClose}
+      />
 
       <div className={styles.body}>
         <ResumeBanner
-          show={wasRestored && step !== "choose_mode" && step !== "summary" && step !== "playlist_done"}
+          show={wasRestored && step !== "summary" && step !== "playlist_done"}
           onDismiss={() => setWasRestored(false)}
         >
           ↩ Sessão restaurada — {completed} tarefa(s) concluída(s)
         </ResumeBanner>
-
-        {/* ── Escolha do modo ── */}
-        {step === "choose_mode" && (
-          <>
-            <div className={styles.promptBox}>
-              <div className={styles.promptTitle}>Como quer usar a música hoje?</div>
-              <div className={styles.promptText}>Escolha uma das formas de ativar sua concentração com música.</div>
-            </div>
-            <div className={styles.classGrid}>
-              {MUSIC_MODES.map((m) => (
-                <button key={m.id} className={styles.classCard} onClick={() => selectMode(m.id)}>
-                  <span className={styles.classEmoji}>{m.emoji}</span>
-                  <div className={styles.classInfo}>
-                    <span className={styles.className}>{m.title}</span>
-                    <span className={styles.classDesc}>{m.desc}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
 
         {/* ── Modo 1: 100 Músicas ── */}
         {step === "hundred_finding" && (

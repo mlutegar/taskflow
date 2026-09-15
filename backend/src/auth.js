@@ -5,14 +5,16 @@
 
 import jwt from "jsonwebtoken";
 
-export const JWT_SECRET =
-  process.env.JWT_SECRET || "taskflow-dev-secret-2026";
-
+// Em produção, um JWT_SECRET forte é obrigatório. Falhar cedo evita subir o
+// servidor assinando tokens com um segredo padrão fraco (falha de segurança).
 if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
-  console.warn(
-    "[auth] AVISO: JWT_SECRET não definido em produção. Use uma chave segura via variável de ambiente."
+  throw new Error(
+    "[auth] JWT_SECRET não definido em produção. Defina uma chave segura via variável de ambiente."
   );
 }
+
+export const JWT_SECRET =
+  process.env.JWT_SECRET || "taskflow-dev-secret-2026";
 
 /**
  * Fastify preHandler — verifica o JWT local e injeta userId no request.
@@ -23,7 +25,7 @@ export function authenticate(request, reply, done) {
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
 
   if (!token) {
-    reply.status(401).send({ error: "Token ausente." });
+    reply.status(401).send({ code: "TOKEN_MISSING", message: "Token ausente." });
     return;
   }
 
@@ -32,6 +34,6 @@ export function authenticate(request, reply, done) {
     request.userId = payload.userId;
     done();
   } catch {
-    reply.status(401).send({ error: "Token inválido ou expirado." });
+    reply.status(401).send({ code: "TOKEN_INVALID", message: "Token inválido ou expirado." });
   }
 }

@@ -17,7 +17,8 @@ import ModesPanel from "./components/ModesPanel";
 import TodayPanel from "./components/TodayPanel";
 import WeeklyReview from "./components/WeeklyReview";
 import styles from "./App.module.css";
-import { ToastProvider } from './components/shared/Toast';
+import { ToastProvider, useToast } from './components/shared/Toast';
+import { SESSION_EXPIRED_EVENT } from "./lib/apiClient";
 import { storageGet, storageSet } from "./lib/storage";
 import { SK } from "./lib/storageKeys";
 import { getUsageLogs } from "./lib/sessionUsageLog";
@@ -294,6 +295,7 @@ export default function App(): JSX.Element {
 
   return (
     <ToastProvider>
+    <SessionExpiredToast />
     <div
       className={styles.app}
       onTouchStart={handleTouchStart}
@@ -619,6 +621,19 @@ export default function App(): JSX.Element {
     </div>
     </ToastProvider>
   );
+}
+
+/** Exibe um toast quando a sessão expira (evento emitido pelo apiClient). */
+function SessionExpiredToast(): null {
+  const { showToast } = useToast();
+  useEffect(() => {
+    function onExpired(): void {
+      showToast("Sua sessão expirou. Entre novamente.", "error");
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, [showToast]);
+  return null;
 }
 
 function DailyWidget(): JSX.Element | null {

@@ -16,7 +16,7 @@ export const PRESET_COMBOS: PresetCombo[] = [
     emoji: "💙",
     description: "Música cria o ambiente sem esforço; TikTok Fixo oferece recompensa previsível e simples — sem escalada, sem pressão.",
     situation: "Quando você está sem energia e precisa de uma sessão gentil",
-    modeIds: ["music", "tiktok_fixed"],
+    modeIds: ["music_album", "tiktok_fixed"],
     color: "#4ea8cc",
     colorBg: "rgba(78,168,204,0.08)",
   },

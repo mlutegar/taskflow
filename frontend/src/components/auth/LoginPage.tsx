@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, useRef, FormEvent } from "react";
 import styles from "./LoginPage.module.css";
 import { formatBuildDate } from "../../version.js";
 
@@ -11,9 +11,12 @@ export default function LoginPage({ signIn, signUp }: LoginPageProps) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [info, setInfo] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
@@ -29,6 +32,9 @@ export default function LoginPage({ signIn, signUp }: LoginPageProps) {
       }
     } catch (err: unknown) {
       setError(translateError((err as { message?: string }).message));
+      // Mantém o e-mail digitado, limpa apenas a senha e devolve o foco a ela.
+      setPassword("");
+      passwordRef.current?.focus();
     } finally {
       setLoading(false);
     }
@@ -59,22 +65,36 @@ export default function LoginPage({ signIn, signUp }: LoginPageProps) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="seu@email.com"
               required
+              autoFocus
               autoComplete="email"
             />
           </label>
 
           <label className={styles.label}>
             Senha
-            <input
-              className={styles.input}
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={mode === "signup" ? "Mínimo 6 caracteres" : "••••••••"}
-              required
-              minLength={6}
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-            />
+            <div className={styles.passwordWrap}>
+              <input
+                ref={passwordRef}
+                className={styles.input}
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === "signup" ? "Mínimo 6 caracteres" : "••••••••"}
+                required
+                minLength={mode === "signup" ? 6 : undefined}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+              />
+              <button
+                type="button"
+                className={styles.eyeButton}
+                onClick={() => setShowPassword((s) => !s)}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                aria-pressed={showPassword}
+                tabIndex={-1}
+              >
+                {showPassword ? "🙈" : "👁️"}
+              </button>
+            </div>
           </label>
 
           {error && <p className={styles.error}>{error}</p>}
@@ -97,13 +117,11 @@ export default function LoginPage({ signIn, signUp }: LoginPageProps) {
   );
 }
 
+/**
+ * O backend já retorna mensagens de erro localizadas em português no campo
+ * `message`. Esta função apenas garante um fallback amigável quando a mensagem
+ * vem vazia (ex.: erro inesperado sem corpo).
+ */
 function translateError(msg: string | undefined): string {
-  if (!msg) return "Ocorreu um erro. Tente novamente.";
-  if (msg.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
-  if (msg.includes("Email not confirmed")) return "Confirme seu e-mail antes de entrar.";
-  if (msg.includes("User already registered")) return "Este e-mail já está cadastrado.";
-  if (msg.includes("Password should be at least")) return "A senha deve ter pelo menos 6 caracteres.";
-  if (msg.includes("Unable to validate email")) return "E-mail inválido.";
-  if (msg.includes("rate limit")) return "Muitas tentativas. Aguarde um momento.";
-  return msg;
+  return msg && msg.trim() ? msg : "Ocorreu um erro. Tente novamente.";
 }

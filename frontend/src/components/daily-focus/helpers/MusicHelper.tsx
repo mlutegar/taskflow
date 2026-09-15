@@ -17,12 +17,6 @@ interface MusicHelperProps {
   onChange: (state: MusicState) => void;
 }
 
-const VARIANTS: { id: string; label: string }[] = [
-  { id: "hundred", label: "100 Músicas" },
-  { id: "album", label: "Álbum" },
-  { id: "playlist", label: "Playlist 10" },
-];
-
 export const DEFAULT_STATE: MusicState = { variant: "hundred", count: 0, currentSong: "", albumName: "", playlist: [] };
 
 export default function MusicHelper({ state, onChange }: MusicHelperProps) {
@@ -32,7 +26,7 @@ export default function MusicHelper({ state, onChange }: MusicHelperProps) {
   // Registra ativação quando o contador chega em 100
   useEffect(() => {
     if (s.variant === "hundred" && s.count === 100 && prevCount.current !== 100) {
-      logActivation("music");
+      logActivation("music_hundred");
     }
     prevCount.current = s.count;
   }, [s.count, s.variant]);
@@ -54,19 +48,6 @@ export default function MusicHelper({ state, onChange }: MusicHelperProps) {
 
   return (
     <div className={styles.helperPanelBody}>
-      {/* Variant selector */}
-      <div className={styles.variantRow}>
-        {VARIANTS.map((v) => (
-          <button
-            key={v.id}
-            className={`${styles.variantBtn} ${s.variant === v.id ? styles.variantBtnActive : ""}`}
-            onClick={() => setField("variant", v.id)}
-          >
-            {v.label}
-          </button>
-        ))}
-      </div>
-
       {s.variant === "hundred" && (
         <>
           {s.count === 100 && (

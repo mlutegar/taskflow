@@ -115,7 +115,7 @@ function computeSuggestions(): Suggestion[] {
 }
 
 const DEFAULT_SUGGESTIONS: Suggestion[] = [
-  { ids: ["music", "pomodoro"], label: "Sugestao popular" },
+  { ids: ["music_hundred", "pomodoro"], label: "Sugestao popular" },
 ];
 
 function loadSlots(): CardSlot[] {

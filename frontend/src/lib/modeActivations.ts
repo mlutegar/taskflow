@@ -12,6 +12,7 @@
 import { storageGet, storageSet } from "./storage";
 import { fetchModeActivations } from "../api/preferences";
 import { withOfflineFallback } from "./syncQueue";
+import { canonicalModeId } from "./modeAliases";
 
 interface ModeActivationEntry {
   modeId: string;
@@ -35,7 +36,14 @@ function load(): ModeActivationEntry[] {
   const entries = storageGet(KEY, []);
   // Limpa entradas antigas
   const limit = cutoff();
-  return Array.isArray(entries) ? entries.filter((e: ModeActivationEntry) => e.date >= limit) : [];
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .filter((e: ModeActivationEntry) => e.date >= limit)
+    // Normaliza ids legados (ex.: "music" → "music_hundred").
+    .map((e: ModeActivationEntry) => {
+      const canon = canonicalModeId(e.modeId);
+      return canon === e.modeId ? e : { ...e, modeId: canon };
+    });
 }
 
 function save(entries: ModeActivationEntry[]): void {

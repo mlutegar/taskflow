@@ -517,7 +517,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const smartScores: Record<string, number> = useMemo(() => {
     const currentBlock = getCurrentHourBlock();
     const lastLog = usageLogs[usageLogs.length - 1];
-    const IDLE_BOOST_IDS = ["momentum", "espresso", "music", "cafe-ritual"];
+    const IDLE_BOOST_IDS = ["momentum", "espresso", "music_hundred", "cafe-ritual"];
 
     // Pré-calcula idle time uma vez
     let minutesIdle = 0;

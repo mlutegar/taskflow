@@ -18,10 +18,16 @@ const loginSchema = z.object({
 });
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
+// NOTA: o estado é mantido em memória (Map). Adequado para uma única instância,
+// mas zera a cada restart e NÃO é compartilhado entre múltiplas instâncias.
+// Para escalar horizontalmente, migrar para um store externo (ex.: Redis)
+// preservando a mesma interface de makeRateLimiter.
 const loginAttempts    = new Map();
 const registerAttempts = new Map();
+const refreshAttempts  = new Map();
 const MAX_LOGIN_ATTEMPTS    = 10;
 const MAX_REGISTER_ATTEMPTS = 5;
+const MAX_REFRESH_ATTEMPTS  = 60;
 const WINDOW_MS             = 15 * 60 * 1000;
 
 function makeRateLimiter(map, max) {
@@ -47,6 +53,7 @@ function makeRateLimiter(map, max) {
 
 const loginLimiter    = makeRateLimiter(loginAttempts,    MAX_LOGIN_ATTEMPTS);
 const registerLimiter = makeRateLimiter(registerAttempts, MAX_REGISTER_ATTEMPTS);
+const refreshLimiter  = makeRateLimiter(refreshAttempts,  MAX_REFRESH_ATTEMPTS);
 
 function signToken(payload) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
@@ -95,7 +102,11 @@ export default async function authRoutes(fastify) {
     }
     const { email, password } = parsed.data;
 
-    const { blocked, retryAfter } = loginLimiter.check(email);
+    // Rate limit por IP+email combinados: impede burlar o limite trocando o
+    // e-mail (mesmo IP) e evita DoS bloqueando o e-mail de uma vítima (outro IP).
+    const ip = req.ip || req.headers["x-forwarded-for"] || "unknown";
+    const rateKey = `${ip}:${email}`;
+    const { blocked, retryAfter } = loginLimiter.check(rateKey);
     if (blocked) {
       reply.header("Retry-After", String(retryAfter));
       return reply.status(429).send({
@@ -114,7 +125,7 @@ export default async function authRoutes(fastify) {
       return reply.status(401).send({ code: "INVALID_CREDENTIALS", message: "E-mail ou senha incorretos." });
     }
 
-    loginLimiter.clear(email);
+    loginLimiter.clear(rateKey);
 
     const token = signToken({ userId: user.id, email: user.email });
     return reply.send({ token, user: { id: user.id, email: user.email } });
@@ -122,6 +133,16 @@ export default async function authRoutes(fastify) {
 
   // POST /auth/refresh
   fastify.post("/refresh", async (req, reply) => {
+    const ip = req.ip || req.headers["x-forwarded-for"] || "unknown";
+    const { blocked, retryAfter } = refreshLimiter.check(ip);
+    if (blocked) {
+      reply.header("Retry-After", String(retryAfter));
+      return reply.status(429).send({
+        code: "RATE_LIMIT_EXCEEDED",
+        message: `Muitas renovações de sessão. Tente novamente em ${Math.ceil(retryAfter / 60)} minuto(s).`,
+      });
+    }
+
     const header = req.headers["authorization"] || "";
     const token  = header.startsWith("Bearer ") ? header.slice(7) : null;
 

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../../lib/apiClient";
 import { useDialog } from "../../lib/useDialog";
 import ModalOverlay from "../shared/ModalOverlay";
 import styles from "../ModesPanel.module.css";
@@ -35,6 +36,128 @@ export default function CreateModeModal({ onSave, onClose }: CreateModeModalProp
   const [whyItWorks, setWhyItWorks] = useState<string>("");
   const [whenToUse, setWhenToUse] = useState<string>("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+  const [aiError, setAiError] = useState<string>("");
+  const [aiProgress, setAiProgress] = useState<string>("");
+  // Categoria/tipo sugeridos pela IA (sem UI de edição; anexados ao modo salvo).
+  const [category, setCategory] = useState<string | undefined>(undefined);
+  const [modeType, setModeType] = useState<string | undefined>(undefined);
+  const [hasGenerated, setHasGenerated] = useState<boolean>(false);
+  // Snapshot para "Desfazer IA" — guarda o estado anterior à última aplicação.
+  const undoRef = useRef<AiSnapshot | null>(null);
+  const [canUndo, setCanUndo] = useState<boolean>(false);
+
+  interface AiModeResult {
+    emoji?: string;
+    name?: string;
+    tagline?: string;
+    steps?: string[];
+    prerequisite?: string;
+    whyItWorks?: string;
+    whenToUse?: string;
+    tips?: string;
+    category?: string;
+    type?: string;
+  }
+
+  interface AiSnapshot {
+    emoji: string;
+    name: string;
+    tagline: string;
+    steps: string[];
+    prerequisite: string;
+    whyItWorks: string;
+    whenToUse: string;
+    tips: string;
+  }
+
+  // Mensagens rotativas de progresso enquanto a IA trabalha (até ~60s).
+  useEffect(() => {
+    if (!aiLoading) { setAiProgress(""); return; }
+    const msgs = [
+      "Pensando no conceito do modo…",
+      "Escrevendo a tagline…",
+      "Montando os passos…",
+      "Definindo pré-requisitos…",
+      "Ajustando os detalhes…",
+    ];
+    let i = 0;
+    setAiProgress(msgs[0]);
+    const id = setInterval(() => { i = (i + 1) % msgs.length; setAiProgress(msgs[i]); }, 3500);
+    return () => clearInterval(id);
+  }, [aiLoading]);
+
+  const snapshot = (): AiSnapshot => ({
+    emoji, name, tagline, steps: [...steps], prerequisite, whyItWorks, whenToUse, tips,
+  });
+
+  const applyResult = (res: AiModeResult, opts: { force: boolean; only?: keyof AiModeResult }): void => {
+    const wants = (field: keyof AiModeResult): boolean => !opts.only || opts.only === field;
+
+    // O emoji só é trocado se force, ou se o usuário ainda estiver no default ("🚀").
+    if (wants("emoji") && res.emoji?.trim() && (opts.force || emoji === "🚀")) setEmoji(res.emoji.trim());
+    if (wants("name") && res.name?.trim() && (opts.force || !name.trim())) setName(res.name.trim());
+    if (wants("tagline") && res.tagline?.trim() && (opts.force || !tagline.trim())) setTagline(res.tagline.trim());
+    if (wants("steps") && res.steps?.length && (opts.force || steps.filter((s) => s.trim()).length === 0)) {
+      setSteps(res.steps.map((s) => s.trim()).filter(Boolean));
+    }
+    if (wants("prerequisite") && res.prerequisite?.trim() && (opts.force || !prerequisite.trim())) setPrerequisite(res.prerequisite.trim());
+    if (wants("whyItWorks") && res.whyItWorks?.trim() && (opts.force || !whyItWorks.trim())) setWhyItWorks(res.whyItWorks.trim());
+    if (wants("whenToUse") && res.whenToUse?.trim() && (opts.force || !whenToUse.trim())) setWhenToUse(res.whenToUse.trim());
+    if (wants("tips") && res.tips?.trim() && (opts.force || !tips.trim())) setTips(res.tips.trim());
+    // Categoria/tipo: só preenche quando não é regeneração de um campo específico.
+    if (!opts.only) {
+      if (res.category?.trim() && (opts.force || !category)) setCategory(res.category.trim());
+      if (res.type?.trim() && (opts.force || !modeType)) setModeType(res.type.trim());
+    }
+    setErrors({});
+  };
+
+  const runAi = async (opts: { force: boolean; only?: keyof AiModeResult }): Promise<void> => {
+    if (!name.trim() && !tagline.trim()) {
+      setAiError("Preencha ao menos o nome ou a tagline antes de usar a IA.");
+      return;
+    }
+    setAiError("");
+    setAiLoading(true);
+    undoRef.current = snapshot();
+    try {
+      const res = (await api.post(
+        "/ai/generate-mode",
+        {
+          emoji,
+          name: name.trim(),
+          tagline: tagline.trim(),
+          steps: steps.filter((s) => s.trim()),
+          prerequisite: prerequisite.trim(),
+          whyItWorks: whyItWorks.trim(),
+          whenToUse: whenToUse.trim(),
+          tips: tips.trim(),
+        },
+        70_000,
+      )) as AiModeResult;
+      applyResult(res, opts);
+      setHasGenerated(true);
+      setCanUndo(true);
+    } catch (err: unknown) {
+      setAiError((err as { message?: string })?.message || "Falha ao preencher com IA.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAiFill = (): Promise<void> => runAi({ force: false });
+  const handleAiRegenerate = (): Promise<void> => runAi({ force: true });
+  const regenerateField = (field: keyof AiModeResult): Promise<void> => runAi({ force: true, only: field });
+
+  const undoAi = (): void => {
+    const snap = undoRef.current;
+    if (!snap) return;
+    setEmoji(snap.emoji); setName(snap.name); setTagline(snap.tagline); setSteps(snap.steps);
+    setPrerequisite(snap.prerequisite); setWhyItWorks(snap.whyItWorks); setWhenToUse(snap.whenToUse); setTips(snap.tips);
+    undoRef.current = null;
+    setCanUndo(false);
+  };
 
   const validate = (): Record<string, string> => {
     const e: Record<string, string> = {};
@@ -64,6 +187,8 @@ export default function CreateModeModal({ onSave, onClose }: CreateModeModalProp
       prerequisite: prerequisite.trim(),
       whyItWorks: whyItWorks.trim(),
       whenToUse: whenToUse.trim(),
+      category: category || undefined,
+      type: modeType || undefined,
       isCustom: true,
     });
   };
@@ -71,6 +196,19 @@ export default function CreateModeModal({ onSave, onClose }: CreateModeModalProp
   const updateStep = (i: number, val: string): void => setSteps((prev) => prev.map((s, idx) => idx === i ? val : s));
   const addStep = (): void => setSteps((prev) => [...prev, ""]);
   const removeStep = (i: number): void => setSteps((prev) => prev.filter((_, idx) => idx !== i));
+
+  const fieldAiBtn = (field: keyof AiModeResult, label: string) => (
+    <button
+      type="button"
+      className={styles.fieldAiBtn}
+      onClick={() => regenerateField(field)}
+      disabled={aiLoading}
+      title={`Gerar "${label}" com IA`}
+      aria-label={`Gerar ${label} com IA`}
+    >
+      ✨
+    </button>
+  );
 
   const dialogRef = useDialog(onClose);
 
@@ -83,6 +221,42 @@ export default function CreateModeModal({ onSave, onClose }: CreateModeModalProp
         </div>
 
         <div className={styles.modalBody}>
+          {/* AI fill */}
+          <div className={styles.aiFillBar}>
+            <button
+              type="button"
+              className={styles.aiFillBtn}
+              onClick={handleAiFill}
+              disabled={aiLoading}
+              title="Preencher os campos vazios usando IA a partir do que você já digitou"
+            >
+              {aiLoading ? "✨ Gerando…" : "✨ Preencher com IA"}
+            </button>
+            {hasGenerated && (
+              <button
+                type="button"
+                className={styles.aiFillBtn}
+                onClick={handleAiRegenerate}
+                disabled={aiLoading}
+                title="Gerar novamente, sobrescrevendo todos os campos"
+              >
+                🔄 Gerar novamente
+              </button>
+            )}
+            {canUndo && !aiLoading && (
+              <button
+                type="button"
+                className={styles.aiUndoBtn}
+                onClick={undoAi}
+                title="Desfazer o preenchimento da IA"
+              >
+                ↩ Desfazer
+              </button>
+            )}
+            {aiLoading && aiProgress && <span className={styles.aiFillProgress}>{aiProgress}</span>}
+            {aiError && <span className={styles.aiFillError}>{aiError}</span>}
+          </div>
+
           {/* Emoji + Name row */}
           <div className={styles.formRow}>
             <div className={styles.formGroup} style={{ flex: "0 0 auto" }}>
@@ -117,7 +291,10 @@ export default function CreateModeModal({ onSave, onClose }: CreateModeModalProp
 
           {/* Tagline */}
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>Tagline *</label>
+            <div className={styles.labelRow}>
+              <label className={styles.formLabel}>Tagline *</label>
+              {fieldAiBtn("tagline", "Tagline")}
+            </div>
             <input
               className={`${styles.formInput} ${errors.tagline ? styles.inputError : ""}`}
               placeholder="Ex: Blocos de foco sem interrupção"
@@ -154,7 +331,10 @@ export default function CreateModeModal({ onSave, onClose }: CreateModeModalProp
 
           {/* Steps */}
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>Passos do Modo *</label>
+            <div className={styles.labelRow}>
+              <label className={styles.formLabel}>Passos do Modo *</label>
+              {fieldAiBtn("steps", "Passos")}
+            </div>
             {errors.steps && <span className={styles.errorText}>{errors.steps}</span>}
             <div className={styles.stepsList}>
               {steps.map((step, i) => (
@@ -177,7 +357,10 @@ export default function CreateModeModal({ onSave, onClose }: CreateModeModalProp
 
           {/* Prerequisite */}
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>✅ Pré-requisito *</label>
+            <div className={styles.labelRow}>
+              <label className={styles.formLabel}>✅ Pré-requisito *</label>
+              {fieldAiBtn("prerequisite", "Pré-requisito")}
+            </div>
             <textarea
               className={`${styles.formTextarea} ${errors.prerequisite ? styles.inputError : ""}`}
               placeholder="O que o usuário precisa ter/fazer antes de iniciar este modo?"
@@ -190,7 +373,10 @@ export default function CreateModeModal({ onSave, onClose }: CreateModeModalProp
 
           {/* Why it works */}
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>🧠 Por que funciona *</label>
+            <div className={styles.labelRow}>
+              <label className={styles.formLabel}>🧠 Por que funciona *</label>
+              {fieldAiBtn("whyItWorks", "Por que funciona")}
+            </div>
             <textarea
               className={`${styles.formTextarea} ${errors.whyItWorks ? styles.inputError : ""}`}
               placeholder="A lógica por trás deste modo — por que ele é eficaz?"
@@ -203,7 +389,10 @@ export default function CreateModeModal({ onSave, onClose }: CreateModeModalProp
 
           {/* When to use */}
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>🕐 Quando usar *</label>
+            <div className={styles.labelRow}>
+              <label className={styles.formLabel}>🕐 Quando usar *</label>
+              {fieldAiBtn("whenToUse", "Quando usar")}
+            </div>
             <textarea
               className={`${styles.formTextarea} ${errors.whenToUse ? styles.inputError : ""}`}
               placeholder="Em que situação ou estado mental este modo é mais indicado?"
@@ -216,7 +405,10 @@ export default function CreateModeModal({ onSave, onClose }: CreateModeModalProp
 
           {/* Tips */}
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>Dica (opcional)</label>
+            <div className={styles.labelRow}>
+              <label className={styles.formLabel}>Dica (opcional)</label>
+              {fieldAiBtn("tips", "Dica")}
+            </div>
             <textarea
               className={styles.formTextarea}
               placeholder="Explique a lógica por trás do modo, dicas de uso…"

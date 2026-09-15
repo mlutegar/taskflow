@@ -10,13 +10,24 @@
  */
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { api } from "../lib/apiClient";
+import { api, refreshSession, SESSION_EXPIRED_EVENT, SESSION_REFRESHED_EVENT } from "../lib/apiClient";
 import { flushQueue } from "../lib/syncQueue";
 
 const BASE_URL          = import.meta.env.VITE_API_URL || "/api";
 const TOKEN_KEY         = "taskflow.authToken";
 const USER_KEY          = "taskflow.authUser";
-const REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000; // renova 1 dia antes de expirar
+// Renova quando restar ~20% da vida do token, limitado a [1min, 24h].
+const REFRESH_LIFE_FRACTION = 0.2;
+const REFRESH_MARGIN_MIN_MS = 60 * 1000;
+const REFRESH_MARGIN_MAX_MS = 24 * 60 * 60 * 1000;
+
+/** Margem antes de expirar: fração do TTL (iat→exp), limitada a [1min, 24h]. */
+function refreshMarginMs(payload: Record<string, unknown>): number {
+  const exp = typeof payload.exp === "number" ? payload.exp : 0;
+  const iat = typeof payload.iat === "number" ? payload.iat : 0;
+  const ttlMs = exp && iat ? (exp - iat) * 1000 : REFRESH_MARGIN_MAX_MS;
+  return Math.min(Math.max(ttlMs * REFRESH_LIFE_FRACTION, REFRESH_MARGIN_MIN_MS), REFRESH_MARGIN_MAX_MS);
+}
 
 interface AuthUser {
   id: string;
@@ -31,10 +42,39 @@ interface StoredSession {
 
 interface AuthContextValue {
   user: AuthUser | null;
-  loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+}
+
+/**
+ * POST resiliente para os endpoints de auth.
+ * - Distingue falha de REDE (fetch rejeita: offline, DNS, backend fora do ar) de
+ *   erro de APLICAÇÃO (resposta HTTP com status != 2xx).
+ * - Protege contra corpos não-JSON (ex.: HTML de erro do proxy) que fariam
+ *   `res.json()` lançar um SyntaxError genérico.
+ * - Lê `message` (padrão dos endpoints de auth) com fallback para `error`.
+ */
+async function postAuth(path: string, body: unknown, fallbackMsg: string): Promise<Record<string, unknown>> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(body),
+    });
+  } catch {
+    throw new Error("Não foi possível conectar ao servidor. Verifique sua conexão.");
+  }
+
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+
+  if (!res.ok) {
+    const msg = (data?.message as string) || (data?.error as string) || fallbackMsg;
+    throw new Error(msg);
+  }
+  if (!data) throw new Error("Resposta inválida do servidor.");
+  return data;
 }
 
 // ── helpers de persistência ───────────────────────────────────────────────────
@@ -78,81 +118,76 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const stored = loadStored();
-  const [user, setUser]       = useState<AuthUser | null>(stored?.user ?? null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [user, setUser] = useState<AuthUser | null>(stored?.user ?? null);
 
-  // Auto-refresh: renova o token quando estiver próximo de expirar
+  // Sessão expirada (emitido pelo apiClient/outra aba quando o refresh falha por
+  // autenticação): limpa o estado para exibir a tela de login.
+  useEffect(() => {
+    function onExpired(): void {
+      clearSession();
+      setUser(null);
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
+
+  // Token renovado (pelo refresh reativo do apiClient ou por outra aba):
+  // atualiza o `user` em memória para refletir eventuais mudanças.
+  useEffect(() => {
+    function onRefreshed(e: Event): void {
+      const detail = (e as CustomEvent<{ user?: AuthUser }>).detail;
+      if (detail?.user) setUser(detail.user);
+    }
+    window.addEventListener(SESSION_REFRESHED_EVENT, onRefreshed);
+    return () => window.removeEventListener(SESSION_REFRESHED_EVENT, onRefreshed);
+  }, []);
+
+  // Auto-refresh proativo: renova o token quando estiver próximo de expirar,
+  // reusando o refresh single-flight compartilhado com o apiClient.
   useEffect(() => {
     if (!user) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
 
-    function scheduleRefresh(): (() => void) | undefined {
+    function scheduleRefresh(): void {
       const token = localStorage.getItem(TOKEN_KEY);
       if (!token) return;
       const payload = decodeToken(token);
       if (!payload?.exp) return;
 
       const expiresInMs = (payload.exp as number) * 1000 - Date.now();
-      const delay       = Math.max(expiresInMs - REFRESH_MARGIN_MS, 0);
+      const delay       = Math.max(expiresInMs - refreshMarginMs(payload), 0);
 
-      const timer = setTimeout(async () => {
-        try {
-          const res = await fetch(`${BASE_URL}/auth/refresh`, {
-            method:  "POST",
-            headers: {
-              "Content-Type":  "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          if (!res.ok) return; // silêncio — próximo login renova
-          const data = await res.json() as { token: string; user: AuthUser };
-          saveSession(data.token, data.user);
-          scheduleRefresh(); // agenda próxima renovação
-        } catch { /* sem internet */ }
+      timer = setTimeout(async () => {
+        if (cancelled) return;
+        const result = await refreshSession();
+        // Sucesso → agenda a próxima; falha transitória/auth já é tratada
+        // pelos eventos (session-refreshed/expired).
+        if (result.status === "ok" && !cancelled) scheduleRefresh();
       }, delay);
-
-      return () => clearTimeout(timer);
     }
 
-    const cleanup = scheduleRefresh();
-    return cleanup;
+    scheduleRefresh();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [user]);
 
+  // NOTA: não há estado de `loading` global aqui — isso desmontaria o LoginPage
+  // durante a tentativa (via gate no Root), descartando a mensagem de erro e
+  // fazendo a tela "reiniciar". O LoginPage usa seu próprio loading local.
   async function signIn(email: string, password: string): Promise<void> {
-    setLoading(true);
-    try {
-      const res = await fetch(`${BASE_URL}/auth/login`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email, password }),
-      });
-      const data = await res.json() as { token: string; user: AuthUser; error?: string };
-      if (!res.ok) throw new Error(data.error || "Erro ao entrar.");
-      saveSession(data.token, data.user);
-      setUser(data.user);
-      tryFlushQueue();
-    } finally {
-      setLoading(false);
-    }
+    const data = await postAuth("/auth/login", { email, password }, "Erro ao entrar.");
+    saveSession(data.token as string, data.user as AuthUser);
+    setUser(data.user as AuthUser);
+    tryFlushQueue();
   }
 
   async function signUp(email: string, password: string): Promise<void> {
-    setLoading(true);
-    try {
-      const res = await fetch(`${BASE_URL}/auth/register`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email, password }),
-      });
-      const data = await res.json() as { token: string; user: AuthUser; error?: string; isNewUser?: boolean };
-      if (!res.ok) throw new Error(data.error || "Erro ao cadastrar.");
-      saveSession(data.token, data.user);
-      setUser(data.user);
-      tryFlushQueue();
-      if (data.isNewUser) {
-        importLocalData().catch(() => {});
-      }
-    } finally {
-      setLoading(false);
+    const data = await postAuth("/auth/register", { email, password }, "Erro ao cadastrar.");
+    saveSession(data.token as string, data.user as AuthUser);
+    setUser(data.user as AuthUser);
+    tryFlushQueue();
+    if (data.isNewUser) {
+      importLocalData().catch(() => {});
     }
   }
 
@@ -162,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

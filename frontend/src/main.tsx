@@ -56,16 +56,6 @@ function NotFoundPage(): JSX.Element {
   );
 }
 
-// ── Loading splash ────────────────────────────────────────────────────────────
-function LoadingScreen(): JSX.Element {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--bg)", flexDirection: "column", gap: "16px" }}>
-      <div style={{ fontSize: "36px" }}>⚡</div>
-      <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Carregando…</div>
-    </div>
-  );
-}
-
 // ── Banner offline ────────────────────────────────────────────────────────────
 function OfflineBanner(): JSX.Element | null {
   const [offline, setOffline] = useState<boolean>(!navigator.onLine);
@@ -117,7 +107,7 @@ function QueryErrorHandler(): null {
 // ── Roteador reativo ──────────────────────────────────────────────────────────
 function Root(): JSX.Element {
   const [hash, setHash] = useState<string>(window.location.hash || "#/");
-  const { user, loading, signIn, signUp, signOut } = useAuth();
+  const { user, signIn, signUp, signOut } = useAuth();
   useEffect(() => {
     const handler = (): void => setHash(window.location.hash || "#/");
     window.addEventListener("hashchange", handler);
@@ -129,8 +119,7 @@ function Root(): JSX.Element {
 
   useStreakReminder();
 
-  if (loading) return <LoadingScreen />;
-  if (!user)   return <LoginPage signIn={signIn} signUp={signUp} />;
+  if (!user) return <LoginPage signIn={signIn} signUp={signUp} />;
 
   // Redirecionar raiz para /tasks
   if (hash === "#/" || hash === "#") {

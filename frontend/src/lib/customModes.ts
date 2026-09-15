@@ -10,6 +10,7 @@ import type { Mode } from "../types/index";
 
 const LS_MODES   = "customModes";          // sem prefixo taskflow. (legado)
 const LS_DELETED = "taskflow.deletedModeIds";
+const LS_HIDDEN  = "taskflow.hiddenModeIds";
 
 // ── Leitura ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,17 @@ export function getCustomModes(): Mode[] {
 export function getDeletedModeIds(): Set<string> {
   try {
     const raw = localStorage.getItem(LS_DELETED);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw));
+  } catch {
+    return new Set();
+  }
+}
+
+/** Retorna o Set de IDs de modos que o usuário ocultou (reversível). */
+export function getHiddenModeIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(LS_HIDDEN);
     if (!raw) return new Set();
     return new Set(JSON.parse(raw));
   } catch {
@@ -67,6 +79,30 @@ export function saveCustomMode(newMode: Mode): Mode[] | undefined {
 
   _syncToBackend(updated, deleted);
   return updated;
+}
+
+// ── Modos ocultos (reversível) ─────────────────────────────────────────────────
+
+function _persistHidden(ids: Set<string>): void {
+  try { localStorage.setItem(LS_HIDDEN, JSON.stringify([...ids])); } catch {}
+}
+
+/** Persiste os modos ocultos e sincroniza com o backend. */
+export function setHiddenModeIds(ids: Set<string>): void {
+  _persistHidden(ids);
+  withOfflineFallback("PUT", "/preferences", { hiddenModeIds: [...ids] });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("hiddenModesUpdated"));
+  }
+}
+
+/** Alterna o estado "oculto" de um modo. Retorna o novo Set. */
+export function toggleHiddenMode(id: string): Set<string> {
+  const hidden = getHiddenModeIds();
+  if (hidden.has(id)) hidden.delete(id);
+  else hidden.add(id);
+  setHiddenModeIds(hidden);
+  return hidden;
 }
 
 /** Remove um modo customizado pelo ID. */

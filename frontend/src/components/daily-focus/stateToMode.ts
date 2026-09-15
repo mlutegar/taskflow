@@ -60,9 +60,9 @@ export const ESTADOS_DEFAULT: Estado[] = [
     label: "Sem foco",
     modeId: "momentum",
     motivo: "5 minutos são o suficiente para criar tração sem precisar de concentração.",
-    modeIdAlt: "music",
+    modeIdAlt: "music_hundred",
     motivoAlt: "A música certa cria um estado de foco sem esforço consciente.",
-    modeIds: ["music", "momentum"],
+    modeIds: ["music_hundred", "momentum"],
     comboMotivo: "Música cria o ambiente; Momentum dá o primeiro empurrão — foco construído em camadas.",
   },
   {
@@ -73,7 +73,7 @@ export const ESTADOS_DEFAULT: Estado[] = [
     motivo: "Tab Hop transforma a dispersão em sistema — você rotaciona apps com intenção em vez de navegar sem rumo.",
     modeIdAlt: "playlist_fixed",
     motivoAlt: "Uma playlist pronta elimina a busca pela música certa — âncora sonora sem esforço de curadoria.",
-    modeIds: ["tabhop", "music"],
+    modeIds: ["tabhop", "playlist_fixed"],
     comboMotivo: "Tab Hop dá estrutura à dispersão; música fecha o ambiente — duas âncoras ao mesmo tempo.",
   },
   {

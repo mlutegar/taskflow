@@ -7,6 +7,7 @@
 import { storageGet, storageAppend, storageSet } from "./storage";
 import { SK } from "./storageKeys";
 import { syncToBackend } from "./syncToBackend";
+import { canonicalModeId } from "./modeAliases";
 
 const LS_KEY = "sessionUsageLog";
 const MAX_ENTRIES = 500; // ~500 sessions ≈ ~1 session/day for 1.5 years
@@ -230,7 +231,13 @@ export function getUsageLogs(): SessionUsageEntry[] {
     d.setDate(d.getDate() - RETAIN_DAYS);
     return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
   })();
-  return all.filter((e) => !e.date || e.date >= cutoff);
+  return all
+    .filter((e) => !e.date || e.date >= cutoff)
+    // Normaliza ids legados (ex.: "music" → "music_hundred") para manter continuidade das estatísticas.
+    .map((e) => {
+      const canon = canonicalModeId(e.modeId);
+      return canon === e.modeId ? e : { ...e, modeId: canon };
+    });
 }
 
 /**

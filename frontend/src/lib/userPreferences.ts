@@ -10,6 +10,7 @@ import { fetchPreferences } from "../api/preferences";
 
 const LS_CUSTOM_MODES    = "customModes";
 const LS_DELETED_MODES   = "taskflow.deletedModeIds";
+const LS_HIDDEN_MODES    = "taskflow.hiddenModeIds";
 const LS_WEEKLY_GOAL     = "taskflow.weeklyGoal";
 const LS_ACTIVITIES      = "taskflow.activities";
 const LS_ESTADOS_CUSTOM  = "taskflow.checkin.estadosCustom";
@@ -55,6 +56,26 @@ export async function loadRemotePreferences(): Promise<void> {
     const deletedSet = new Set([...localDeletedArr, ...remoteDeletedArr]);
     if (deletedSet.size > localDeletedArr.length) {
       try { localStorage.setItem(LS_DELETED_MODES, JSON.stringify([...deletedSet])); } catch {}
+    }
+
+    // hiddenModeIds: o servidor é a fonte da verdade (last-write-wins).
+    // Diferente de deletedModeIds (que é definitivo e usa união), ocultar é
+    // reversível — usar união faria um modo reexibido "reviver" ao sincronizar
+    // com um dispositivo que ainda o tinha oculto. Por isso o remoto sobrescreve
+    // o local sempre que o campo existir na resposta.
+    if (Array.isArray(remote.hiddenModeIds)) {
+      const localHiddenArr = lsGet<string[]>(LS_HIDDEN_MODES, []);
+      const same =
+        localHiddenArr.length === remote.hiddenModeIds.length &&
+        new Set(localHiddenArr).size === new Set([...localHiddenArr, ...remote.hiddenModeIds]).size;
+      if (!same) {
+        try {
+          localStorage.setItem(LS_HIDDEN_MODES, JSON.stringify(remote.hiddenModeIds));
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("hiddenModesUpdated"));
+          }
+        } catch {}
+      }
     }
 
     // customModes: mescla por ID, respeitando deletedSet
