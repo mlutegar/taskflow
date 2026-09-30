@@ -17,40 +17,130 @@ model User {
 }
 
 model Task {
-  id          String    @id @default(uuid())
-  userId      String    @map("user_id")
-  title       String
-  description String?
-  completed   Boolean   @default(false)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  completedAt DateTime? @map("completed_at")
-  deletedAt   DateTime? @map("deleted_at")
-  priority    Int       @default(4)
-  dueDate     DateTime? @map("due_date")
-  recurrence  String?   // "daily" | "weekly" | "biweekly" | "monthly"
+  id               String    @id @default(uuid())
+  userId           String    @map("user_id")
+  title            String
+  description      String?
+  completed        Boolean   @default(false)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+  version          Int       @default(0)
+  completedAt      DateTime? @map("completed_at")
+  deletedAt        DateTime? @map("deleted_at")
+  priority         Int       @default(4)
+  dueDate          DateTime? @map("due_date")
+  dueTime          String?   @map("due_time") // hora de vencimento "HH:MM" (opcional)
+  recurrence       String? // "daily" | "weekly" | "biweekly" | "monthly"
+  recurrenceRule   String?   @map("recurrence_rule") // JSON para regras personalizadas
+  projectId        String?   @map("project_id")
+  estimatedMinutes Int?      @map("estimated_minutes") // tempo estimado para concluir (minutos)
+  actualMinutes    Int?      @map("actual_minutes") // tempo real gasto (minutos)
+  orbitaProjects   String?   @map("orbita_projects") // JSON array de paths de projetos do Órbita (Claude Web) associados
+  orbitaPrompt     String?   @map("orbita_prompt") // prompt customizado enviado ao Claude Web (se vazio, usa template da task)
+  orbitaLastKey    String?   @map("orbita_last_key") // key da última aba aberta no Órbita (p/ reusar/continuar)
+  orbitaLastProvider String? @map("orbita_last_provider") // provider usado no último launch (claude|codex|antigravity)
+  orbitaHistory    String?   @map("orbita_history") // JSON array com histórico de launches (quando/projeto/provider/key)
 
   checklist   ChecklistItem[]
   dailyTasks  DailyTask[]
+  completions TaskCompletion[]
+  project     Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userId, completed])
   @@index([userId, dueDate])
   @@index([userId, deletedAt])
+  @@index([userId, projectId])
   @@map("tasks")
 }
 
+model Project {
+  id                      String   @id @default(uuid())
+  userId                  String   @map("user_id")
+  name                    String
+  description             String?
+  color                   String   @default("#7c6ef5")
+  emoji                   String   @default("📁")
+  parentId                String?  @map("parent_id")
+  archived                Boolean  @default(false)
+  defaultEstimatedMinutes Int?     @map("default_estimated_minutes") // tempo estimado padrão herdado por novas tarefas
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @default(now()) @updatedAt @map("updated_at")
+
+  parent   Project?  @relation("ProjectHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children Project[] @relation("ProjectHierarchy")
+  tasks    Task[]
+
+  @@unique([userId, parentId, name])
+  @@index([userId, archived])
+  @@index([parentId])
+  @@map("projects")
+}
+
+model TaskCompletion {
+  id              String    @id @default(uuid())
+  taskId          String    @map("task_id")
+  userId          String    @map("user_id")
+  scheduledFor    DateTime? @map("scheduled_for")
+  previousDueDate DateTime? @map("previous_due_date")
+  nextDueDate     DateTime? @map("next_due_date")
+  completedAt     DateTime  @default(now()) @map("completed_at")
+  undoneAt        DateTime? @map("undone_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt])
+  @@index([taskId, completedAt])
+  @@map("task_completions")
+}
+
+// Registro imutável das alterações relevantes de uma tarefa. Os snapshots
+// ficam como JSON serializado para manter compatibilidade com SQLite.
+model TaskChange {
+  id        Int       @id @default(autoincrement())
+  userId    String    @map("user_id")
+  taskId    String?   @map("task_id")
+  action    String
+  before    String?
+  after     String?
+  metadata  String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  undoneAt  DateTime? @map("undone_at")
+
+  @@index([userId, createdAt])
+  @@index([taskId, createdAt])
+  @@map("task_changes")
+}
+
+// Garante que uma mutação reenviada (timeout, reconexão ou toque duplo)
+// produza no máximo um efeito no servidor.
+model TaskMutationReceipt {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id")
+  key       String
+  method    String
+  path      String
+  status    Int      @default(0)
+  response  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, key])
+  @@index([createdAt])
+  @@map("task_mutation_receipts")
+}
+
 model ChecklistItem {
-  id          Int      @id @default(autoincrement())
-  taskId      String   @map("task_id")
-  parentId    Int?     @map("parent_id")
+  id          Int     @id @default(autoincrement())
+  taskId      String  @map("task_id")
+  parentId    Int?    @map("parent_id")
   description String
   note        String?
-  completed   Boolean  @default(false)
-  order       Int      @default(0)
+  completed   Boolean @default(false)
+  order       Int     @default(0)
 
-  task        Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  parent      ChecklistItem?  @relation("ChecklistChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children    ChecklistItem[] @relation("ChecklistChildren")
+  task     Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  parent   ChecklistItem?  @relation("ChecklistChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children ChecklistItem[] @relation("ChecklistChildren")
 
   @@index([taskId])
   @@map("checklist_items")
@@ -66,9 +156,10 @@ model Routine {
   currentProgress   Float     @default(0) @map("current_progress")
   lastCompletedDate DateTime? @map("last_completed_date")
   completionHistory String    @default("[]") @map("completion_history")
+  recurrence        String?
   createdAt         DateTime  @default(now()) @map("created_at")
 
-  checklist         RoutineChecklistItem[]
+  checklist RoutineChecklistItem[]
 
   @@index([userId])
   @@map("routines")
@@ -81,7 +172,7 @@ model RoutineChecklistItem {
   completed   Boolean @default(false)
   order       Int     @default(0)
 
-  routine     Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  routine Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
 
   @@map("routine_checklist_items")
 }
@@ -104,7 +195,7 @@ model DailyTask {
   position  Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
 
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([date, taskId, userId])
   @@index([userId])
@@ -115,6 +206,7 @@ model DailyTask {
 model DailyFocusSession {
   id          String   @id @default(uuid())
   userId      String   @map("user_id")
+  clientId    String?  @map("client_id") // UUID gerado no cliente p/ idempotência (dedupe no upsert)
   date        DateTime @map("date")
   completedAt String?  @map("completed_at") // TIME stored as string HH:MM
   level       Int      @default(1)
@@ -127,6 +219,7 @@ model DailyFocusSession {
   tabsOpened  Int      @default(0) @map("tabs_opened")
   createdAt   DateTime @default(now()) @map("created_at")
 
+  @@unique([userId, clientId])
   @@index([userId, createdAt])
   @@map("daily_focus_sessions")
 }
@@ -138,19 +231,47 @@ model DailyFocusCheckin {
   modeId    String   @map("mode_id")
   date      DateTime @map("date")
   hour      Int
-  rating    Int?     // -1 or 1
+  rating    Int? // -1 or 1
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId, date])
   @@map("daily_focus_checkins")
 }
 
-model DailyFocusDayState {
+model DailyFocusEmotion {
+  id        String   @id @default(uuid())
   userId    String   @map("user_id")
+  emotion   String
+  moment    String // "start" | "resume" | "end"
+  intensity String? // "leve" | "forte"
   date      DateTime @map("date")
-  level     Int      @default(0)
-  usedModes String   @default("{}") @map("used_modes") // JSON stored as string
-  updatedAt DateTime @default(now()) @map("updated_at")
+  hour      Int
+  timestamp String? // ISO do cliente (dedup)
+  taskTitle String?  @map("task_title")
+  taskIndex Int?     @map("task_index")
+  taskId    String?  @map("task_id")
+  modeIds   String?  @map("mode_ids") // JSON array como texto
+  level     Int?
+  rushMode  Boolean? @map("rush_mode")
+  tabMode   Boolean? @map("tab_mode")
+  pauseSecs Int?     @map("pause_secs")
+  completed Boolean?
+  usedSecs  Int?     @map("used_secs")
+  totalSecs Int?     @map("total_secs")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, date])
+  @@map("daily_focus_emotions")
+}
+
+model DailyFocusDayState {
+  userId             String   @map("user_id")
+  date               DateTime @map("date")
+  level              Int      @default(0)
+  usedModes          String   @default("{}") @map("used_modes") // JSON stored as string
+  continuousActivity String?  @map("continuous_activity") // JSON stored as string (atividade contínua do dia)
+  continuousCompleted String? @map("continuous_completed") // JSON stored as string (log de contínuas concluídas hoje)
+  updatedAt          DateTime @default(now()) @map("updated_at")
 
   @@id([userId, date])
   @@map("daily_focus_day_state")
@@ -164,42 +285,70 @@ model DailyFocusAchievement {
   @@map("daily_focus_achievements")
 }
 
+// Sessão de foco EM ANDAMENTO (cross-device). Uma por usuário (LWW por updatedAt).
+// Guarda os snapshots que hoje vivem só no localStorage do dispositivo:
+//   - live       → snapshot DailyFocusLive (fase, running, remainingSecs, anchorTs, ...)
+//   - session    → payload do useSessionPersist ("taskflow_sess_daily_focus")
+//   - focusTimer  → acumulador modeFocusTimer ("taskflow.modeFocusTimer")
+model DailyFocusActiveSession {
+  userId     String    @id @map("user_id")
+  date       DateTime  @map("date")
+  live       String    @map("live")         // JSON stored as string
+  session    String    @default("{}") @map("session")      // JSON stored as string
+  focusTimer String?   @map("focus_timer")  // JSON stored as string (opcional)
+  version    Int       @default(0)          // contador monotônico p/ concorrência otimística (imune a relógio)
+  endedAt    DateTime? @map("ended_at")     // tombstone: sessão encerrada (detecção cross-device antes da limpeza)
+  updatedAt  DateTime  @default(now()) @map("updated_at")
+
+  @@map("daily_focus_active_sessions")
+}
+
 model UserPreferences {
-  userId          String   @id @map("user_id")
-  customModes     String   @default("[]")  @map("custom_modes")     // JSON array
-  deletedModeIds  String   @default("[]")  @map("deleted_mode_ids") // JSON array — modos que o usuário deletou
-  hiddenModeIds   String   @default("[]")  @map("hidden_mode_ids")  // JSON array — modos que o usuário ocultou (reversível)
-  weeklyGoal      Int      @default(5)     @map("weekly_goal")
-  activities      String   @default("[]")  @map("activities")       // JSON array
-  estadosCustom   String   @default("[]")  @map("estados_custom")   // JSON array
-  paperReminders  String   @default("[]")  @map("paper_reminders")  // JSON array
-  lastEstadoId    String?  @map("last_estado_id")                   // último estado selecionado no check-in
-  onboarded       Boolean  @default(false) @map("onboarded")        // flag de onboarding do check-in
-  updatedAt       DateTime @updatedAt      @map("updated_at")
+  userId         String   @id @map("user_id")
+  customModes    String   @default("[]") @map("custom_modes") // JSON array
+  deletedModeIds String   @default("[]") @map("deleted_mode_ids") // JSON array — modos que o usuário deletou
+  hiddenModeIds  String   @default("[]") @map("hidden_mode_ids") // JSON array — modos que o usuário ocultou (reversível)
+  weeklyGoal     Int      @default(5) @map("weekly_goal")
+  activities     String   @default("[]") @map("activities") // JSON array
+  estadosCustom  String   @default("[]") @map("estados_custom") // JSON array
+  paperReminders String   @default("[]") @map("paper_reminders") // JSON array
+  lastEstadoId   String?  @map("last_estado_id") // último estado selecionado no check-in
+  onboarded      Boolean  @default(false) @map("onboarded") // flag de onboarding do check-in
+  orbitaPromptTemplate String @default("") @map("orbita_prompt_template") // template global do prompt do Órbita (placeholders {{titulo}} etc.)
+  timezone       String   @default("America/Sao_Paulo")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@map("user_preferences")
 }
 
 model SessionUsageLog {
-  id                    Int       @id @default(autoincrement())
-  userId                String    @map("user_id")
-  modeId                String    @map("mode_id")
-  date                  String    // YYYY-MM-DD
-  hour                  Int
-  worked                Boolean?                  // null = "mais ou menos"
-  focusedMinutes        Int       @default(0) @map("focused_minutes")
-  idleMinutes           Int       @default(0) @map("idle_minutes")
-  idleReason            String    @default("[]") @map("idle_reason")   // JSON array
-  feeling               String    @default("[]")                        // JSON array
-  comboWith             String?   @map("combo_with")                   // modeId do parceiro se foi sessão combo
-  startedAt             DateTime? @map("started_at")                   // timestamp automático de início
-  endedAt               DateTime? @map("ended_at")                     // timestamp automático de fim
-  sessionDurationMinutes Int?     @map("session_duration_minutes")     // endedAt - startedAt em minutos
-  efficiencyPct         Int?      @map("efficiency_pct")               // focusedMinutes / sessionDurationMinutes * 100
-  note                  String?   @map("note")                         // anotação livre pós-sessão
-  createdAt             DateTime  @default(now()) @map("created_at")
+  id                     Int       @id @default(autoincrement())
+  clientId               String?   @unique @map("client_id") // UUID gerado no cliente — idempotência de sync e dedupe por sessão
+  userId                 String    @map("user_id")
+  modeId                 String    @map("mode_id")
+  date                   String // YYYY-MM-DD
+  hour                   Int
+  worked                 Boolean? // null = "mais ou menos"
+  focusedMinutes         Int       @default(0) @map("focused_minutes")
+  idleMinutes            Int       @default(0) @map("idle_minutes")
+  idleReason             String    @default("[]") @map("idle_reason") // JSON array
+  feeling                String    @default("[]") // JSON array
+  comboWith              String?   @map("combo_with") // modeId do parceiro se foi sessão combo
+  startedAt              DateTime? @map("started_at") // timestamp automático de início
+  endedAt                DateTime? @map("ended_at") // timestamp automático de fim
+  sessionDurationMinutes Int?      @map("session_duration_minutes") // tempo de foco efetivo (sincronizado ao Daily Focus)
+  efficiencyPct          Int?      @map("efficiency_pct") // focusedMinutes / sessionDurationMinutes * 100
+  pauseCount             Int?      @map("pause_count") // nº de pausas do foco durante a sessão
+  pausedMinutes          Int?      @map("paused_minutes") // tempo total pausado com o modo ativo
+  focusBlocks            Int?      @map("focus_blocks") // nº de blocos de foco (fragmentação)
+  tasksCompleted         Int?      @map("tasks_completed") // tarefas concluídas com o modo ativo
+  note                   String?   @map("note") // anotação livre pós-sessão
+  createdAt              DateTime  @default(now()) @map("created_at")
 
-  @@unique([userId, modeId, date, hour])
+  // Removido o unique (userId, modeId, date, hour): duas sessões do mesmo modo na mesma
+  // hora colidiam no upsert e uma sobrescrevia a outra (perda de sessão). A idempotência
+  // agora é por `clientId`. Mantido índice não-único para performance de consulta.
+  @@index([userId, modeId, date])
   @@index([userId, date])
   @@map("session_usage_logs")
 }
@@ -208,7 +357,7 @@ model UserModeActivation {
   id        Int      @id @default(autoincrement())
   userId    String   @map("user_id")
   modeId    String   @map("mode_id")
-  date      String   // YYYY-MM-DD
+  date      String // YYYY-MM-DD
   createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([userId, modeId, date])
@@ -219,7 +368,7 @@ model ModeLog {
   id        Int      @id @default(autoincrement())
   userId    String   @map("user_id")
   modeId    String   @map("mode_id")
-  date      String   // YYYY-MM-DD
+  date      String // YYYY-MM-DD
   createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([userId, modeId, date])

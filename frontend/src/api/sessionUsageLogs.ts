@@ -17,6 +17,7 @@ interface UsageLogEntry {
 
 interface UsageLogRaw {
   id?: unknown;
+  client_id?: unknown;
   mode_id: string;
   date: string;
   hour: number;
@@ -60,7 +61,7 @@ export async function fetchUsageLogs(): Promise<UsageLogEntry[]> {
     const nextCursor = Array.isArray(data) ? null  : (data as UsageLogPage).nextCursor;
 
     all.push(...items.map((r: UsageLogRaw) => ({
-      ...(r.id ? { id: r.id } : {}),
+      ...((r.client_id ?? r.id) ? { id: r.client_id ?? r.id } : {}),
       modeId:         r.mode_id,
       date:           r.date,
       hour:           r.hour,

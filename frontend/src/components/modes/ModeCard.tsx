@@ -5,6 +5,7 @@ import { MODES } from "../../data/modes";
 import { storageSet } from "../../lib/storage";
 import { SK } from "../../lib/storageKeys";
 import type { ModeConfig } from "./types";
+import { useActiveMode } from "../../contexts/ActiveModeContext";
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 // All primitive/scalar props so React.memo can do shallow equality comparison.
@@ -77,6 +78,7 @@ function ModeCard({
   onFlash,
   onSequenceAdd,
 }: ModeCardProps) {
+  const { expand } = useActiveMode();
   if (compactView) {
     return (
       <div
@@ -232,10 +234,10 @@ function ModeCard({
           {isActiveSession ? (
             <button
               className={styles.viewSessionBtn}
-              onClick={() => sessionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              title="Ir para a sessão ativa"
+              onClick={() => { expand(); sessionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+              title="Abrir a sessão ativa"
             >
-              ● Ver sessão ↑
+              ● Ver sessão
             </button>
           ) : (
             <>

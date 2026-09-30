@@ -1,0 +1,231 @@
+.card {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 950; /* acima do MultiCardSession (900), abaixo dos modais (1000) */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 280px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  animation: floatIn 0.2s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.timer {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes floatIn {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.pulse {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 var(--accent);
+  animation: pulse 1.8s ease-out infinite;
+}
+
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(124, 110, 245, 0.55); }
+  70%  { box-shadow: 0 0 0 8px rgba(124, 110, 245, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(124, 110, 245, 0); }
+}
+
+.emoji {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.closeBtn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.closeBtn:hover {
+  background: var(--danger);
+  color: var(--text-inverse);
+  border-color: var(--danger);
+}
+
+/* ── Ações (expandir + encerrar) ─────────────────────────── */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.actionBtn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.actionBtn:hover {
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-color: var(--accent);
+}
+
+/* ── Painel de encerramento (registro rápido) ────────────── */
+/* Quando o painel aparece, o card quebra linha e ele ocupa a largura toda. */
+.card:has(.confirmPanel) {
+  flex-wrap: wrap;
+  cursor: default;
+}
+
+.confirmPanel {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.confirmTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.confirmPreview {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.confirmQuickRow {
+  display: flex;
+  gap: 6px;
+}
+
+.confirmWorked,
+.confirmNotWorked {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.confirmWorked:hover {
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-color: var(--accent);
+}
+
+.confirmNotWorked:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+
+.confirmSecondaryRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.confirmLink {
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.confirmLink:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+@media (max-width: 520px) {
+  .card {
+    bottom: 76px; /* acima da bottom nav mobile */
+    right: 12px;
+    left: 12px;
+    max-width: none;
+  }
+}

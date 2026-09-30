@@ -1,35 +1,14 @@
-import { useState, useEffect } from "react";
 import { useTasks } from "../hooks/useTasks";
 import { useRoutines } from "../hooks/useRoutines";
 import ModesPanel from "../components/ModesPanel";
 import styles from "../App.module.css";
 import { SK } from "../lib/storageKeys";
 import { storageGet } from "../lib/storage";
+import { useActiveMode } from "../contexts/ActiveModeContext";
 
 export default function ModesPage(): JSX.Element {
-  const ACTIVE_SESSION_KEY = "taskflow." + SK.ACTIVE_MULTI_CARD_SESSION;
-  const [hasActiveSession, setHasActiveSession] = useState<boolean>(
-    () => !!localStorage.getItem(ACTIVE_SESSION_KEY)
-  );
-
-  useEffect(() => {
-    const sync = (): void =>
-      setHasActiveSession(!!localStorage.getItem(ACTIVE_SESSION_KEY));
-    const handleStorage = (e: StorageEvent): void => {
-      if (e.key === ACTIVE_SESSION_KEY || e.key === null) sync();
-    };
-    const handleVisibility = (): void => {
-      if (document.visibilityState === "visible") sync();
-    };
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("multiCardSessionChanged", sync);
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("multiCardSessionChanged", sync);
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, []);
+  // Dot reflete qualquer sessão ativa (modo único OU multi-card), reativo via contexto.
+  const { hasActiveSession } = useActiveMode();
 
   const { tasks, handleCompleteTask, handleCreateTask, handleAddTaskChecklist, handleToggleTaskChecklist } = useTasks("", "due_date_asc");
   const { routines, handleCompleteRoutine, handleAddRoutineChecklist, handleToggleRoutineChecklist } = useRoutines("");

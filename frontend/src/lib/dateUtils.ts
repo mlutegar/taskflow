@@ -101,3 +101,39 @@ export function formatPtBR(str: string, options: Intl.DateTimeFormatOptions = { 
 export function formatISOShort(iso: string): string {
   return formatPtBR(iso, { weekday: "short", day: "2-digit", month: "short" });
 }
+
+/**
+ * Diferença em dias (horário local) entre uma data ISO (YYYY-MM-DD) e hoje.
+ * Negativo = no passado, 0 = hoje, positivo = no futuro.
+ * @param {string} iso
+ * @returns {number} NaN se a string for inválida.
+ */
+export function daysUntilISO(iso: string): number {
+  if (!iso) return NaN;
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return NaN;
+  const target = new Date(y, m - 1, d);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
+export type DueTone = "overdue" | "today" | "soon" | "normal";
+
+/**
+ * Rótulo relativo amigável para um vencimento ISO (YYYY-MM-DD), em hora local.
+ * Ex.: "atrasada 2 dias", "vence hoje", "vence amanhã", "vence em 5 dias".
+ * @param {string} iso
+ * @returns {{ text: string; tone: DueTone } | null} null se inválida/vazia.
+ */
+export function dueDateLabel(iso: string): { text: string; tone: DueTone } | null {
+  const diff = daysUntilISO(iso);
+  if (Number.isNaN(diff)) return null;
+  if (diff < 0) {
+    const n = Math.abs(diff);
+    return { text: n === 1 ? "atrasada 1 dia" : `atrasada ${n} dias`, tone: "overdue" };
+  }
+  if (diff === 0) return { text: "vence hoje", tone: "today" };
+  if (diff === 1) return { text: "vence amanhã", tone: "soon" };
+  return { text: `vence em ${diff} dias`, tone: diff <= 7 ? "soon" : "normal" };
+}

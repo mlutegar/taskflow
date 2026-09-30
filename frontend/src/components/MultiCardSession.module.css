@@ -76,6 +76,97 @@
   background: rgba(224,82,82,0.08);
 }
 
+/* ── Ações da barra (agrupa minimizar | encerrar) ── */
+.topActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.actionsDivider {
+  width: 1px;
+  height: 18px;
+  background: var(--border, rgba(255,255,255,0.12));
+}
+
+/* ── Botão minimizar (afordância clara, hover neutro/accent) ── */
+.minWrap {
+  position: relative;
+  display: inline-flex;
+}
+.minBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 8px;
+  color: var(--text-muted, #9aa0b2);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.14s;
+}
+.minBtn:hover {
+  border-color: var(--accent, #7c6ef5);
+  color: var(--accent, #7c6ef5);
+  background: rgba(124,110,245,0.10);
+}
+.minIcon {
+  display: block;
+}
+/* Em telas estreitas mostra só o ícone (rótulo continua no title/aria-label). */
+@media (max-width: 520px) {
+  .minLabel { display: none; }
+  .minBtn { padding: 5px 7px; }
+}
+
+/* ── Dica de primeira vez ── */
+.minHint {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  background: var(--accent, #7c6ef5);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 10px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  animation: hintPop 0.2s ease;
+}
+.minHint::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: 18px;
+  width: 10px;
+  height: 10px;
+  background: var(--accent, #7c6ef5);
+  transform: rotate(45deg);
+}
+.minHintClose {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: #fff;
+  border-radius: 5px;
+  width: 18px;
+  height: 18px;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1;
+}
+@keyframes hintPop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Current card info ─────────────────────────────── */
 .cardInfo {
   display: flex;

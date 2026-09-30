@@ -4,13 +4,49 @@ import { getCustomModes } from "../../lib/customModes";
 import { playBeep, playTimerDone, playNewRecord, playPaperReview } from "../../lib/sounds";
 import { tasksApi } from "../../api/tasks";
 import { useSessionPersist } from "../../lib/useSessionPersist";
+import { DailyFocusLive, loadDailyFocusLive, saveDailyFocusLive, clearDailyFocusLive, liveRemaining, DAILY_FOCUS_LIVE_EVENT, endRemoteActiveSession, loadRemoteActiveSession, flushActiveSessionPush, beaconActiveSessionNow } from "../../lib/dailyFocusLive";
 import { getHelper } from "./helpers/index";
 import { addSession, getHistory, getMaxLevel, updateMaxLevel, getStreak, getWeeklyStats, getMaxLevelByMode, updateMaxLevelByMode, getLastDateByLevel, getMaxCycles, updateMaxCycles } from "../../lib/dailyFocusHistory";
 import { tryUnlock } from "../../lib/dailyFocusAchievements";
 import { getDayLevel, setDayLevel, getUsedModes, addUsedModes } from "../../lib/dailyFocusDay";
-import { usageStats } from "../../lib/modeLog";
+import {
+  isTodaySelfDev, setTodaySelfDev, getSelfDevStreak,
+  isRecommendationDismissed, dismissRecommendation,
+  getExampleOfTheDay, COMPOUND_YEAR_FACTOR,
+} from "../../lib/selfDevelopment";
+import { getContinuousActivity, setContinuousActivity, replaceContinuousActivity, getLastActivity, getContinuousStreak, registerTick, addProgress, completeContinuousActivity, uncompleteLast, getCompletedToday, type ContinuousActivity, type CompletedEntry } from "../../lib/continuousActivity";
+import ContinuousActivityPicker from "./components/ContinuousActivityPicker";
+import { useToast } from "../shared/Toast";
+import { usageStats } from "../../lib/sessionUsageLog";
 import { logCheckinUsage, getCheckinCount, getCheckinStreak, logSessionFeedback, updateLastFeedbackEstadoAfter } from "../../lib/checkinLog";
 import CheckInScreen from "./CheckInScreen";
+import PrepareDayScreen, { type DayPriority } from "./PrepareDayScreen";
+import EmotionCheckModal from "./components/EmotionCheckModal";
+import { logEmotion, getTodayEmotions, getEmotionCount } from "../../lib/emotionLog";
+import { getEmotionById } from "../../data/emotions";
+import type { EmotionMoment } from "../../types";
+import { useQuickTask } from "../../contexts/QuickTaskContext";
+import {
+  MOBILE_MQ, isMobileViewport, readMinimizedPref, writeMinimizedPref, initialContActMinimized,
+} from "../../lib/continuousActivityUiPrefs";
+
+// Contexto capturado no instante do checkpoint emocional (associa emoção ao momento da sessão).
+interface EmotionCtx {
+  taskTitle?: string;
+  taskIndex?: number;
+  taskId?: string | null;
+  modeIds?: string[];
+  level?: number;
+  rushMode?: boolean;
+  tabMode?: boolean;
+  pauseSecs?: number;
+  completed?: boolean;
+  usedSecs?: number;
+  totalSecs?: number;
+}
+
+// Cooldown para não reabrir o modal em micro-pausas (Play→Pause→Play em poucos segundos).
+const EMOTION_COOLDOWN_MS = 2 * 60 * 1000;
 import styles from "./DailyFocus.module.css";
 import { MODES } from "../../data/modes";
 import { ESTADOS_DEFAULT } from "./stateToMode";
@@ -23,6 +59,9 @@ import ProgressDots from "./components/ProgressDots";
 import DailyTimer from "./components/DailyTimer";
 import TabModeBar from "./components/TabModeBar";
 import TaskSlot from "./components/TaskSlot";
+import SlotBoard from "../SlotBoard";
+import { useActiveMode } from "../../contexts/ActiveModeContext";
+import { useConfirm } from "../ConfirmDialog";
 
 interface Task {
   title: string;
@@ -133,6 +172,11 @@ const ESTADO_CELEBRATE_MSG: Record<string, string> = {
 
 export default function DailyFocusPage() {
   const { saved, persist, clearSaved } = useSessionPersist("daily_focus");
+  const { showToast } = useToast();
+
+  // Snapshot "live" (card persistente): lido uma vez no mount para rehidratar o timer
+  // caso o usuário tenha retomado a sessão pelo card enquanto navegava por outra página.
+  const liveInit = useRef<DailyFocusLive | null>(loadDailyFocusLive()).current;
 
   const [level, setLevel]                   = useState<number>(saved?.level ?? getDayLevel());
   const [tasks, setTasks]                   = useState<Task[]>(() => migrateTasks(saved?.tasks ?? makeTasks(1)));
@@ -150,9 +194,19 @@ export default function DailyFocusPage() {
     }
     return migrated;
   });
-  const [timerRemaining, setTimerRemaining] = useState<number | null>(saved?.timerRemaining ?? null);
-  const [timerRunning, setTimerRunning]     = useState<boolean>(false);
-  const [phase, setPhase]                   = useState<string>(saved?.phase ?? "checkin");
+  const [timerRemaining, setTimerRemaining] = useState<number | null>(() => {
+    // Se o card retomou o timer em background, usa o restante já descontado.
+    if (liveInit && liveInit.running && liveInit.remainingSecs != null) return liveRemaining(liveInit);
+    return saved?.timerRemaining ?? null;
+  });
+  const [timerRunning, setTimerRunning]     = useState<boolean>(() => !!(liveInit && liveInit.running));
+  // Fluxo direto: pula a tela de recomendação (CheckInScreen) e começa na preparação do dia.
+  const [phase, setPhase]                   = useState<string>(saved?.phase ?? "prepare");
+  // Checkpoint emocional exibido a cada início/retomada/fim do timer (null = fechado).
+  // Guarda o momento + contexto capturado no instante do clique.
+  const [emotionPrompt, setEmotionPrompt]   = useState<null | { moment: EmotionMoment; ctx: EmotionCtx }>(null);
+  // Cooldown p/ evitar reabrir o modal em micro-pausas (Play→Pause→Play em segundos).
+  const lastEmotionTsRef                    = useRef<number>(0);
   const [timerDone, setTimerDone]           = useState<boolean>(false);
   const [rushMode, setRushMode]             = useState<boolean>(saved?.rushMode ?? false);
   const [tabMode, setTabMode]               = useState<boolean>(saved?.tabMode ?? false);
@@ -166,7 +220,7 @@ export default function DailyFocusPage() {
   const [pendingNextIdx, setPendingNextIdx] = useState<number | null>(saved?.pendingNextIdx ?? null);
 
   // Modos usados hoje (bloqueados no picker)
-  const [usedModes, setUsedModes] = useState<Record<string, boolean>>(() => getUsedModes());
+  const [usedModes, setUsedModes] = useState<Record<string, number>>(() => getUsedModes());
 
   // Recorde pessoal e progresso do dia
   const maxLevel = getMaxLevel();
@@ -193,6 +247,134 @@ export default function DailyFocusPage() {
   const [checkinModeId, setCheckinModeId] = useState<string | null>(saved?.checkinModeId ?? null);
   const [checkinEstadoId, setCheckinEstadoId] = useState<string | null>(saved?.checkinEstadoId ?? null);
 
+  // Prioridades do dia definidas na etapa de preparação (base da seleção do Daily Focus).
+  const [dayPriorities, setDayPriorities] = useState<DayPriority[]>(saved?.dayPriorities ?? []);
+
+  // Atividade Contínua do dia (atividade de fundo, sem timer, fora da sequência).
+  // Persiste por dia via localStorage (continuousActivity.ts), não pelo useSessionPersist.
+  const [continuousActivity, setContinuousActivityState] = useState<ContinuousActivity | null>(() => getContinuousActivity());
+  // No mobile inicia minimizado (indicador compacto que expande ao tocar); no desktop, expandido.
+  // Respeita preferência salva pelo usuário (ver initialContActMinimized / persistência abaixo).
+  const [contActMinimized, setContActMinimized] = useState<boolean>(initialContActMinimized); // chip minimizado na fase work
+  const contActUserSetRef = useRef<boolean>(false); // usuário mexeu manualmente nesta sessão?
+  const contActChipRef = useRef<HTMLDivElement | null>(null); // card expandido (focus/gesto)
+  const contActTouchStartY = useRef<number | null>(null); // início de swipe-down p/ minimizar
+  const { isOpen: quickTaskOpen } = useQuickTask();
+
+  // Minimizar/expandir com persistência da escolha manual do usuário (por dispositivo).
+  const setContActMinimizedPref = useCallback((min: boolean): void => {
+    contActUserSetRef.current = true;
+    setContActMinimized(min);
+    writeMinimizedPref(min);
+  }, []);
+
+  // Reavalia o padrão ao girar/redimensionar — só enquanto o usuário não escolheu manualmente.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(MOBILE_MQ);
+    const onChange = (): void => {
+      if (contActUserSetRef.current) return; // respeita escolha manual
+      if (readMinimizedPref() !== null) return; // preferência salva vence
+      setContActMinimized(mq.matches);
+    };
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+
+  // Ao abrir a captura rápida (FAB/atalho), recolhe a Atividade Contínua no mobile
+  // para não competir visualmente; não persiste (é automático/temporário).
+  useEffect(() => {
+    if (quickTaskOpen && isMobileViewport()) setContActMinimized(true);
+  }, [quickTaskOpen]);
+  const [contActStreak] = useState<number>(() => getContinuousStreak());
+  const [contActLast] = useState<ContinuousActivity | null>(() => getLastActivity());
+  const [contActCopied, setContActCopied] = useState<boolean>(false);
+  const [contActPicking, setContActPicking] = useState<boolean>(false); // picker aberto na fase work (concluir/trocar)
+  const [contActDoneToday, setContActDoneToday] = useState<CompletedEntry[]>(() => getCompletedToday());
+  // Grava campos da atividade (merge parcial) e re-lê o estado normalizado.
+  const saveContinuousActivity = useCallback((patch: Partial<ContinuousActivity>): void => {
+    setContinuousActivity(patch);
+    setContinuousActivityState(getContinuousActivity());
+  }, []);
+  // Conclui a atividade atual (registra no dia), mostra toast com Desfazer e abre
+  // o picker para escolher outra.
+  const handleCompleteContinuousActivity = useCallback((): void => {
+    const done = completeContinuousActivity();
+    setContinuousActivityState(getContinuousActivity());
+    setContActDoneToday(getCompletedToday());
+    setContActPicking(true);
+    if (done) {
+      const adv = done.goalTarget != null
+        ? `${done.progress}/${done.goalTarget} ${done.goalUnit}`.trim()
+        : done.ticks > 0 ? `${done.ticks}× hoje` : "";
+      showToast(
+        `${done.icon || "🔄"} “${done.title}” concluída${adv ? ` · ${adv}` : ""}`,
+        "success",
+        {
+          durationMs: 6000,
+          action: {
+            label: "Desfazer",
+            onClick: () => {
+              uncompleteLast();
+              setContinuousActivityState(getContinuousActivity());
+              setContActDoneToday(getCompletedToday());
+              setContActPicking(false);
+            },
+          },
+        },
+      );
+    }
+  }, [showToast]);
+  // Escolhe uma nova atividade contínua durante a sessão (troca): substitui a atual
+  // zerando ticks/progress e fecha o picker.
+  const pickContinuousActivity = useCallback((next: Partial<ContinuousActivity>): void => {
+    replaceContinuousActivity(next);
+    setContinuousActivityState(getContinuousActivity());
+    setContActPicking(false);
+  }, []);
+  const clearContinuousActivityUI = useCallback((): void => {
+    setContinuousActivity({ title: "", link: "", note: "", goalTarget: null, goalUnit: "" });
+    setContinuousActivityState(getContinuousActivity());
+  }, []);
+  // Registra um acesso à atividade (tick) e opcionalmente abre o link.
+  const openContinuousActivity = useCallback((): void => {
+    const updated = registerTick();
+    setContinuousActivityState(updated ?? getContinuousActivity());
+  }, []);
+  const bumpContinuousProgress = useCallback((delta: number): void => {
+    const updated = addProgress(delta);
+    setContinuousActivityState(updated ?? getContinuousActivity());
+  }, []);
+  const copyContinuousLink = useCallback((link: string): void => {
+    try { navigator.clipboard?.writeText(link); } catch {}
+    setContActCopied(true);
+    setTimeout(() => setContActCopied(false), 1500);
+  }, []);
+  // Foco profundo → minimiza o chip; pausa → revela. (o usuário ainda pode alternar manualmente)
+  useEffect(() => {
+    if (phase !== "work") return;
+    if (contActPicking) { setContActMinimized(false); return; } // não minimiza enquanto escolhe
+    setContActMinimized(timerRunning);
+  }, [timerRunning, phase, contActPicking]);
+
+  // Ao expandir: move o foco para o primeiro botão do card (a11y).
+  useEffect(() => {
+    if (contActMinimized || !continuousActivity || phase !== "work") return;
+    const el = contActChipRef.current?.querySelector<HTMLElement>("a, button");
+    el?.focus();
+  }, [contActMinimized, continuousActivity, phase]);
+
+  // Mobile: tocar fora do card expandido minimiza (fecha limpo).
+  useEffect(() => {
+    if (contActMinimized || !isMobileViewport()) return;
+    const onPointer = (e: PointerEvent): void => {
+      const node = contActChipRef.current;
+      if (node && !node.contains(e.target as Node)) setContActMinimizedPref(true);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [contActMinimized, setContActMinimizedPref]);
+
   // Feedback de sessão (não persiste)
   const [sessionFeedback, setSessionFeedback] = useState<string | null>(null); // null | "good" | "bad"
   const [estadoAfterSelected, setEstadoAfterSelected] = useState<string | null>(null);
@@ -210,9 +392,25 @@ export default function DailyFocusPage() {
     });
 
   // UI state (not persisted)
+  // Recomendação de autodesenvolvimento na 1ª tarefa
+  const [selfDevMarked, setSelfDevMarked]         = useState<boolean>(() => isTodaySelfDev());
+  const [recDismissed, setRecDismissed]           = useState<boolean>(() => isRecommendationDismissed());
+  const [selfDevStreak, setSelfDevStreak]         = useState<number>(() => getSelfDevStreak());
+  const selfDevExample = useMemo(() => getExampleOfTheDay(), []);
+  const toggleSelfDev = useCallback(() => {
+    setSelfDevMarked((prev) => {
+      const next = !prev;
+      setTodaySelfDev(next);
+      setSelfDevStreak(getSelfDevStreak());
+      return next;
+    });
+  }, []);
+  const dismissRec = useCallback(() => {
+    dismissRecommendation(7);
+    setRecDismissed(true);
+  }, []);
   const [showHelperPicker, setShowHelperPicker]   = useState<boolean>(false);
   const [pickerForTask, setPickerForTask]         = useState<number | null>(null); // index | null (null = work-phase global)
-  const [showInterPicker, setShowInterPicker]     = useState<boolean>(false); // picker de modos "entre" na fase work
   const [showHistory, setShowHistory]             = useState<boolean>(false);
   const [newAchievements, setNewAchievements]     = useState<any[]>([]);
   const [editingTitle, setEditingTitle]           = useState<boolean>(false);
@@ -224,6 +422,10 @@ export default function DailyFocusPage() {
   const [_notifRequested, _setNotifRequested]       = useState<boolean>(false);
   const [ladderAnimating, setLadderAnimating]     = useState<boolean>(false);
   const [showTaskSwitcher, setShowTaskSwitcher]   = useState<boolean>(false);
+
+  // Sessão de módulos ("Minha Sessão") reaproveitada na área pausada.
+  const { activateMultiCard, hasActiveSession } = useActiveMode();
+  const { confirm, ConfirmUI } = useConfirm();
 
   // Paper & Pen
   const workSecsRef = useRef<number>(0);
@@ -260,8 +462,8 @@ export default function DailyFocusPage() {
 
   // Persist on state changes
   useEffect(() => {
-    persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId, pendingNextIdx, tabMode, tabCycleCount, tabElapsed });
-  }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId, pendingNextIdx, tabMode, tabCycleCount, tabElapsed]);
+    persist({ level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId, pendingNextIdx, tabMode, tabCycleCount, tabElapsed, dayPriorities });
+  }, [level, tasks, currentIdx, helperStates, timerRemaining, phase, rushMode, taskTimings, checkinModeId, checkinEstadoId, pendingNextIdx, tabMode, tabCycleCount, tabElapsed, dayPriorities]);
 
   // Atualiza document.title conforme a fase
   useEffect(() => {
@@ -281,12 +483,17 @@ export default function DailyFocusPage() {
       if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
       if (e.code === "Space" && phase === "work" && !rushMode && !tabMode && !timerDone) {
         e.preventDefault();
-        setTimerRunning((v) => !v);
+        if (timerRunning) {
+          setTimerRunning(false);
+        } else {
+          const tSecs = (tasks[currentIdx]?.durationMin || 0) * 60;
+          requestStart(timerRemaining === tSecs ? "start" : "resume");
+        }
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [phase, rushMode, tabMode, timerDone]);
+  }, [phase, rushMode, tabMode, timerDone, timerRunning, timerRemaining, tasks, currentIdx]);
 
   // Avisa ao fechar aba com sessão em andamento
   useEffect(() => {
@@ -316,6 +523,22 @@ export default function DailyFocusPage() {
     return () => clearInterval(interval);
   }, [pausedSince]);
 
+  // Tick de 1s para exibir há quanto tempo a tarefa está pausada.
+  const [pauseNow, setPauseNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (!pausedSince) return;
+    setPauseNow(Date.now());
+    const id = setInterval(() => setPauseNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [pausedSince]);
+
+  // Marca quando a sessão de módulos ativa foi iniciada a partir do Daily Focus,
+  // para evitar reconfirmar "Trocar de sessão?" ao remontar/reiniciar a própria.
+  const dfSessionActiveRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (!hasActiveSession) dfSessionActiveRef.current = false;
+  }, [hasActiveSession]);
+
   // Rush mode: stopwatch crescente (conta segundos enquanto running)
   useEffect(() => {
     if (!rushMode || phase !== "work") return;
@@ -339,6 +562,165 @@ export default function DailyFocusPage() {
   const currentTask = tasks[currentIdx] || {} as Task;
   const totalSecs = (currentTask.durationMin || 0) * 60;
   const activeHelperModeIds = currentTask.helperModeIds ?? [];
+
+  // Inicia/retoma o timer e abre o checkpoint emocional (não bloqueia o timer).
+  const requestStart = (moment: EmotionMoment): void => {
+    setTimerRunning(true);
+    setLongPause(false);
+    // Cooldown: evita re-perguntar em micro-pausas.
+    if (Date.now() - lastEmotionTsRef.current < EMOTION_COOLDOWN_MS) return;
+    const pauseSecs = pausedSince ? Math.round((Date.now() - pausedSince) / 1000) : undefined;
+    setEmotionPrompt({
+      moment,
+      ctx: {
+        taskTitle: currentTask?.title,
+        taskIndex: currentIdx,
+        taskId: currentTask?.supabaseId ?? null,
+        modeIds: currentTask?.helperModeIds ?? [],
+        level,
+        rushMode,
+        tabMode,
+        pauseSecs: moment === "resume" ? pauseSecs : undefined,
+      },
+    });
+  };
+
+  // ── Card persistente do Daily Focus ────────────────────────────────────────
+  // Mantém o snapshot "live" sincronizado. Só existe em fases com timer; nas demais
+  // (checkin/select/prepare/celebrate) o snapshot é limpo e o card some.
+  const liveSnapRef = useRef<DailyFocusLive | null>(null);
+  // Throttle: NÃO depende de `timerRemaining` (mudaria a cada 1s). O restante é gravado
+  // ancorado em `anchorTs` — o card recalcula o tempo ao vivo a partir daí. Só reescreve
+  // em mudanças de estado (fase, tarefa, pausar/continuar, modo). O ref garante que a
+  // gravação capture o restante mais recente sem virar dependência.
+  const timerRemainingRef = useRef<number | null>(timerRemaining);
+  timerRemainingRef.current = timerRemaining;
+  useEffect(() => {
+    const hasTimer = phase === "work" || phase === "between";
+    if (!hasTimer) {
+      liveSnapRef.current = null;
+      clearDailyFocusLive();
+      return;
+    }
+    const noCountdown = rushMode || tabMode;
+    const snap: DailyFocusLive = {
+      taskTitle: currentTask?.title ?? "",
+      phase,
+      running: timerRunning,
+      remainingSecs: noCountdown ? null : timerRemainingRef.current,
+      anchorTs: Date.now(),
+      totalSecs,
+      rushMode,
+      tabMode,
+      cycleCount: tabCycleCount,
+      nextTaskTitle: tasks[currentIdx + 1]?.title ?? "",
+      taskIndex: currentIdx,
+      taskCount: tasks.length,
+    };
+    liveSnapRef.current = snap;
+    saveDailyFocusLive(snap);
+  }, [phase, currentIdx, currentTask?.title, timerRunning, rushMode, tabMode, totalSecs, tabCycleCount, tasks]);
+
+  // Auto-pausa ao sair da página (desmontagem por navegação): congela o restante e
+  // marca como pausado. O usuário pode retomar pelo card, e aí segue rodando em background.
+  useEffect(() => {
+    return () => {
+      const s = liveSnapRef.current;
+      if (s && s.running) {
+        const frozen = s.remainingSecs == null ? null : (liveRemaining(s) ?? 0);
+        saveDailyFocusLive({ ...s, running: false, remainingSecs: frozen, anchorTs: Date.now() });
+      }
+    };
+  }, []);
+
+  // Reidratação cross-device: quando o useRemoteSync (ou um resync por visibilidade)
+  // traz a sessão ativa de outro dispositivo — grava no localStorage + dispara
+  // DAILY_FOCUS_LIVE_EVENT — aplica o estado remoto aqui. Dedupe por `anchorTs`
+  // (não reaplica o mesmo snapshot); também detecta encerramento remoto (tombstone).
+  const lastAppliedAnchorRef = useRef<number>(0);
+  useEffect(() => {
+    const onLive = (): void => {
+      const live = loadDailyFocusLive();
+
+      // Snapshot sumiu enquanto esta aba mostrava o timer → sessão encerrada em
+      // outro dispositivo. Reseta suavemente para a tela inicial do fluxo.
+      if (!live) {
+        if (phase === "work" || phase === "between") {
+          showToast("Sessão encerrada em outro dispositivo.");
+          setTimerRunning(false);
+          setTimerRemaining(null);
+          setPhase("prepare");
+        }
+        return;
+      }
+
+      if (live.phase !== "work" && live.phase !== "between") return;
+      // Já estamos numa sessão local em andamento com o mesmo snapshot — ignora.
+      if (live.anchorTs === lastAppliedAnchorRef.current) return;
+      // Sessão local já em curso nesta aba (mesma fase) — não sobrescreve edições locais.
+      if ((phase === "work" || phase === "between") && live.anchorTs <= lastAppliedAnchorRef.current) return;
+
+      let sess: any;
+      try {
+        const raw = localStorage.getItem("taskflow_sess_daily_focus");
+        sess = raw ? JSON.parse(raw) : undefined;
+      } catch { sess = undefined; }
+
+      const wasIdle = phase !== "work" && phase !== "between";
+      lastAppliedAnchorRef.current = live.anchorTs;
+
+      if (sess) {
+        if (sess.level != null) setLevel(sess.level);
+        if (sess.tasks) setTasks(migrateTasks(sess.tasks));
+        setCurrentIdx(sess.currentIdx ?? 0);
+        setHelperStates(sess.helperStates ?? {});
+        setTaskTimings(sess.taskTimings ?? []);
+        setRushMode(sess.rushMode ?? false);
+        setTabMode(sess.tabMode ?? false);
+        setTabCycleCount(sess.tabCycleCount ?? 0);
+        setTabElapsed(sess.tabElapsed ?? 0);
+        setPendingNextIdx(sess.pendingNextIdx ?? null);
+      }
+
+      const rem = live.running && live.remainingSecs != null
+        ? liveRemaining(live)
+        : (live.remainingSecs ?? sess?.timerRemaining ?? null);
+      setTimerRemaining(rem);
+      setTimerRunning(!!live.running);
+      setPhase(live.phase);
+
+      // Só avisa quando a sessão "apareceu do nada" (estava ocioso).
+      if (wasIdle) showToast("Retomando sua sessão de outro dispositivo.");
+    };
+    window.addEventListener(DAILY_FOCUS_LIVE_EVENT, onLive);
+    return () => window.removeEventListener(DAILY_FOCUS_LIVE_EVENT, onLive);
+  }, [phase, showToast]);
+
+  // Resync da sessão ativa quando a aba volta a ficar visível ou a rede reconecta.
+  // (o useRemoteSync só roda uma vez no login — isto cobre o device já aberto.)
+  useEffect(() => {
+    const onVisible = (): void => { if (document.visibilityState === "visible") void loadRemoteActiveSession(); };
+    const onOnline = (): void => { void loadRemoteActiveSession(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+    };
+  }, []);
+
+  // Flush imediato do estado em transições importantes (play/pause, troca de tarefa),
+  // sem esperar o debounce — reduz a janela de perda ao trocar de device.
+  useEffect(() => {
+    if (phase === "work" || phase === "between") flushActiveSessionPush();
+  }, [timerRunning, currentIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ao fechar a aba/app: envia o último estado com fetch keepalive (sobrevive ao pagehide).
+  useEffect(() => {
+    const onHide = (): void => { beaconActiveSessionNow(); };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, []);
   // Aba ativa = tab selecionada manualmente, ou o primeiro modo, ou null
   const activeTabModeId = useMemo(
     () =>
@@ -504,24 +886,25 @@ export default function DailyFocusPage() {
     setShowHelperPicker(false);
   };
 
-  // Adiciona um modo "entre" à tarefa atual (fase work) — limite: MAX_MODES
-  const handleSelectInterHelper = (modeId: string): void => {
-    setTasks((prev) => prev.map((t, i) => {
-      if (i !== currentIdx) return t;
-      const ids = t.interModeIds ?? [];
-      if (ids.includes(modeId) || ids.length >= MAX_MODES) return t;
-      return { ...t, interModeIds: [...ids, modeId] };
-    }));
-    initHelperIfNeeded(modeId, currentIdx);
-    setShowInterPicker(false);
-  };
-
-  // Remove um modo "entre" da tarefa atual (fase work)
-  const handleRemoveInterById = (modeId: string): void => {
-    setTasks((prev) => prev.map((t, i) => {
-      if (i !== currentIdx) return t;
-      return { ...t, interModeIds: (t.interModeIds ?? []).filter((id) => id !== modeId) };
-    }));
+  // Inicia a sessão de módulos montada em "Minha Sessão" (SlotBoard) direto da
+  // área pausada. Reaproveita a MultiCardSession global (overlay minimizável).
+  const handleStartInterSession = async (
+    cards: any[],
+    mode: "sequential" | "parallel",
+  ): Promise<void> => {
+    if (!cards || cards.length === 0) return;
+    // Só confirma se houver uma sessão ativa que NÃO seja a que o próprio Daily
+    // Focus iniciou (evita fricção ao remontar/reiniciar a mesma sessão).
+    if (hasActiveSession && !dfSessionActiveRef.current) {
+      const ok = await confirm({
+        title: "Trocar de sessão?",
+        message: "Você tem uma sessão em andamento. Iniciar esta vai encerrá-la sem registrar.",
+        confirmLabel: "Trocar",
+      });
+      if (!ok) return;
+    }
+    activateMultiCard(cards, mode, currentTask?.title ?? "");
+    dfSessionActiveRef.current = true;
   };
 
   // Remove um modo específico de uma tarefa
@@ -546,6 +929,24 @@ export default function DailyFocusPage() {
     setTasks(updated);
 
     playBeep(); // som de conclusão de tarefa
+
+    // Checkpoint emocional de saída (moment "end") — associado à tarefa recém-concluída.
+    // Ignora o cooldown de início/retomada: o fim de tarefa é sempre um bom momento de registro.
+    setEmotionPrompt({
+      moment: "end",
+      ctx: {
+        taskTitle: currentTask?.title,
+        taskIndex: currentIdx,
+        taskId: currentTask?.supabaseId ?? null,
+        modeIds: currentTask?.helperModeIds ?? [],
+        level,
+        rushMode,
+        tabMode,
+        completed: true,
+        usedSecs: Math.max(0, Math.round(usedSecs)),
+        totalSecs,
+      },
+    });
 
     // Busca a próxima tarefa pendente (não concluída), priorizando a ordem natural
     // mas considerando que pode haver tarefas em espera fora de ordem sequencial
@@ -723,6 +1124,7 @@ export default function DailyFocusPage() {
     if (tabMode && tabCycleCount >= 3) toUnlock.push("cycle_master");
     if (completedTasks.some((t) => (t.helperModeIds ?? []).length > 0)) toUnlock.push("helper_user");
     if (hadEarlyCompletion || timings.some((t) => t.early)) toUnlock.push("early_bird");
+    if (getEmotionCount() >= 10) toUnlock.push("emotion_aware");
 
     const newAch = tryUnlock(toUnlock);
     if (newAch.length) setNewAchievements(newAch);
@@ -734,6 +1136,9 @@ export default function DailyFocusPage() {
       .filter(Boolean);
     addUsedModes(modesUsedThisSession);
     setUsedModes(getUsedModes());
+
+    // Sessão concluída → encerra a sessão ativa remota (não reidrata em outro device).
+    endRemoteActiveSession();
 
     setPhase("celebrate");
   };
@@ -755,7 +1160,7 @@ export default function DailyFocusPage() {
     setCheckinEstadoId(null);
     setSessionFeedback(null);
     setPendingNextIdx(null);
-    setPhase("checkin");
+    setPhase("prepare");
     setLadderAnimating(true);
     setTimeout(() => setLadderAnimating(false), 500);
   };
@@ -806,12 +1211,30 @@ export default function DailyFocusPage() {
       const newAchs2 = tryUnlock(["observador"]);
       if (newAchs2.length > 0) setNewAchievements((prev) => [...prev, ...newAchs2]);
     }
+    setPhase("prepare");
+  };
+
+  // ── Etapa de preparação → seleção do Daily Focus ──────────
+  // Pré-preenche os slots do nível atual com as prioridades do dia (na ordem),
+  // mantendo título + vínculo com a tarefa real (supabaseId).
+  const handlePrepareContinue = (priorities: DayPriority[]): void => {
+    setDayPriorities(priorities);
+    if (priorities.length > 0) {
+      setTasks((prev) => prev.map((t, i) => {
+        const p = priorities[i];
+        if (!p) return t;
+        // Não sobrescreve um slot que o usuário já preencheu manualmente.
+        if (t.title?.trim() || t.supabaseId) return t;
+        return { ...t, title: p.title, supabaseId: p.id };
+      }));
+    }
     setPhase("select");
   };
 
   const handleReset = (): void => {
     if (!window.confirm("Resetar tudo? O nível voltará para 1.")) return;
     clearSaved();
+    endRemoteActiveSession();
     setLevel(1);
     setTasks(makeTasks(1));
     setCurrentIdx(0);
@@ -826,6 +1249,7 @@ export default function DailyFocusPage() {
     setTabElapsed(0);
     setCheckinModeId(null);
     setCheckinEstadoId(null);
+    setDayPriorities([]);
     setSessionFeedback(null);
     setPendingNextIdx(null);
     setPhase("checkin"); // volta para o check-in ao resetar
@@ -906,7 +1330,13 @@ export default function DailyFocusPage() {
         </div>
         <div className={styles.headerActions}>
           <button className={styles.iconBtn} onClick={() => setShowHistory(true)} title="Histórico">📋</button>
-          {phase !== "select" && (
+          {phase === "prepare" && (
+            <button className={styles.iconBtn} onClick={() => setPhase("checkin")}>← Voltar</button>
+          )}
+          {phase === "select" && (
+            <button className={styles.iconBtn} onClick={() => setPhase("prepare")}>← Voltar</button>
+          )}
+          {phase !== "select" && phase !== "prepare" && phase !== "checkin" && (
             <button className={styles.iconBtn} onClick={() => { setTimerRunning(false); setPhase("select"); }}>← Voltar</button>
           )}
           <button className={styles.iconBtn} onClick={handleReset}>↺</button>
@@ -921,6 +1351,16 @@ export default function DailyFocusPage() {
           <CheckInScreen
             allModes={ALL_MODES}
             onSelect={handleCheckinSelect}
+            onSkip={() => setPhase("prepare")}
+          />
+        )}
+
+        {/* ── PREPARE PHASE (preparação e priorização do dia) ── */}
+        {phase === "prepare" && (
+          <PrepareDayScreen
+            level={level}
+            estadoId={checkinEstadoId}
+            onContinue={handlePrepareContinue}
             onSkip={() => setPhase("select")}
           />
         )}
@@ -1016,10 +1456,48 @@ export default function DailyFocusPage() {
             </div>
             <div className={styles.selectSub}>
               {tasks.length === 1
-                ? "Qual é a tarefa mais importante do seu dia?"
+                ? "Qual será sua primeira tarefa do dia?"
                 : `Escolha as ${tasks.length} tarefas mais importantes do dia.`}
               {" "}Timers: {tasks.map((t) => `${t.durationMin}min`).join(" → ")}.
             </div>
+
+            {tasks.length === 1 && !recDismissed && (
+              <div className={styles.selectRecommendation}>
+                <button
+                  className={styles.selectRecommendationClose}
+                  onClick={dismissRec}
+                  title="Não mostrar por 7 dias"
+                  aria-label="Dispensar recomendação por 7 dias"
+                >
+                  ×
+                </button>
+                <span className={styles.selectRecommendationIcon} aria-hidden="true">🌱</span>
+                <div className={styles.selectRecommendationBody}>
+                  <div>
+                    <strong>Sempre que possível, comece por uma tarefa de autodesenvolvimento.</strong>{" "}
+                    Invista primeiro em algo que torne você melhor nas próximas tarefas — por exemplo,{" "}
+                    {selfDevExample}.
+                  </div>
+                  <div className={styles.selectRecommendationCompound}>
+                    📈 Melhorar <strong>1% por dia</strong> ≈ <strong>{COMPOUND_YEAR_FACTOR}×</strong> em um ano.
+                  </div>
+                  <div className={styles.selectRecommendationActions}>
+                    <button
+                      className={`${styles.selfDevChip} ${selfDevMarked ? styles.selfDevChipActive : ""}`}
+                      onClick={toggleSelfDev}
+                      aria-pressed={selfDevMarked}
+                    >
+                      {selfDevMarked ? "✓ Autodesenvolvimento" : "＋ É autodesenvolvimento"}
+                    </button>
+                    {selfDevStreak > 0 && (
+                      <span className={styles.selfDevStreak} title="Dias seguidos começando por autodesenvolvimento">
+                        🔥 {selfDevStreak} {selfDevStreak === 1 ? "dia" : "dias"} seguido{selfDevStreak === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Modo de sessão toggle (Timer / Rush / Abas) */}
             <div className={styles.rushToggle}>
@@ -1068,8 +1546,29 @@ export default function DailyFocusPage() {
                   usedModes={usedModes}
                   suggestedModeId={checkinModeId ?? suggestedModeId}
                   hideDuration={tabMode}
+                  todayPriorities={dayPriorities}
                 />
               ))}
+            </div>
+
+            {/* Atividade contínua do dia (fora da sequência, sem timer) */}
+            <div className={styles.contActField}>
+              <label className={styles.contActFieldLabel}>
+                🔄 Atividade contínua do dia <span className={styles.contActFieldHint}>(opcional — sem timer, para as pausas)</span>
+                {contActStreak > 0 && (
+                  <span className={styles.contActStreak} title="Dias seguidos com atividade contínua">
+                    🔥 {contActStreak} {contActStreak === 1 ? "dia" : "dias"}
+                  </span>
+                )}
+              </label>
+
+              <ContinuousActivityPicker
+                activity={continuousActivity}
+                last={contActLast}
+                completedToday={contActDoneToday}
+                onSave={saveContinuousActivity}
+                onClear={clearContinuousActivityUI}
+              />
             </div>
 
             {/* Fix #7: estimativa total de tempo */}
@@ -1094,6 +1593,161 @@ export default function DailyFocusPage() {
         {/* ── WORK PHASE ── */}
         {phase === "work" && (
           <div className={styles.workLayout}>
+            {/* Atividade contínua — chip flutuante minimizável (sem timer) */}
+            {continuousActivity && (
+              contActMinimized ? (
+                <button
+                  className={styles.contActChipMini}
+                  onClick={() => setContActMinimizedPref(false)}
+                  title={`Atividade contínua: ${continuousActivity.title}`}
+                  aria-label={`Atividade contínua: ${continuousActivity.title}. Toque para expandir`}
+                  aria-expanded={false}
+                >
+                  {continuousActivity.goalTarget != null && continuousActivity.goalTarget > 0 && (
+                    <span
+                      className={styles.contActChipMiniRing}
+                      aria-hidden="true"
+                      style={{
+                        background: `conic-gradient(#38bdf8 ${Math.min(
+                          100,
+                          Math.round((continuousActivity.progress / continuousActivity.goalTarget) * 100)
+                        )}%, transparent 0)`,
+                        WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))",
+                        mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px))",
+                      }}
+                    />
+                  )}
+                  {continuousActivity.icon || "🔄"}
+                  {continuousActivity.ticks > 0 && (
+                    <span className={styles.contActChipMiniBadge}>{continuousActivity.ticks}</span>
+                  )}
+                </button>
+              ) : (
+                <div
+                  className={styles.contActChip}
+                  ref={contActChipRef}
+                  role="group"
+                  aria-label="Atividade contínua"
+                  aria-live="polite"
+                  onTouchStart={(e) => { contActTouchStartY.current = e.touches[0]?.clientY ?? null; }}
+                  onTouchEnd={(e) => {
+                    const start = contActTouchStartY.current;
+                    contActTouchStartY.current = null;
+                    if (start == null) return;
+                    const dy = (e.changedTouches[0]?.clientY ?? start) - start;
+                    if (dy > 40) setContActMinimizedPref(true); // swipe-down minimiza
+                  }}
+                >
+                  <span className={styles.contActChipIcon}>{continuousActivity.icon || "🔄"}</span>
+                  <div className={styles.contActChipBody}>
+                    <span className={styles.contActChipLabel}>
+                      Atividade contínua
+                      {continuousActivity.ticks > 0 && <> · {continuousActivity.ticks}×</>}
+                    </span>
+                    <span className={styles.contActChipTitle}>{continuousActivity.title}</span>
+                    {continuousActivity.goalTarget != null && (
+                      <span className={styles.contActChipGoal}>
+                        {continuousActivity.progress}/{continuousActivity.goalTarget} {continuousActivity.goalUnit}
+                        <button className={styles.contActStepBtn} onClick={() => bumpContinuousProgress(-1)} title="−1">−</button>
+                        <button className={styles.contActStepBtn} onClick={() => bumpContinuousProgress(1)} title="+1">+</button>
+                      </span>
+                    )}
+                    {continuousActivity.goalTarget != null && continuousActivity.progress >= continuousActivity.goalTarget && (
+                      <button
+                        className={styles.contActGoalMet}
+                        onClick={handleCompleteContinuousActivity}
+                        title="Meta batida — concluir e escolher outra"
+                      >
+                        🎯 Meta batida — concluir?
+                      </button>
+                    )}
+                  </div>
+                  {continuousActivity.link && (
+                    <>
+                      <a
+                        className={styles.contActChipOpen}
+                        href={continuousActivity.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Abrir (conta como avanço)"
+                        onClick={openContinuousActivity}
+                      >
+                        ↗
+                      </a>
+                      <button
+                        className={styles.contActChipCopy}
+                        onClick={() => copyContinuousLink(continuousActivity.link)}
+                        title="Copiar link (abrir no celular)"
+                      >
+                        {contActCopied ? "✓" : "⧉"}
+                      </button>
+                    </>
+                  )}
+                  {!continuousActivity.link && (
+                    <button
+                      className={styles.contActChipOpen}
+                      onClick={openContinuousActivity}
+                      title="Marcar avanço"
+                    >
+                      +1
+                    </button>
+                  )}
+                  <button
+                    className={styles.contActChipComplete}
+                    onClick={handleCompleteContinuousActivity}
+                    title="Concluir e escolher outra atividade contínua"
+                    aria-label="Concluir atividade contínua"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    className={styles.contActChipSwap}
+                    onClick={() => setContActPicking(true)}
+                    title="Trocar atividade contínua"
+                    aria-label="Trocar atividade contínua"
+                  >
+                    ↻
+                  </button>
+                  <button
+                    className={styles.contActChipMinimize}
+                    onClick={() => setContActMinimizedPref(true)}
+                    title="Minimizar"
+                    aria-label="Minimizar atividade contínua"
+                  >
+                    –
+                  </button>
+                </div>
+              )
+            )}
+
+            {/* Picker de atividade contínua durante a sessão (concluir/trocar) */}
+            {(contActPicking || !continuousActivity) && (
+              <div className={styles.contActPicker}>
+                <div className={styles.contActPickerHeader}>
+                  <span>🔄 {continuousActivity ? "Trocar atividade contínua" : "Escolher atividade contínua"}</span>
+                  {contActPicking && (
+                    <button
+                      className={styles.contActPickerClose}
+                      onClick={() => setContActPicking(false)}
+                      title="Fechar"
+                      aria-label="Fechar seletor"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <ContinuousActivityPicker
+                  activity={continuousActivity}
+                  last={contActLast}
+                  completedToday={contActDoneToday}
+                  onSave={saveContinuousActivity}
+                  onPick={pickContinuousActivity}
+                  onClear={clearContinuousActivityUI}
+                  afterPick={() => setContActPicking(false)}
+                />
+              </div>
+            )}
+
             {/* Progress dots */}
             {tasks.length > 1 && (
               <ProgressDots total={tasks.length} current={currentIdx} done={currentIdx} />
@@ -1190,10 +1844,43 @@ export default function DailyFocusPage() {
                   </div>
                 )}
 
+                {continuousActivity && !timerRunning && !timerDone && (
+                  <div className={styles.contActPauseCta}>
+                    <span className={styles.contActPauseCtaText}>
+                      {checkinEstadoId && continuousActivity.title.toLowerCase().match(/estud|aprend|ler|curso|anki|idioma|livro|artigo/)
+                        ? <>🌱 Seu 1% de hoje mora aqui: <strong>{continuousActivity.title}</strong></>
+                        : <>Em pausa? Avance sua atividade contínua: <strong>{continuousActivity.title}</strong></>}
+                      {continuousActivity.ticks > 0 && <span className={styles.contActPauseCtaCount}> · {continuousActivity.ticks}× hoje</span>}
+                    </span>
+                    {continuousActivity.link ? (
+                      <a
+                        className={styles.contActPauseCtaBtn}
+                        href={continuousActivity.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={openContinuousActivity}
+                      >
+                        {continuousActivity.icon || "🔄"} Abrir
+                      </a>
+                    ) : (
+                      <button className={styles.contActPauseCtaBtn} onClick={openContinuousActivity}>
+                        {continuousActivity.icon || "🔄"} +1 avanço
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div className={styles.timerBtns}>
                   <button
                     className={`${styles.timerBtn} ${styles.timerBtnPrimary}`}
-                    onClick={() => { setTimerRunning((v) => !v); setLongPause(false); }}
+                    onClick={() => {
+                      if (timerRunning) {
+                        setTimerRunning(false);
+                        setLongPause(false);
+                      } else {
+                        requestStart(timerRemaining === totalSecs ? "start" : "resume");
+                      }
+                    }}
                     disabled={timerDone}
                   >
                     {timerRunning ? "⏸ Pausar" : "▶ Iniciar"}
@@ -1298,95 +1985,60 @@ export default function DailyFocusPage() {
               </div>
             ))}
 
-            {/* Painel "entre tarefas" — aparece automaticamente quando o timer está pausado */}
+            {/* Minha Sessão — aparece automaticamente quando o timer está pausado (ou em rush mode).
+                Reaproveita o SlotBoard/MultiCardSession da página Modos para montar e iniciar
+                uma sessão de módulos direto da experiência de foco. */}
             {(() => {
-              const interIds = currentTask.interModeIds ?? [];
               const isPaused = !timerRunning && !timerDone && timerRemaining != null && timerRemaining < totalSecs;
               const isRushMode = rushMode;
               // Mostra o painel se: timer pausado OU rush mode (sem timer)
               const showInter = isPaused || isRushMode;
               if (!showInter) return null;
+              // Há quanto tempo pausado (#6) e contexto da sugestão (#3)
+              const pausedSecs = pausedSince ? Math.max(0, Math.floor((pauseNow - pausedSince) / 1000)) : 0;
+              const pausedLabel = pausedSecs >= 60
+                ? `pausado há ${Math.floor(pausedSecs / 60)} min`
+                : pausedSecs > 0
+                  ? `pausado há ${pausedSecs}s`
+                  : null;
+              const suggestContext = longPause ? "long-pause" as const : "short-pause" as const;
               return (
                 <div className={styles.interPanel}>
                   <div className={styles.interPanelHeader}>
-                    <span className={styles.interPanelIcon}>☕</span>
+                    <span className={styles.interPanelIcon}>🧩</span>
                     <span className={styles.interPanelTitle}>
-                      {rushMode ? "Entre tarefas" : "Pausado — aproveite para:"}
+                      {rushMode ? "Entre tarefas — monte sua sessão" : "Pausado — monte sua sessão"}
                     </span>
+                    {!rushMode && pausedLabel && (
+                      <span className={styles.interPanelLongPause}>
+                        {pausedLabel}
+                      </span>
+                    )}
                     {longPause && !timerDone && (
                       <span className={styles.interPanelLongPause}>
                         mais de 5 min
                       </span>
                     )}
-                    {/* Chips dos modos ativos + botão adicionar */}
-                    <div className={styles.interPanelChips}>
-                      {interIds.map((modeId) => {
-                        const m = getModeById(modeId);
-                        return m ? (
-                          <span key={modeId} className={styles.interPanelChip}>
-                            {m.emoji}
-                            <button
-                              className={styles.interPanelChipRemove}
-                              onClick={() => handleRemoveInterById(modeId)}
-                              title={`Remover ${m.name}`}
-                            >×</button>
-                          </span>
-                        ) : null;
-                      })}
+                    {/* CTA para retomar a tarefa sem sair da pausa (#2) */}
+                    {isPaused && (
                       <button
-                        className={styles.interPanelAddBtn}
-                        onClick={() => setShowInterPicker(true)}
-                        title="Adicionar modo entre tarefas"
-                      >+</button>
-                    </div>
+                        className={styles.interPanelResumeBtn}
+                        onClick={() => requestStart("resume")}
+                        title="Retomar a contagem da tarefa atual"
+                      >
+                        ▶ Retomar tarefa
+                      </button>
+                    )}
                   </div>
-                  {interIds.length === 1 ? (
-                    (() => {
-                      const m = getModeById(interIds[0]);
-                      const entry = getHelper(interIds[0]);
-                      return m && entry ? (
-                        <entry.Component
-                          state={helperStates[`${currentIdx}:${interIds[0]}`] || {}}
-                          onChange={makeHelperOnChange(interIds[0], currentIdx)}
-                          modeConfig={m}
-                        />
-                      ) : null;
-                    })()
-                  ) : (
-                    <div className={styles.helperPanelGrid}>
-                      {interIds.map((modeId, mIdx) => {
-                        const m = getModeById(modeId);
-                        const entry = getHelper(modeId);
-                        if (!m || !entry) return null;
-                        const isCollapsed = collapsedHelpers.has(`inter:${modeId}`);
-                        return (
-                          <div key={modeId} className={styles.helperPanel} style={{ borderTop: `3px solid ${m.color || "var(--accent)"}` }}>
-                            <div className={styles.helperPanelHeader}>
-                              <span className={styles.helperPanelEmoji}>{m.emoji}</span>
-                              <span className={styles.helperPanelName}>{m.name}</span>
-                              <div className={styles.helperPanelActions}>
-                                {interIds.length > 1 && (
-                                  <>
-                                    <button className={styles.helperPanelReorderBtn} disabled={mIdx === 0} onClick={() => handleReorderHelper("interModeIds", modeId, -1)}>‹</button>
-                                    <button className={styles.helperPanelReorderBtn} disabled={mIdx === interIds.length - 1} onClick={() => handleReorderHelper("interModeIds", modeId, 1)}>›</button>
-                                  </>
-                                )}
-                                <button className={styles.helperPanelCollapseBtn} onClick={() => toggleHelperCollapse(`inter:${modeId}`)}>{isCollapsed ? "▼" : "▲"}</button>
-                                <button className={styles.helperPanelRemove} onClick={() => handleRemoveInterById(modeId)}>×</button>
-                              </div>
-                            </div>
-                            {!isCollapsed && (
-                              <entry.Component
-                                state={helperStates[`${currentIdx}:${modeId}`] || {}}
-                                onChange={makeHelperOnChange(modeId, currentIdx)}
-                                modeConfig={m}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div className={styles.interSlotBoardWrap}>
+                    <SlotBoard
+                      onStartSession={handleStartInterSession}
+                      storageNamespace="daily-focus"
+                      suggestContext={rushMode ? null : suggestContext}
+                      title="Minha sessão"
+                      subtitle="Monte os módulos para aproveitar a pausa e inicie quando quiser."
+                    />
+                  </div>
                 </div>
               );
             })()}
@@ -1547,7 +2199,6 @@ export default function DailyFocusPage() {
         {/* ── BETWEEN PHASE ── */}
         {phase === "between" && (() => {
           const completedTask = tasks[currentIdx] || {} as Task;
-          const interIds = completedTask.interModeIds ?? [];
           const nextTask = pendingNextIdx != null ? tasks[pendingNextIdx] : null;
           return (
             <div className={styles.workLayout}>
@@ -1566,47 +2217,30 @@ export default function DailyFocusPage() {
                 </div>
               </div>
 
-              {/* Helpers "entre" da tarefa concluída */}
-              {interIds.length === 1 ? (
-                (() => {
-                  const m = getModeById(interIds[0]);
-                  const entry = getHelper(interIds[0]);
-                  return m && entry ? (
-                    <div className={styles.helperPanel} style={{ borderTop: `3px solid ${m.color || "var(--accent)"}` }}>
-                      <div className={styles.helperPanelHeader}>
-                        <span className={styles.helperPanelEmoji}>{m.emoji}</span>
-                        <span className={styles.helperPanelName}>{m.name}</span>
-                        <span className={styles.helperPanelBadge}>entre tarefas</span>
-                      </div>
-                      <entry.Component
-                        state={helperStates[`${currentIdx}:${interIds[0]}`] || {}}
-                        onChange={makeHelperOnChange(interIds[0], currentIdx)}
-                        modeConfig={m}
-                      />
-                    </div>
-                  ) : null;
-                })()
-              ) : (
-                <div className={styles.helperPanelGrid}>
-                  {interIds.map((modeId) => {
-                    const m = getModeById(modeId);
-                    const entry = getHelper(modeId);
-                    if (!m || !entry) return null;
-                    return (
-                      <div key={modeId} className={styles.helperPanel} style={{ borderTop: `3px solid ${m.color || "var(--accent)"}` }}>
-                        <div className={styles.helperPanelHeader}>
-                          <span className={styles.helperPanelEmoji}>{m.emoji}</span>
-                          <span className={styles.helperPanelName}>{m.name}</span>
-                          <span className={styles.helperPanelBadge}>entre tarefas</span>
-                        </div>
-                        <entry.Component
-                          state={helperStates[`${currentIdx}:${modeId}`] || {}}
-                          onChange={makeHelperOnChange(modeId, currentIdx)}
-                          modeConfig={m}
-                        />
-                      </div>
-                    );
-                  })}
+              {/* Atividade contínua — aproveite a pausa */}
+              {continuousActivity && (
+                <div className={styles.contActPauseCta}>
+                  <span className={styles.contActPauseCtaText}>
+                    {continuousActivity.icon || "🔄"} Aproveite para avançar: <strong>{continuousActivity.title}</strong>
+                    {continuousActivity.goalTarget != null
+                      ? <span className={styles.contActPauseCtaCount}> · {continuousActivity.progress}/{continuousActivity.goalTarget} {continuousActivity.goalUnit}</span>
+                      : continuousActivity.ticks > 0 && <span className={styles.contActPauseCtaCount}> · {continuousActivity.ticks}× hoje</span>}
+                  </span>
+                  {continuousActivity.link ? (
+                    <a
+                      className={styles.contActPauseCtaBtn}
+                      href={continuousActivity.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={openContinuousActivity}
+                    >
+                      Abrir ↗
+                    </a>
+                  ) : (
+                    <button className={styles.contActPauseCtaBtn} onClick={openContinuousActivity}>
+                      +1 avanço
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1636,6 +2270,22 @@ export default function DailyFocusPage() {
             {newRecord && (
               <div className={styles.newRecordHighlight}>
                 Você superou seu recorde anterior!
+              </div>
+            )}
+
+            {/* Resumo da atividade contínua */}
+            {continuousActivity && (continuousActivity.ticks > 0 || continuousActivity.progress > 0) && (
+              <div className={styles.contActCelebrate}>
+                {continuousActivity.icon || "🔄"} Você avançou <strong>{continuousActivity.title}</strong>{" "}
+                {continuousActivity.goalTarget != null
+                  ? <>{continuousActivity.progress}/{continuousActivity.goalTarget} {continuousActivity.goalUnit}</>
+                  : <>{continuousActivity.ticks}× hoje</>}
+                {" "}👏
+              </div>
+            )}
+            {contActDoneToday.length > 0 && (
+              <div className={styles.contActCelebrate}>
+                ✓ Contínuas concluídas hoje: {contActDoneToday.map((c) => `${c.icon || "🔄"} ${c.title}`).join(" · ")}
               </div>
             )}
 
@@ -1671,6 +2321,43 @@ export default function DailyFocusPage() {
                 {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""} · Nível {level} → {level + 1}
               </div>
             )}
+
+            {/* Resumo emocional do dia (checkpoints registrados) */}
+            {(() => {
+              const today = getTodayEmotions();
+              if (today.length === 0) return null;
+              const counts: Record<string, number> = {};
+              for (const e of today) counts[e.emotion] = (counts[e.emotion] || 0) + 1;
+              const parts = Object.entries(counts)
+                .sort((a, b) => b[1] - a[1])
+                .map(([id, n]) => {
+                  const em = getEmotionById(id);
+                  return `${em?.emoji ?? ""} ${em?.label ?? id}${n > 1 ? ` ×${n}` : ""}`;
+                });
+              return (
+                <div className={styles.emotionSummary}>
+                  <span className={styles.emotionSummaryLabel}>Hoje você registrou:</span>{" "}
+                  {parts.join(" · ")}
+                </div>
+              );
+            })()}
+
+            {/* Aderência ao plano: prioridades do dia executadas nesta sessão */}
+            {dayPriorities.length > 0 && (() => {
+              const plannedIds = new Set(dayPriorities.map((p) => String(p.id)));
+              const doneFromPlan = tasks.filter((t) => t.supabaseId && plannedIds.has(String(t.supabaseId)) && t.done).length;
+              const pct = Math.round((doneFromPlan / dayPriorities.length) * 100);
+              return (
+                <div className={styles.adherenceBox}>
+                  🎯 <strong>{doneFromPlan}/{dayPriorities.length}</strong> prioridades do dia concluídas nesta sessão ({pct}%)
+                  {doneFromPlan === dayPriorities.length
+                    ? " — plano do dia cumprido! 🙌"
+                    : dayPriorities.length - doneFromPlan === 1
+                      ? " — falta 1 para fechar o dia."
+                      : ` — faltam ${dayPriorities.length - doneFromPlan}.`}
+                </div>
+              );
+            })()}
             {checkinEstadoId && (() => {
               const e = ESTADOS_DEFAULT.find((est: any) => est.id === checkinEstadoId);
               const m = checkinModeId ? getModeById(checkinModeId) : null;
@@ -1855,14 +2542,17 @@ export default function DailyFocusPage() {
         />
       )}
 
-      {showInterPicker && (
-        <HelperPickerModal
-          currentIds={currentTask.interModeIds ?? []}
-          customModes={customModes}
-          usedModes={usedModes}
-          filterType="entre"
-          onSelect={handleSelectInterHelper}
-          onClose={() => setShowInterPicker(false)}
+      {ConfirmUI}
+
+      {emotionPrompt && (
+        <EmotionCheckModal
+          moment={emotionPrompt.moment}
+          onSelect={(id, intensity) => {
+            logEmotion({ emotion: id, moment: emotionPrompt.moment, intensity, ...emotionPrompt.ctx });
+            lastEmotionTsRef.current = Date.now();
+            setEmotionPrompt(null);
+          }}
+          onSkip={() => setEmotionPrompt(null)}
         />
       )}
 

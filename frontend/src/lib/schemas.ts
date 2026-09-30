@@ -7,7 +7,7 @@ export const taskSchema = z.object({
     .max(200, "O título deve ter no máximo 200 caracteres."),
   description: z
     .string()
-    .max(1000, "A descrição deve ter no máximo 1000 caracteres.")
+    .max(10000, "A descrição deve ter no máximo 10000 caracteres.")
     .optional()
     .or(z.literal("")),
   priority: z
@@ -21,8 +21,18 @@ export const taskSchema = z.object({
     .optional()
     .or(z.literal("")),
   recurrence: z
-    .enum(["", "daily", "weekly", "biweekly", "monthly"])
+    .enum(["", "daily", "weekdays", "weekly", "biweekly", "monthly", "monthly_first", "custom"])
     .optional(),
+  recurrence_rule: z.object({
+    type: z.enum(["interval", "weekdays"]).optional(),
+    intervalDays: z.number().min(1).max(365).optional(),
+    weekdays: z.array(z.number().min(0).max(6)).optional(),
+    skipWeekends: z.boolean().optional(),
+    skipHolidays: z.boolean().optional(),
+  }).nullable().optional(),
+  project_id: z.string().uuid().nullable().optional(),
+  estimated_minutes: z.number().int().min(0).max(1440).nullable().optional(),
+  actual_minutes: z.number().int().min(0).max(10080).nullable().optional(),
 });
 
 export type TaskSchema = z.infer<typeof taskSchema>;
@@ -45,6 +55,10 @@ export const routineSchema = z.object({
   unit: z
     .string()
     .max(50, "A unidade deve ter no máximo 50 caracteres.")
+    .optional()
+    .nullable(),
+  recurrence: z
+    .enum(["none", "daily", "weekdays"])
     .optional()
     .nullable(),
 });

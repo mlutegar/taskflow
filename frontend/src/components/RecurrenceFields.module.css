@@ -1,0 +1,17 @@
+.wrap { display: grid; gap: 8px; min-width: 180px; }
+.select, .inlineLabel input {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius-sm); padding: 8px 10px; font: inherit;
+}
+.inlineLabel { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-muted); }
+.inlineLabel input { width: 66px; }
+.days { display: flex; gap: 4px; flex-wrap: wrap; }
+.day, .dayActive {
+  width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border);
+  color: var(--text-muted); background: var(--surface-2); font-size: 11px;
+}
+.dayActive { color: #fff; background: var(--accent); border-color: var(--accent); }
+.options { display: grid; gap: 5px; font-size: 11px; color: var(--text-muted); }
+.options label { display: flex; align-items: center; gap: 6px; }
+.compact { min-width: 100%; }
+.compact .select { padding: 6px 8px; font-size: 12px; }

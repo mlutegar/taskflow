@@ -1,3 +1,8 @@
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -6,4 +11,30 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  animation: overlayFadeIn 140ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay { animation: none; }
+}
+
+/* ── Variante lateral (drawer) — só em telas largas ──────────────────────── */
+@media (min-width: 900px) {
+  .side {
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .side > * {
+    margin-right: 24px;
+    animation: slideInRight 180ms ease-out;
+  }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side > * { animation: none; }
 }

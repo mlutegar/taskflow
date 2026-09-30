@@ -248,19 +248,12 @@
   color: var(--accent);
 }
 
-/* ── Mode Filter ────────────────────────────────────── */
-.filterRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 16px;
-}
-
-.filterPill {
-  font-size: 12px;
+/* Botão de apagar histórico (ação destrutiva) */
+.dangerBtn {
+  font-size: 11px;
   font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 99px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-muted);
@@ -268,15 +261,309 @@
   transition: all 0.15s;
 }
 
-.filterPill:hover {
+.dangerBtn:hover {
+  border-color: #e05c5c;
+  color: #e05c5c;
+  background: rgba(224, 92, 92, 0.08);
+}
+
+/* ── Modal: apagar histórico ───────────────────────────────────────────── */
+.clearModal {
+  width: min(440px, 92vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  padding: 20px 20px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.clearTitle {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text);
+}
+
+.clearSubtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.clearField {
+  margin-bottom: 14px;
+}
+
+.clearLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.clearScopeHint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0 16px;
+}
+
+.clearScopeHint strong {
+  color: var(--text);
+}
+
+.clearActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dangerBtnSolid {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #e05c5c;
+  background: #e05c5c;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dangerBtnSolid:hover:not(:disabled) {
+  background: #cf4a4a;
+  border-color: #cf4a4a;
+}
+
+.dangerBtnSolid:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ── Mode Filter ────────────────────────────────────── */
+.filterRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filterLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.filterSelect {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 30px 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s;
+  max-width: 260px;
+}
+
+.filterSelect:hover,
+.filterSelect:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.filterClear {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filterClear:hover {
   border-color: var(--accent);
   color: var(--text);
 }
 
-.filterPillActive {
-  background: var(--accent);
+.resultCount {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* ── Combobox de modos (busca + multi-seleção) ───────── */
+.combo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.comboTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s;
+  min-width: 200px;
+  max-width: 260px;
+}
+
+.comboTrigger:hover,
+.comboTrigger:focus {
   border-color: var(--accent);
-  color: #fff;
+  outline: none;
+}
+
+.comboSummary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comboChevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.comboPanel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  width: min(320px, 90vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comboSearch {
+  width: 100%;
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2, var(--surface));
+  color: var(--text);
+}
+
+.comboSearch:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.comboList {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.comboEmpty {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 16px 8px;
+  margin: 0;
+}
+
+.comboGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.comboGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  padding: 8px 8px 4px;
+  cursor: pointer;
+}
+
+.comboGroupToggle {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent);
+}
+
+.comboOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.comboOption:hover {
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+}
+
+.comboOptionActive {
+  background: var(--accent-bg, rgba(99, 102, 241, 0.1));
+}
+
+.comboCheck {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.comboLabel {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comboCount {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-2, rgba(127, 127, 127, 0.12));
+  border-radius: 99px;
+  padding: 1px 7px;
+  flex-shrink: 0;
 }
 
 

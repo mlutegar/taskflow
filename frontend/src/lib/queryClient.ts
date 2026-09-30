@@ -7,6 +7,10 @@
  */
 
 import { QueryClient, MutationCache } from "@tanstack/react-query";
+import { ApiError } from "./apiClient";
+
+// Status HTTP "definitivos" (erro de negócio/permissão): repetir não ajuda.
+const NON_RETRYABLE_STATUS = new Set([400, 401, 403, 404, 409, 422]);
 
 /** Função de notificação de erros, registrada via setMutationErrorHandler(). */
 let _errorHandler: ((message: string, type: string) => void) | null = null;
@@ -29,7 +33,15 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      retry: 1,
+      // Backend "frio"/renovação de token na primeira conexão: retries com
+      // backoff dão tempo do servidor aquecer e do refresh concluir antes de
+      // desistir. Erros definitivos (negócio/auth) falham na hora — não adianta
+      // repetir um 404/422/401 já resolvido pelo fluxo de refresh.
+      retry: (count, error) => {
+        if (error instanceof ApiError && NON_RETRYABLE_STATUS.has(error.status)) return false;
+        return count < 2;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
     },
   },
 });

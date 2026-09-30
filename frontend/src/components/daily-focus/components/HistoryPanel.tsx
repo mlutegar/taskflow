@@ -3,6 +3,8 @@ import { getHistory, getMaxLevel, getStats } from "../../../lib/dailyFocusHistor
 import { ESTADOS_DEFAULT } from "../stateToMode";
 import { getAllWithStatus } from "../../../lib/dailyFocusAchievements";
 import { getCheckinLog } from "../../../lib/checkinLog";
+import { getEmotionLog, getEmotionsByHour, getEmotionCounts } from "../../../lib/emotionLog";
+import { getEmotionById } from "../../../data/emotions";
 import ModalOverlay from "../../shared/ModalOverlay";
 import styles from "../DailyFocus.module.css";
 
@@ -41,12 +43,26 @@ function HistoryPanel({ onClose }: HistoryPanelProps) {
     ? ESTADOS_DEFAULT.find((e) => e.id === bestEstado[0])
     : null;
 
+  // Checkpoints emocionais (Play / Retomar / Fim) — heatmap por hora
+  const emotionLog = getEmotionLog();
+  const emotionByHour = getEmotionsByHour(emotionLog);
+  const emotionHours = Object.keys(emotionByHour)
+    .map(Number)
+    .sort((a, b) => a - b);
+  const emotionTotals = getEmotionCounts(undefined, emotionLog);
+  const emotionRank = Object.entries(emotionTotals).sort((a, b) => b[1] - a[1]);
+  const maxHourTotal = emotionHours.reduce((mx, h) => {
+    const total = Object.values(emotionByHour[h]).reduce((s, n) => s + n, 0);
+    return Math.max(mx, total);
+  }, 1);
+
   // Melhoria 9 — export de dados em JSON
   function handleExport(): void {
     const data = {
       exportedAt: new Date().toISOString(),
       sessions: history,
       checkinLog,
+      emotionLog,
       stats,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -181,6 +197,62 @@ function HistoryPanel({ onClose }: HistoryPanelProps) {
                     </span>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Checkpoints emocionais — heatmap por hora do dia */}
+          {emotionLog.length > 0 && (
+            <div className={styles.historySection}>
+              <div className={styles.historySectionLabel}>💗 Emoção ao longo do dia</div>
+
+              {/* Ranking compacto */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", margin: "8px 0 12px" }}>
+                {emotionRank.map(([id, n]) => {
+                  const em = getEmotionById(id);
+                  return (
+                    <span key={id} style={{
+                      fontSize: "12px",
+                      padding: "3px 8px",
+                      borderRadius: "999px",
+                      background: "var(--surface-2)",
+                      border: `1px solid ${em?.color ?? "var(--border)"}`,
+                      color: "var(--text)",
+                    }}>
+                      {em?.emoji ?? ""} {em?.label ?? id} <strong>{n}</strong>
+                    </span>
+                  );
+                })}
+              </div>
+
+              {/* Heatmap: uma coluna por hora com dado; cor = emoção dominante, opacidade = volume */}
+              <div style={{ display: "flex", gap: "4px", alignItems: "flex-end", flexWrap: "wrap" }}>
+                {emotionHours.map((h) => {
+                  const byEmotion = emotionByHour[h];
+                  const total = Object.values(byEmotion).reduce((s, n) => s + n, 0);
+                  const [domId] = Object.entries(byEmotion).sort((a, b) => b[1] - a[1])[0];
+                  const em = getEmotionById(domId);
+                  const opacity = 0.35 + 0.65 * (total / maxHourTotal);
+                  const tip = Object.entries(byEmotion)
+                    .map(([id, n]) => `${getEmotionById(id)?.label ?? id}: ${n}`)
+                    .join(", ");
+                  return (
+                    <div key={h} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }} title={`${h}h — ${tip}`}>
+                      <div style={{
+                        width: "22px",
+                        height: "22px",
+                        borderRadius: "5px",
+                        background: em?.color ?? "var(--primary)",
+                        opacity,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "12px",
+                      }}>{em?.emoji ?? ""}</div>
+                      <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>{h}h</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

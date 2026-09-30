@@ -7,6 +7,24 @@ function parseJson(val, fallback) {
   try { return JSON.parse(val); } catch { return fallback; }
 }
 
+// Recorrências agendáveis (espelha frontend/src/lib/dailyRoutine.ts).
+const DAILY_RECURRENCES = new Set(["daily", "weekdays"]);
+
+/**
+ * true se a rotina/hábito "vale para hoje" segundo sua recorrência.
+ * - sem recorrência (null/"none"): sempre vale (comportamento legado).
+ * - "daily": todo dia. "weekdays": seg–sex (getDay 1..5, horário local).
+ */
+function appliesToday(recurrence, ref = new Date()) {
+  if (!recurrence || recurrence === "none") return true;
+  if (!DAILY_RECURRENCES.has(recurrence)) return true;
+  if (recurrence === "weekdays") {
+    const dow = ref.getDay(); // 0=dom … 6=sáb
+    return dow >= 1 && dow <= 5;
+  }
+  return true;
+}
+
 function shapeRoutine(routine) {
   const checklist = (routine.checklist ?? []).sort((a, b) => a.order - b.order || Number(a.id) - Number(b.id));
   const today = TODAY();
@@ -27,6 +45,8 @@ function shapeRoutine(routine) {
     current_progress: routine.currentProgress,
     last_completed_date: lastDate,
     completion_history: completionHistory,
+    recurrence: routine.recurrence ?? null,
+    applies_today: appliesToday(routine.recurrence),
     created_at: routine.createdAt,
     checklist,
     checklist_count: checklist.length,
@@ -101,12 +121,13 @@ export default async function routinesRoutes(fastify) {
 
     if (status === "pending") return shaped.filter((r) => !r.is_completed_today);
     if (status === "done") return shaped.filter((r) => r.is_completed_today);
+    if (status === "today") return shaped.filter((r) => r.applies_today);
     return shaped;
   });
 
   // POST /routines
   fastify.post("/", MUTATION_RATE_LIMIT, async (req, reply) => {
-    const { title, description, target_value, unit } = req.body;
+    const { title, description, target_value, unit, recurrence } = req.body;
     const routine = await prisma.routine.create({
       data: {
         userId: req.userId,
@@ -114,6 +135,7 @@ export default async function routinesRoutes(fastify) {
         description,
         targetValue: target_value ?? null,
         unit: unit ?? null,
+        recurrence: recurrence ?? null,
       },
       include: { checklist: true },
     });
@@ -133,6 +155,7 @@ export default async function routinesRoutes(fastify) {
     if (body.description !== undefined) data.description = body.description;
     if (body.target_value !== undefined) data.targetValue = body.target_value;
     if (body.unit !== undefined) data.unit = body.unit;
+    if (body.recurrence !== undefined) data.recurrence = body.recurrence || null;
     if (body.current_progress !== undefined) data.currentProgress = body.current_progress;
     if (body.last_completed_date !== undefined) data.lastCompletedDate = body.last_completed_date ? new Date(body.last_completed_date) : null;
     if (body.completion_history !== undefined) data.completionHistory = JSON.stringify(body.completion_history);

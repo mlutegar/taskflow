@@ -27,27 +27,38 @@ export default async function dailyFocusRoutes(fastify) {
 
   // POST /daily-focus/sessions
   fastify.post("/sessions", async (req, reply) => {
-    const { date, completedAt, level, tasks, timings, rushMode, estadoId, tabMode, cycleCount, tabsOpened } = req.body ?? {};
+    const { clientId, date, completedAt, level, tasks, timings, rushMode, estadoId, tabMode, cycleCount, tabsOpened } = req.body ?? {};
 
     if (!date || !/^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
       return reply.status(400).send({ error: "date obrigatório no formato DD/MM/YYYY." });
     }
 
-    const session = await prisma.dailyFocusSession.create({
-      data: {
-        userId: req.userId,
-        date: new Date(ptBRToIso(date)),
-        completedAt: completedAt || null,
-        level: level ?? 1,
-        tasks: JSON.stringify(tasks ?? []),
-        timings: JSON.stringify(timings ?? []),
-        rushMode: rushMode ?? false,
-        estadoId: estadoId || null,
-        tabMode: tabMode ?? false,
-        cycleCount: cycleCount ?? 0,
-        tabsOpened: tabsOpened ?? 0,
-      },
-    });
+    const data = {
+      userId: req.userId,
+      date: new Date(ptBRToIso(date)),
+      completedAt: completedAt || null,
+      level: level ?? 1,
+      tasks: JSON.stringify(tasks ?? []),
+      timings: JSON.stringify(timings ?? []),
+      rushMode: rushMode ?? false,
+      estadoId: estadoId || null,
+      tabMode: tabMode ?? false,
+      cycleCount: cycleCount ?? 0,
+      tabsOpened: tabsOpened ?? 0,
+    };
+
+    // Com clientId → upsert idempotente: reenvios (retry/offline/multi-device)
+    // não criam duplicatas. Sem clientId → create (compatibilidade com clientes antigos).
+    let session;
+    if (clientId && typeof clientId === "string") {
+      session = await prisma.dailyFocusSession.upsert({
+        where: { userId_clientId: { userId: req.userId, clientId } },
+        create: { ...data, clientId },
+        update: data,
+      });
+    } else {
+      session = await prisma.dailyFocusSession.create({ data });
+    }
     reply.status(201);
     return { id: session.id };
   });
@@ -70,6 +81,7 @@ export default async function dailyFocusRoutes(fastify) {
 
     return {
       data: sessions.map((s) => ({
+        clientId: s.clientId ?? null,
         date: isoToPtBR(s.date.toISOString().split("T")[0]),
         completedAt: s.completedAt || "",
         level: s.level,
@@ -83,6 +95,20 @@ export default async function dailyFocusRoutes(fastify) {
       })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
+  });
+
+  // DELETE /daily-focus/sessions?days=N — apaga histórico de sessões (escopo opcional por período)
+  fastify.delete("/sessions", async (req, reply) => {
+    const { days } = req.query ?? {};
+    const where = { userId: req.userId };
+    const nDays = Number(days);
+    if (Number.isFinite(nDays) && nDays > 0) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - nDays);
+      where.date = { gte: cutoff };
+    }
+    const { count } = await prisma.dailyFocusSession.deleteMany({ where });
+    reply.status(200).send({ ok: true, deleted: count });
   });
 
   // ── Check-ins ─────────────────────────────────────────────────────────────
@@ -142,6 +168,21 @@ export default async function dailyFocusRoutes(fastify) {
     return { checkins, feedbacks };
   });
 
+  // DELETE /daily-focus/checkins?modeId=X&days=N — apaga check-ins/feedbacks (escopo opcional)
+  fastify.delete("/checkins", async (req, reply) => {
+    const { modeId, days } = req.query ?? {};
+    const where = { userId: req.userId };
+    if (modeId) where.modeId = modeId;
+    const nDays = Number(days);
+    if (Number.isFinite(nDays) && nDays > 0) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - nDays);
+      where.date = { gte: cutoff };
+    }
+    const { count } = await prisma.dailyFocusCheckin.deleteMany({ where });
+    reply.status(200).send({ ok: true, deleted: count });
+  });
+
   // PATCH /daily-focus/checkins/feedback
   fastify.patch("/checkins/feedback", async (req, reply) => {
     const { estadoId, modeId, date, rating } = req.body ?? {};
@@ -181,6 +222,95 @@ export default async function dailyFocusRoutes(fastify) {
     reply.status(200).send({ ok: true });
   });
 
+  // ── Emoções (checkpoint emocional por sessão) ───────────────────────────────
+
+  // POST /daily-focus/emotions
+  fastify.post("/emotions", async (req, reply) => {
+    const {
+      emotion, moment, intensity, date, hour, timestamp,
+      taskTitle, taskIndex, taskId, modeIds, level,
+      rushMode, tabMode, pauseSecs, completed, usedSecs, totalSecs,
+    } = req.body ?? {};
+
+    if (!emotion || typeof emotion !== "string") {
+      return reply.status(400).send({ error: "emotion obrigatório." });
+    }
+    if (moment !== "start" && moment !== "resume" && moment !== "end") {
+      return reply.status(400).send({ error: "moment deve ser 'start', 'resume' ou 'end'." });
+    }
+    if (!date) {
+      return reply.status(400).send({ error: "date obrigatório." });
+    }
+    if (hour === undefined || hour === null || hour < 0 || hour > 23) {
+      return reply.status(400).send({ error: "hour deve ser entre 0 e 23." });
+    }
+    if (intensity && intensity !== "leve" && intensity !== "forte") {
+      return reply.status(400).send({ error: "intensity deve ser 'leve' ou 'forte'." });
+    }
+
+    // Dedup: mesmo (userId, timestamp, moment) já gravado → idempotente.
+    if (timestamp) {
+      const dup = await prisma.dailyFocusEmotion.findFirst({
+        where: { userId: req.userId, timestamp, moment },
+      });
+      if (dup) return reply.status(200).send({ ok: true, deduped: true });
+    }
+
+    await prisma.dailyFocusEmotion.create({
+      data: {
+        userId: req.userId,
+        emotion,
+        moment,
+        intensity: intensity || null,
+        date: new Date(date),
+        hour,
+        timestamp: timestamp || null,
+        taskTitle: taskTitle || null,
+        taskIndex: taskIndex ?? null,
+        taskId: taskId || null,
+        modeIds: Array.isArray(modeIds) ? JSON.stringify(modeIds) : null,
+        level: level ?? null,
+        rushMode: rushMode ?? null,
+        tabMode: tabMode ?? null,
+        pauseSecs: pauseSecs ?? null,
+        completed: completed ?? null,
+        usedSecs: usedSecs ?? null,
+        totalSecs: totalSecs ?? null,
+      },
+    });
+    reply.status(201).send({ ok: true });
+  });
+
+  // GET /daily-focus/emotions
+  fastify.get("/emotions", async (req) => {
+    const rows = await prisma.dailyFocusEmotion.findMany({
+      where: { userId: req.userId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const emotions = rows.map((r) => ({
+      emotion: r.emotion,
+      moment: r.moment,
+      intensity: r.intensity ?? undefined,
+      date: r.date.toISOString().split("T")[0],
+      hour: r.hour,
+      timestamp: r.timestamp || r.createdAt.toISOString(),
+      taskTitle: r.taskTitle ?? undefined,
+      taskIndex: r.taskIndex ?? undefined,
+      taskId: r.taskId ?? undefined,
+      modeIds: r.modeIds ? parseJson(r.modeIds, undefined) : undefined,
+      level: r.level ?? undefined,
+      rushMode: r.rushMode ?? undefined,
+      tabMode: r.tabMode ?? undefined,
+      pauseSecs: r.pauseSecs ?? undefined,
+      completed: r.completed ?? undefined,
+      usedSecs: r.usedSecs ?? undefined,
+      totalSecs: r.totalSecs ?? undefined,
+    }));
+
+    return { emotions };
+  });
+
   // ── Estado do dia ──────────────────────────────────────────────────────────
 
   // GET /daily-focus/day-state
@@ -196,21 +326,143 @@ export default async function dailyFocusRoutes(fastify) {
       date: state.date.toISOString().split("T")[0],
       level: state.level,
       usedModes: parseJson(state.usedModes, {}),
+      continuousActivity: state.continuousActivity ? parseJson(state.continuousActivity, null) : null,
+      continuousCompleted: state.continuousCompleted ? parseJson(state.continuousCompleted, []) : [],
     };
   });
 
   // PUT /daily-focus/day-state
+  // Atualização parcial: só toca nos campos presentes no body (level / usedModes / continuousActivity).
   fastify.put("/day-state", async (req, reply) => {
-    const { level, usedModes } = req.body;
+    const { level, usedModes, continuousActivity, continuousCompleted } = req.body ?? {};
     const today = new Date(todayIso());
+
+    const update = { updatedAt: new Date() };
+    if (level !== undefined) update.level = level;
+    if (usedModes !== undefined) update.usedModes = JSON.stringify(usedModes ?? {});
+    if (continuousActivity !== undefined) {
+      update.continuousActivity = continuousActivity ? JSON.stringify(continuousActivity) : null;
+    }
+    if (continuousCompleted !== undefined) {
+      update.continuousCompleted = continuousCompleted ? JSON.stringify(continuousCompleted) : null;
+    }
 
     await prisma.dailyFocusDayState.upsert({
       where: { userId_date: { userId: req.userId, date: today } },
-      update: { level, usedModes: JSON.stringify(usedModes ?? {}), updatedAt: new Date() },
-      create: { userId: req.userId, date: today, level, usedModes: JSON.stringify(usedModes ?? {}) },
+      update,
+      create: {
+        userId: req.userId,
+        date: today,
+        level: level ?? 0,
+        usedModes: JSON.stringify(usedModes ?? {}),
+        continuousActivity: continuousActivity ? JSON.stringify(continuousActivity) : null,
+        continuousCompleted: continuousCompleted ? JSON.stringify(continuousCompleted) : null,
+      },
     });
 
     reply.status(200).send({ ok: true });
+  });
+
+  // ── Sessão ativa (cross-device) ──────────────────────────────────────────────
+  // Persiste a sessão de foco EM ANDAMENTO para reidratar em outro dispositivo.
+  // Uma por usuário; last-write-wins. Só vale para o dia corrente.
+
+  // Limite de tamanho do payload (evita gravar blobs enormes por bug/abuso).
+  const ACTIVE_SESSION_MAX_BYTES = 128 * 1024; // 128 KB
+
+  // GET /daily-focus/active-session
+  fastify.get("/active-session", async (req) => {
+    const row = await prisma.dailyFocusActiveSession.findUnique({
+      where: { userId: req.userId },
+    });
+    if (!row) return null;
+
+    // Higiene: se a linha é de outro dia, apaga e não devolve (evita lixo acumulando).
+    const rowDate = row.date.toISOString().split("T")[0];
+    if (rowDate !== todayIso()) {
+      await prisma.dailyFocusActiveSession.deleteMany({ where: { userId: req.userId } });
+      return null;
+    }
+
+    return {
+      date: rowDate,
+      live: parseJson(row.live, null),
+      session: parseJson(row.session, {}),
+      focusTimer: row.focusTimer ? parseJson(row.focusTimer, null) : null,
+      version: row.version,
+      endedAt: row.endedAt ? row.endedAt.toISOString() : null,
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
+
+  // PUT /daily-focus/active-session
+  // Concorrência otimística: se `baseVersion` for enviado e não bater com a versão
+  // atual do servidor, responde 409 com a versão vigente (o cliente decide re-tentar).
+  // A versão é um contador monotônico — imune a divergências de relógio entre devices.
+  fastify.put("/active-session", async (req, reply) => {
+    const { live, session, focusTimer, baseVersion } = req.body ?? {};
+
+    // Guarda de tamanho.
+    const rawSize = Buffer.byteLength(JSON.stringify({ live, session, focusTimer }), "utf8");
+    if (rawSize > ACTIVE_SESSION_MAX_BYTES) {
+      return reply.status(413).send({ error: "Payload da sessão ativa excede o limite." });
+    }
+
+    const today = new Date(todayIso());
+    const now = new Date();
+
+    const existing = await prisma.dailyFocusActiveSession.findUnique({
+      where: { userId: req.userId },
+    });
+
+    // Conflito de versão: alguém gravou entre o read e o write do cliente.
+    if (existing && typeof baseVersion === "number" && existing.version !== baseVersion) {
+      return reply.status(409).send({
+        error: "conflict",
+        version: existing.version,
+        updatedAt: existing.updatedAt.toISOString(),
+      });
+    }
+
+    const nextVersion = (existing?.version ?? 0) + 1;
+    const data = {
+      date: today,
+      live: JSON.stringify(live ?? null),
+      session: JSON.stringify(session ?? {}),
+      focusTimer: focusTimer != null ? JSON.stringify(focusTimer) : null,
+      version: nextVersion,
+      endedAt: null, // um PUT reabre/reativa (limpa tombstone)
+      updatedAt: now,
+    };
+
+    await prisma.dailyFocusActiveSession.upsert({
+      where: { userId: req.userId },
+      update: data,
+      create: { userId: req.userId, ...data },
+    });
+
+    reply.status(200).send({ ok: true, version: nextVersion, updatedAt: now.toISOString() });
+  });
+
+  // DELETE /daily-focus/active-session
+  // Tombstone: marca `endedAt` (mantém a linha p/ o outro device detectar o fim no
+  // próximo GET/poll). A limpeza física acontece no GET de outro dia. `?hard=1` apaga já.
+  fastify.delete("/active-session", async (req, reply) => {
+    if (req.query?.hard === "1") {
+      await prisma.dailyFocusActiveSession.deleteMany({ where: { userId: req.userId } });
+      return reply.status(200).send({ ok: true, ended: true });
+    }
+
+    const existing = await prisma.dailyFocusActiveSession.findUnique({
+      where: { userId: req.userId },
+    });
+    if (!existing) return reply.status(200).send({ ok: true, ended: true });
+
+    await prisma.dailyFocusActiveSession.update({
+      where: { userId: req.userId },
+      data: { endedAt: new Date(), version: existing.version + 1, updatedAt: new Date() },
+    });
+    reply.status(200).send({ ok: true, ended: true, version: existing.version + 1 });
   });
 
   // ── Achievements ───────────────────────────────────────────────────────────

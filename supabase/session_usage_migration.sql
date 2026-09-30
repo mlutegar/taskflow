@@ -32,3 +32,11 @@ CREATE INDEX IF NOT EXISTS idx_session_usage_user_date
 
 CREATE INDEX IF NOT EXISTS idx_session_usage_mode
   ON session_usage_logs (user_id, mode_id);
+
+-- Métricas ricas do acumulador de foco (sincronizado ao Daily Focus)
+ALTER TABLE session_usage_logs ADD COLUMN IF NOT EXISTS session_duration_minutes INTEGER;
+ALTER TABLE session_usage_logs ADD COLUMN IF NOT EXISTS efficiency_pct INTEGER;
+ALTER TABLE session_usage_logs ADD COLUMN IF NOT EXISTS pause_count INTEGER;
+ALTER TABLE session_usage_logs ADD COLUMN IF NOT EXISTS paused_minutes INTEGER;
+ALTER TABLE session_usage_logs ADD COLUMN IF NOT EXISTS focus_blocks INTEGER;
+ALTER TABLE session_usage_logs ADD COLUMN IF NOT EXISTS tasks_completed INTEGER;

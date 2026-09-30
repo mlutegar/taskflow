@@ -1,5 +1,28 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Inputs de data/hora nativos: no WebKit do iOS têm largura intrínseca que
+   ignora width:100% e estouram o container (rolagem horizontal). Neutralizamos
+   a aparência nativa globalmente para que respeitem o layout. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  margin-left: auto;
+}
+
 :root {
   --bg: #0f0f13;
   --surface: #1a1a22;
@@ -8,6 +31,7 @@
   --text: #e8e8f0;
   --text-muted: #7a7a9a;
   --accent: #7c6ef5;
+  --accent-rgb: 124, 110, 245;
   --accent-hover: #9585ff;
   --danger: #e05252;
   --success: #4ecca3;
@@ -18,6 +42,16 @@
   --low: #4ecca3;
   --radius: 10px;
   --radius-sm: 6px;
+
+  /* ── Layout flutuante (mobile) ────────────────────────────────────────────
+     Constantes de UI compartilhadas entre o FAB "Nova tarefa", a bottom nav e
+     os cards flutuantes (Atividade Contínua, sessão). Centralizadas aqui para
+     que ajustar uma delas não reintroduza sobreposições. */
+  --fab-size: 56px;            /* diâmetro do FAB no mobile */
+  --bottomnav-h: 84px;         /* folga acima da barra inferior no mobile */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --z-fab: 900;                /* FAB (abaixo do modal 1000) */
+  --z-floating-card: 950;      /* cards flutuantes acima do FAB */
 
   /* ── Semitransparentes para badges e banners ──────────────────────────────── */
   --success-bg:     rgba(78, 204, 163, 0.14);
@@ -38,6 +72,27 @@
   --font-xl:   22px;
 }
 
+/* ── Tema claro (aplicado via data-theme="light" no <html>) ─────────────────
+   Mantém os mesmos nomes de variável; só troca os valores. */
+:root[data-theme="light"] {
+  --bg: #f5f5f8;
+  --surface: #ffffff;
+  --surface-2: #ececf3;
+  --border: #dcdce6;
+  --text: #1c1c26;
+  --text-muted: #6a6a86;
+  --accent: #6a5cf0;
+  --accent-hover: #574bd6;
+
+  --success-bg:     rgba(56, 168, 130, 0.14);
+  --warning-bg:     rgba(214, 142,  40, 0.14);
+  --danger-bg:      rgba(210,  64,  64, 0.12);
+  --success-border: rgba(56, 168, 130, 0.30);
+  --warning-border: rgba(214, 142,  40, 0.30);
+  --danger-border:  rgba(210,  64,  64, 0.25);
+  --text-inverse:   #ffffff;
+}
+
 @media (max-width: 480px) {
   :root {
     --font-xs:   10px;
@@ -51,8 +106,11 @@
 html {
   /* Ocupa a altura real da janela no mobile (exclui barra do browser) */
   height: -webkit-fill-available;
-  /* Impede scroll horizontal no nível raiz */
-  overflow-x: hidden;
+  /* `hidden` em apenas um eixo faz o outro virar `auto`, criando um segundo
+     scroll container e prendendo roda/trackpad. `clip` corta sem capturar a
+     rolagem vertical do documento. */
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 body {
@@ -62,12 +120,15 @@ body {
   min-height: 100vh;
   min-height: -webkit-fill-available;
   line-height: 1.5;
-  /* Evita o efeito de "borracha" ao rolar — parece mais app nativo */
-  overscroll-behavior: none;
+  /* Bloqueia somente o arraste lateral; o eixo vertical precisa continuar
+     encadeando normalmente para roda, trackpad e gesto de toque. */
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
   /* Espaço para o indicador de home (bottom bar) do iPhone */
   padding-bottom: env(safe-area-inset-bottom);
-  /* Impede scroll horizontal no nível raiz */
-  overflow-x: hidden;
+  /* Não transformar o body em um scroll container vertical secundário. */
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 button {

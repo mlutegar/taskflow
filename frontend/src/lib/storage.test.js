@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { storageGet, storageSet, storageRemove, storageGetInt, storageSetInt, storageAppend } from './storage';
 
 const PREFIX = 'taskflow.';

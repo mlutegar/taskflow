@@ -1,0 +1,12 @@
+.wrap { position: relative; }
+.button { width: 52px; height: 44px; font-size: 22px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); display: grid; place-items: center; cursor: pointer; }
+.button:hover { border-color: var(--accent); }
+.popover { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: 268px; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,.5); display: grid; gap: 8px; }
+.custom { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); font-size: 14px; }
+.custom:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,110,245,.22); }
+.grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; max-height: 180px; overflow: auto; }
+.option { font-size: 20px; padding: 5px 0; border-radius: 7px; cursor: pointer; }
+.option:hover { background: var(--surface-2); }
+.active { background: var(--accent); }
+
+@media (max-width: 520px) { .popover { width: 240px; } }

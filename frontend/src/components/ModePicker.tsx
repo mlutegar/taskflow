@@ -2,8 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from "rea
 import type { MouseEvent } from "react";
 import { MODES, CATEGORY_BY_ID, CATEGORY_ORDER } from "../data/modes";
 import { getCustomModes, getHiddenModeIds, toggleHiddenMode, setHiddenModeIds } from "../lib/customModes";
-import { getUsageLogs } from "../lib/sessionUsageLog";
-import { usageStats } from "../lib/modeLog";
+import { getUsageLogs, usageStatsLive } from "../lib/sessionUsageLog";
 import { todayISO, todayPtBR } from "../lib/dateUtils";
 import { storageGet, storageSet } from "../lib/storage";
 import { pruneOrder, getFavorites, toggleFavorite as toggleFavoriteStore } from "../lib/modeUtils";
@@ -162,8 +161,8 @@ export default function ModePicker({ onSelect, onClose, selectedIds = [], usedTo
 
   // Contagem de uso nos últimos 7 dias (mini-stat + ordenação por uso).
   const usage7d = useMemo<Map<string, number>>(
-    () => new Map(usageStats(7).map((s) => [s.modeId, s.count])),
-    []
+    () => new Map(usageStatsLive(7).map((s) => [s.modeId, s.count])),
+    [refreshUsage]
   );
 
   // Poda ids órfãos da ordem aleatória salva (modos removidos/renomeados).

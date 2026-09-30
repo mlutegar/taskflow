@@ -8,6 +8,7 @@ import { storageGet, storageAppend, storageSet } from "./storage";
 import { SK } from "./storageKeys";
 import { syncToBackend } from "./syncToBackend";
 import { canonicalModeId } from "./modeAliases";
+import { getModeFocusStats } from "./modeFocusTimer";
 
 const LS_KEY = "sessionUsageLog";
 const MAX_ENTRIES = 500; // ~500 sessions ≈ ~1 session/day for 1.5 years
@@ -26,8 +27,12 @@ interface SessionUsageEntry {
   comboWith?: string;
   startedAt?: string;              // ISO datetime de início (capturado automaticamente)
   endedAt?: string;                // ISO datetime de fim (capturado automaticamente)
-  sessionDurationMinutes?: number; // endedAt - startedAt em minutos
+  sessionDurationMinutes?: number; // duração de FOCO efetivo (sincronizada ao Daily Focus)
   efficiencyPct?: number;          // focusedMinutes / sessionDurationMinutes * 100 (max 100)
+  pauseCount?: number;             // nº de pausas do foco durante a sessão
+  pausedMinutes?: number;          // tempo total pausado (min) com o modo ativo
+  focusBlocks?: number;            // nº de blocos de foco (fragmentação)
+  tasksCompleted?: number;         // tarefas concluídas com o modo ativo
   note?: string;                   // anotação livre pós-sessão
   intention?: string;              // intenção declarada antes de iniciar a sessão
 }
@@ -159,7 +164,7 @@ function generateId(): string {
   });
 }
 
-export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReason, feeling, comboWith, sessionStartedAt, sessionEndedAt, note, intention }: {
+export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReason, feeling, comboWith, sessionStartedAt, sessionEndedAt, focusMinutes, pauseCount, pausedMinutes, focusBlocks, tasksCompleted, note, intention }: {
   modeId: string;
   worked: boolean;
   focusedMinutes: number;
@@ -169,6 +174,16 @@ export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReas
   comboWith?: string;
   sessionStartedAt?: string;
   sessionEndedAt?: string;
+  /**
+   * Tempo de foco EFETIVO do modo em minutos (acumulado só enquanto o Daily Focus
+   * esteve rodando). Quando presente, é a fonte de verdade da duração/eficiência —
+   * substitui o cálculo wall-clock de `sessionStartedAt → sessionEndedAt`.
+   */
+  focusMinutes?: number;
+  pauseCount?: number;
+  pausedMinutes?: number;
+  focusBlocks?: number;
+  tasksCompleted?: number;
   note?: string;
   intention?: string;
 }): unknown {
@@ -177,17 +192,20 @@ export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReas
   const hour = new Date().getHours();
   const id = generateId();
 
-  // Calcula duração e eficiência automaticamente a partir dos timestamps
+  // Duração da sessão = tempo de FOCO efetivo (sincronizado ao Daily Focus) quando
+  // disponível; senão, fallback para o wall-clock entre início e fim.
   let sessionDurationMinutes: number | undefined;
   let efficiencyPct: number | undefined;
-  if (sessionStartedAt && sessionEndedAt) {
+  if (typeof focusMinutes === "number" && focusMinutes > 0) {
+    sessionDurationMinutes = Math.max(1, Math.round(focusMinutes));
+  } else if (sessionStartedAt && sessionEndedAt) {
     const diffMs = new Date(sessionEndedAt).getTime() - new Date(sessionStartedAt).getTime();
     if (diffMs > 0) {
       sessionDurationMinutes = Math.max(1, Math.round(diffMs / 60000));
-      if (focusedMinutes > 0) {
-        efficiencyPct = Math.min(100, Math.round((focusedMinutes / sessionDurationMinutes) * 100));
-      }
     }
+  }
+  if (sessionDurationMinutes !== undefined && focusedMinutes > 0) {
+    efficiencyPct = Math.min(100, Math.round((focusedMinutes / sessionDurationMinutes) * 100));
   }
 
   const entry: SessionUsageEntry = {
@@ -197,13 +215,19 @@ export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReas
     ...(sessionEndedAt      ? { endedAt: sessionEndedAt }                      : {}),
     ...(sessionDurationMinutes !== undefined ? { sessionDurationMinutes }       : {}),
     ...(efficiencyPct          !== undefined ? { efficiencyPct }                : {}),
+    ...(pauseCount             !== undefined ? { pauseCount }                   : {}),
+    ...(pausedMinutes          !== undefined ? { pausedMinutes }               : {}),
+    ...(focusBlocks            !== undefined ? { focusBlocks }                 : {}),
+    ...(tasksCompleted         !== undefined ? { tasksCompleted }             : {}),
     ...(note                   ? { note }                                       : {}),
     ...(intention              ? { intention }                                  : {}),
   };
   const saved = storageAppend(LS_KEY, entry, MAX_ENTRIES);
+  invalidateUsageCache();
 
   syncToBackend("POST", "/session-usage-logs", {
     id:                       entry.id,
+    client_id:                entry.id,
     mode_id:                  entry.modeId,
     date:                     entry.date,
     hour:                     entry.hour,
@@ -217,27 +241,175 @@ export function logUsage({ modeId, worked, focusedMinutes, idleMinutes, idleReas
     ...(entry.endedAt                   ? { ended_at:                 entry.endedAt }              : {}),
     ...(entry.sessionDurationMinutes !== undefined ? { session_duration_minutes: entry.sessionDurationMinutes } : {}),
     ...(entry.efficiencyPct          !== undefined ? { efficiency_pct:           entry.efficiencyPct }         : {}),
+    ...(entry.pauseCount             !== undefined ? { pause_count:              entry.pauseCount }            : {}),
+    ...(entry.pausedMinutes          !== undefined ? { paused_minutes:           entry.pausedMinutes }         : {}),
+    ...(entry.focusBlocks            !== undefined ? { focus_blocks:             entry.focusBlocks }           : {}),
+    ...(entry.tasksCompleted         !== undefined ? { tasks_completed:          entry.tasksCompleted }        : {}),
     ...(entry.note                               ? { note:                      entry.note }                  : {}),
   });
 
   return saved;
 }
 
-/** Retorna todos os registros salvos (entradas dos últimos 90 dias). */
+/**
+ * Registro RÁPIDO/MÍNIMO de uma sessão — usado ao encerrar pelo card flutuante sem
+ * abrir o formulário completo. Lê as métricas já medidas pelo acumulador de foco
+ * (`getModeFocusStats`) e persiste, garantindo que **nenhuma sessão se perca para a
+ * análise**. Deve ser chamado ANTES de `stopModeFocusTimer` (que limpa o acumulador).
+ *
+ * @param worked  respondido no card (👍/👎). Se omitido, assume `false` (registro neutro).
+ */
+export function logQuickUsage({ modeId, worked, sessionStartedAt, comboWith, intention }: {
+  modeId: string;
+  worked?: boolean;
+  sessionStartedAt?: string;
+  comboWith?: string;
+  intention?: string;
+}): unknown {
+  if (!modeId) return false;
+  const stats = getModeFocusStats();
+  return logUsage({
+    modeId,
+    worked: worked ?? false,
+    focusedMinutes: stats.focusMinutes,
+    idleMinutes: 0,
+    idleReason: [],
+    feeling: [],
+    comboWith,
+    sessionStartedAt,
+    sessionEndedAt: new Date().toISOString(),
+    focusMinutes: stats.focusMinutes > 0 ? stats.focusMinutes : undefined,
+    pauseCount: stats.pauseCount,
+    pausedMinutes: stats.pausedMinutes,
+    focusBlocks: stats.focusBlocks,
+    tasksCompleted: stats.tasksCompleted,
+    intention,
+  });
+}
+
+// ── Cache de leitura ───────────────────────────────────────────────────────────
+// `getUsageLogs()` é chamado dezenas de vezes por render em ~6 telas (ranking,
+// analytics, histórico). Cada chamada lê+parseia+filtra o localStorage. Memoizamos
+// o resultado e invalidamos nas nossas escritas e em mudanças cross-tab (`storage`).
+let _usageCache: SessionUsageEntry[] | null = null;
+
+/** Invalida o cache de `getUsageLogs` — chamar após qualquer escrita no log. */
+export function invalidateUsageCache(): void {
+  _usageCache = null;
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e) => {
+    if (!e.key || e.key.includes("sessionUsageLog")) invalidateUsageCache();
+  });
+}
+
+/** Retorna todos os registros salvos (entradas dos últimos 90 dias). Memoizado. */
 export function getUsageLogs(): SessionUsageEntry[] {
+  if (_usageCache) return _usageCache;
   const all: SessionUsageEntry[] = storageGet(LS_KEY, []);
   const cutoff = (() => {
     const d = new Date();
     d.setDate(d.getDate() - RETAIN_DAYS);
     return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
   })();
-  return all
+  _usageCache = all
     .filter((e) => !e.date || e.date >= cutoff)
     // Normaliza ids legados (ex.: "music" → "music_hundred") para manter continuidade das estatísticas.
     .map((e) => {
       const canon = canonicalModeId(e.modeId);
       return canon === e.modeId ? e : { ...e, modeId: canon };
     });
+  return _usageCache;
+}
+
+export interface ClearScope {
+  /** Só apaga registros deste modo. */
+  modeId?: string;
+  /** Só apaga registros dos últimos N dias. */
+  days?: number;
+}
+
+function cutoffIso(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+}
+
+/** Apaga o histórico local de uso de sessões (todo, ou com escopo por modo/período). */
+export function clearUsageLog(scope: ClearScope = {}): void {
+  if (!scope.modeId && !scope.days) {
+    storageSet(LS_KEY, []);
+    return;
+  }
+  const cutoff = scope.days ? cutoffIso(scope.days) : null;
+  const all: SessionUsageEntry[] = storageGet(LS_KEY, []);
+  const kept = all.filter((e) => {
+    const matchesMode = !scope.modeId || canonicalModeId(e.modeId) === scope.modeId;
+    const matchesDays = !cutoff || (e.date ?? "") >= cutoff;
+    // Mantém o que NÃO cai no escopo de exclusão.
+    return !(matchesMode && matchesDays);
+  });
+  storageSet(LS_KEY, kept);
+}
+
+interface UsageStat {
+  modeId: string;
+  count: number;
+}
+
+/**
+ * Ranking "mais usados" por modo nos últimos `days` dias.
+ * Fonte única de verdade após a fusão de modeLog → sessionUsageLog.
+ * Conta CONCLUSÕES DE TAREFA por modo (soma `tasksCompleted`), com fallback de
+ * 1 por sessão quando a métrica não está disponível (registros legados / combos).
+ * Retorna [{ modeId, count }] ordenado do maior para o menor — mesma assinatura
+ * do antigo `usageStats` de modeLog.ts, para consumo transparente pela UI.
+ */
+export function usageStats(days = 7): UsageStat[] {
+  const start = new Date();
+  start.setDate(start.getDate() - (days - 1));
+  const startIso = [start.getFullYear(), String(start.getMonth() + 1).padStart(2, "0"), String(start.getDate()).padStart(2, "0")].join("-");
+
+  const counts: Record<string, number> = {};
+  for (const e of getUsageLogs()) {
+    if (e.date < startIso) continue;
+    const inc = typeof e.tasksCompleted === "number" && e.tasksCompleted > 0 ? e.tasksCompleted : 1;
+    counts[e.modeId] = (counts[e.modeId] || 0) + inc;
+  }
+  return Object.entries(counts)
+    .map(([modeId, count]) => ({ modeId, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Conclusões de tarefa da sessão de modo único EM ANDAMENTO (ainda não persistidas no
+ * log, pois `logUsage` só grava ao encerrar). Lê o modo ativo (`ACTIVE_MODE_SESSION`) e
+ * o acumulador de foco (`tasksCompleted`). Retorna null se não há sessão/contagem.
+ * Nota: sessões multi-card não usam `ACTIVE_MODE_SESSION` — só aparecem ao encerrar.
+ */
+function getLiveCompletion(): { modeId: string; count: number } | null {
+  const snap = storageGet<{ modeId?: string } | null>(SK.ACTIVE_MODE_SESSION, null);
+  if (!snap?.modeId) return null;
+  const { tasksCompleted } = getModeFocusStats();
+  if (!tasksCompleted || tasksCompleted <= 0) return null;
+  return { modeId: canonicalModeId(snap.modeId), count: tasksCompleted };
+}
+
+/**
+ * Como `usageStats`, mas sobrepõe as conclusões AO VIVO da sessão de modo em andamento —
+ * para o ranking "mais usados" atualizar a cada tarefa concluída (e não só no fim da
+ * sessão). Use nas telas de ranking; use `usageStats` puro em analytics/relatórios.
+ */
+export function usageStatsLive(days = 7): UsageStat[] {
+  const base = usageStats(days);
+  const live = getLiveCompletion();
+  if (!live) return base;
+  const map = new Map(base.map((s) => [s.modeId, s.count]));
+  map.set(live.modeId, (map.get(live.modeId) || 0) + live.count);
+  return [...map.entries()]
+    .map(([modeId, count]) => ({ modeId, count }))
+    .sort((a, b) => b.count - a.count);
 }
 
 /**
@@ -482,6 +654,58 @@ export function getFocusedMinutesByMode(days = 30): FocusedMinutesByMode[] {
   return Object.entries(map)
     .map(([modeId, s]) => ({ modeId, ...s }))
     .sort((a, b) => b.totalFocusMin - a.totalFocusMin);
+}
+
+export interface FocusQualityByMode {
+  modeId: string;
+  sessions: number;
+  totalFocusMin: number;
+  avgFocusMin: number;
+  avgPauses: number;         // média de pausas por sessão
+  totalPausedMin: number;    // tempo total pausado
+  avgBlocks: number;         // fragmentação média (blocos de foco/sessão)
+  totalTasks: number;        // tarefas concluídas com o modo ativo
+  focusContinuity: number;   // min de foco por bloco (↑ = foco menos fragmentado)
+}
+
+/**
+ * Qualidade do foco por modo (últimos N dias): usa as métricas ricas capturadas pelo
+ * acumulador (`pauseCount`, `pausedMinutes`, `focusBlocks`, `tasksCompleted`). Só
+ * considera sessões que trazem essas métricas (registradas após a sincronização).
+ * Retorna ordenado por `avgFocusMin` desc.
+ */
+export function getFocusQualityByMode(days = 30): FocusQualityByMode[] {
+  const cutoff = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  })();
+  const map: Record<string, { sessions: number; focus: number; pauses: number; paused: number; blocks: number; tasks: number }> = {};
+  for (const e of getUsageLogs().filter((e) => e.date >= cutoff)) {
+    // Só agrega sessões com métrica de fragmentação/pausas (novo formato).
+    if (e.focusBlocks === undefined && e.pauseCount === undefined) continue;
+    if (!map[e.modeId]) map[e.modeId] = { sessions: 0, focus: 0, pauses: 0, paused: 0, blocks: 0, tasks: 0 };
+    const m = map[e.modeId];
+    m.sessions++;
+    m.focus  += e.sessionDurationMinutes || e.focusedMinutes || 0;
+    m.pauses += e.pauseCount || 0;
+    m.paused += e.pausedMinutes || 0;
+    m.blocks += e.focusBlocks || 0;
+    m.tasks  += e.tasksCompleted || 0;
+  }
+  return Object.entries(map)
+    .map(([modeId, m]) => ({
+      modeId,
+      sessions: m.sessions,
+      totalFocusMin: m.focus,
+      avgFocusMin: m.sessions ? Math.round(m.focus / m.sessions) : 0,
+      avgPauses: m.sessions ? Math.round((m.pauses / m.sessions) * 10) / 10 : 0,
+      totalPausedMin: m.paused,
+      avgBlocks: m.sessions ? Math.round((m.blocks / m.sessions) * 10) / 10 : 0,
+      totalTasks: m.tasks,
+      focusContinuity: m.blocks ? Math.round(m.focus / m.blocks) : m.focus,
+    }))
+    .sort((a, b) => b.avgFocusMin - a.avgFocusMin);
 }
 
 /**
@@ -945,6 +1169,7 @@ export async function loadRemoteUsageLogs(): Promise<void> {
       if (fresh.length) {
         const merged = [...local, ...fresh].slice(-MAX_ENTRIES);
         storageSet(LS_KEY, merged);
+        invalidateUsageCache();
       }
     }
   } catch {

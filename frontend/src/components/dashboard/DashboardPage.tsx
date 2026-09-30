@@ -4,10 +4,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { getHistory, getStreak } from "../../lib/dailyFocusHistory";
-import { usageStats, loadRemoteModeLog } from "../../lib/modeLog";
 import { getCheckinLog, getSessionFeedback } from "../../lib/checkinLog";
 import { getAllWithStatus } from "../../lib/dailyFocusAchievements";
-import { getUsageLogs, getFeelingStats, getTemporalTrend, getCorrelationByEstado, getFocusedMinutesByDay, getTotalFocusedMinutes, getFocusedMinutesByMode, getBestDayOfWeek, getWeeklyFocusComparison, loadRemoteUsageLogs, getSessionEfficiencyList, getTwoHourBlockEfficiency, getAvgEfficiencyByMode, getWeeklyEfficiencyTrend, getDailyEfficiencyMap, getEfficiencyByDayOfWeek } from "../../lib/sessionUsageLog";
+import { usageStats, getUsageLogs, getFeelingStats, getTemporalTrend, getCorrelationByEstado, getFocusedMinutesByDay, getTotalFocusedMinutes, getFocusedMinutesByMode, getBestDayOfWeek, getWeeklyFocusComparison, loadRemoteUsageLogs, getSessionEfficiencyList, getTwoHourBlockEfficiency, getAvgEfficiencyByMode, getWeeklyEfficiencyTrend, getDailyEfficiencyMap, getEfficiencyByDayOfWeek } from "../../lib/sessionUsageLog";
 import { getMoodModeStats } from "../../lib/moodModeCorrelation";
 import { getDistractionInsights } from "../../lib/distractionInsights";
 import WeeklyReview from "../WeeklyReview";
@@ -504,6 +503,11 @@ function FocusedMinutesByModeChart({ days, remoteLoaded }: FocusedMinutesByModeC
     });
   }, [days, remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const maxVal = useMemo(
+    () => Math.max(...data.map((d: { foco: number; idle: number }) => d.foco + d.idle), 1),
+    [data]
+  );
+
   if (!data.length || !data.some((d: { foco: number }) => d.foco > 0)) {
     return (
       <div className={styles.section}>
@@ -529,11 +533,6 @@ function FocusedMinutesByModeChart({ days, remoteLoaded }: FocusedMinutesByModeC
       </div>
     );
   };
-
-  const maxVal = useMemo(
-    () => Math.max(...data.map((d: { foco: number; idle: number }) => d.foco + d.idle), 1),
-    [data]
-  );
 
   return (
     <div className={styles.section}>
@@ -808,17 +807,6 @@ interface UsageInsightsProps {
 function UsageInsights({ remoteLoaded }: UsageInsightsProps): JSX.Element {
   const logs = useMemo(() => getUsageLogs(), [remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!logs.length) {
-    return (
-      <div className={styles.section}>
-        <div className={styles.sectionTitle}>⏰ Melhor momento para cada modo</div>
-        <div className={styles.empty}>
-          Registre suas sessões com "📝 Registrar uso" para ver insights aqui.
-        </div>
-      </div>
-    );
-  }
-
   // ── Estatísticas por modo ──────────────────────────────────────────────────
   const modeStats = useMemo(() => {
     const byMode: Record<string, { total: number; worked: number; focusSum: number }> = {};
@@ -882,6 +870,17 @@ function UsageInsights({ remoteLoaded }: UsageInsightsProps): JSX.Element {
       })
       .slice(0, 4);
   }, [remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!logs.length) {
+    return (
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>⏰ Melhor momento para cada modo</div>
+        <div className={styles.empty}>
+          Registre suas sessões com "📝 Registrar uso" para ver insights aqui.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1257,15 +1256,6 @@ interface MoodModeChartProps {
 function MoodModeChart({ remoteLoaded }: MoodModeChartProps): JSX.Element {
   const moodModeData = useMemo(() => getMoodModeStats(), [remoteLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (moodModeData.length < 3) {
-    return (
-      <div className={styles.section}>
-        <div className={styles.sectionTitle}>🧠 Humor × Modo Eficaz</div>
-        <EmptyState icon="📊" title="Dados insuficientes ainda — use mais modos após seus check-ins para ver correlações aqui." />
-      </div>
-    );
-  }
-
   const { estados, chartData } = useMemo(() => {
     const topModes = [...new Set(moodModeData.map((d: { modeId: string }) => d.modeId))].slice(0, 8);
     const estados = [...new Set(moodModeData.map((d: { estado: string }) => d.estado))];
@@ -1282,6 +1272,15 @@ function MoodModeChart({ remoteLoaded }: MoodModeChartProps): JSX.Element {
     });
     return { estados, chartData };
   }, [moodModeData]);
+
+  if (moodModeData.length < 3) {
+    return (
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>🧠 Humor × Modo Eficaz</div>
+        <EmptyState icon="📊" title="Dados insuficientes ainda — use mais modos após seus check-ins para ver correlações aqui." />
+      </div>
+    );
+  }
 
   return (
     <div className={styles.section}>
@@ -1916,12 +1915,12 @@ export default function DashboardPage(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadRemoteUsageLogs(), loadRemoteModeLog()]).finally(() => {
+    loadRemoteUsageLogs().finally(() => {
       if (!cancelled) setRemoteLoaded(true);
     });
 
     const handleStorage = (e: StorageEvent): void => {
-      if (e.key && (e.key.includes("sessionUsageLog") || e.key.includes("modeLog"))) {
+      if (e.key && e.key.includes("sessionUsageLog")) {
         setRemoteLoaded((prev) => !prev);
       }
     };

@@ -8,6 +8,7 @@ interface AddRoutineFormProps {
     description: string | null;
     target_value: number | null;
     unit: string | null;
+    recurrence: string | null;
   }) => Promise<void>;
   onCancel: () => void;
 }
@@ -18,6 +19,7 @@ export default function AddRoutineForm({ onSubmit, onCancel }: AddRoutineFormPro
   const [hasTarget, setHasTarget] = useState<boolean>(false);
   const [targetValue, setTargetValue] = useState<string>("");
   const [unit, setUnit] = useState<string>("");
+  const [recurrence, setRecurrence] = useState<string>("none");
   const [saving, setSaving] = useState<boolean>(false);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
@@ -51,6 +53,7 @@ export default function AddRoutineForm({ onSubmit, onCancel }: AddRoutineFormPro
         description: description.trim() || null,
         target_value: hasTarget && targetValue ? Number(targetValue) : null,
         unit: hasTarget && unit ? unit.trim() : null,
+        recurrence: recurrence === "none" ? null : recurrence,
       });
     } finally {
       setSaving(false);
@@ -81,6 +84,19 @@ export default function AddRoutineForm({ onSubmit, onCancel }: AddRoutineFormPro
           rows={2}
         />
         {errors.description && <span className={styles.errorMsg}>{errors.description}</span>}
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label}>Quando praticar</label>
+        <select
+          className={styles.input}
+          value={recurrence}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRecurrence(e.target.value)}
+        >
+          <option value="none">Sempre (todo dia)</option>
+          <option value="daily">Diária</option>
+          <option value="weekdays">Dias úteis (seg–sex)</option>
+        </select>
       </div>
 
       <label className={styles.toggle}>

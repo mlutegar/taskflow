@@ -19,6 +19,10 @@ export const SK = {
   ACTIVE_TAB:                  "activeTab",
   ACTIVE_MULTI_CARD_SESSION:   "activeMultiCardSession",
   MULTI_CARD_SESSION_LOG:      "multiCardSessionLog",
+  ACTIVE_MODE_SESSION:         "activeModeSession",   // sessão de modo único global (persiste reload)
+  FLOATING_CARD_POS:           "floatingCardPos",     // posição custom do card flutuante (drag)
+  MINIMIZE_HINT_SEEN:          "minimizeHintSeen",    // dica "dá pra minimizar" já vista
+  MODE_FOCUS_TIMER:            "modeFocusTimer",      // acumulador de tempo de foco do modo (sync c/ Daily Focus)
 
   // Modes Panel
   MODES_SORT_BY:        "modesSortBy",
@@ -30,7 +34,6 @@ export const SK = {
   MODES_RANDOM_SEED:    "modesRandomSeed",
   MODES_FAVORITE:       "favoriteModes",
   MODE_STATS:           "modeStats",
-  MODE_LOG:             "modeLog",
   MODE_COMBO_LOGS:      "modeComboLogs",
   MODE_ACTIVATIONS:     "modeActivations",
 
@@ -45,11 +48,14 @@ export const SK = {
   CHECKIN_ESTADOS_CUSTOM: "checkin.estadosCustom",
   CHECKIN_LOG:          "checkinLog",
   CHECKIN_FEEDBACK:     "checkinFeedback",
+  EMOTION_LOG:          "emotionLog",   // checkpoints emocionais por sessão (Play/retomada)
   DAILY_FOCUS_DAY:      "dailyFocus.day",
   DAILY_FOCUS_HISTORY:  "dailyFocus.history",
   DAILY_FOCUS_ACHIEVEMENTS: "dailyFocus.achievements",
   DAILY_FOCUS_MAX_LEVEL:   "dailyFocus.maxLevel",
   DAILY_FOCUS_MAX_CYCLES:  "dailyFocus.maxCycles",
+  DAILY_FOCUS_LIVE:        "dailyFocus.live",     // snapshot da sessão ativa p/ card persistente
+  DAILY_FOCUS_ACTIVE_VERSION: "dailyFocus.activeVersion", // versão sincronizada da sessão ativa (concorrência otimística)
 
   // Preferências
   WEEKLY_SUMMARY_LAST_SHOWN: "weeklySummary.lastShown",

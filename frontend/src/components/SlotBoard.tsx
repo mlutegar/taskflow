@@ -5,6 +5,8 @@ import styles from "./SlotBoard.module.css";
 import { getMultiCardSessions } from "../lib/multiCardSessionLog";
 import { getUsageLogs } from "../lib/sessionUsageLog";
 import { todayISO } from "../lib/dateUtils";
+import { MODES } from "../data/modes";
+import { getCustomModes } from "../lib/customModes";
 
 function getTodayStr(): string {
   return todayISO();
@@ -29,17 +31,29 @@ interface CardSlot {
 }
 
 type SessionMode = 'sequential' | 'parallel';
+type SuggestContext = "long-pause" | "short-pause" | null;
 
 interface SlotBoardProps {
   onStartSession: (cards: ModeConfig[], mode: SessionMode) => void;
   addModeRef?: React.MutableRefObject<((mode: ModeConfig) => void) | null>;
+  /**
+   * Isola a composição (slots) e o modo (sequencial/paralelo) num namespace
+   * próprio de localStorage. Os **templates** salvos continuam globais/compartilhados.
+   * Ex.: "daily-focus" → chave `taskflow.slotBoard.daily-focus`.
+   */
+  storageNamespace?: string;
+  /** Prioriza sugestões adequadas ao contexto (pausa longa vs. retomada rápida). */
+  suggestContext?: SuggestContext;
+  /** Sobrescreve o título/subtítulo do cabeçalho (ex.: dentro do Daily Focus). */
+  title?: string;
+  subtitle?: string;
 }
 
 const LS_KEY = "taskflow.slotBoard";
 const LS_MODE_KEY = "taskflow.sessionMode";
 const TEMPLATES_KEY = "taskflow.sessionTemplates";
 
-// ── Templates ──────────────────────────────────────────────────────────────
+// ── Templates (sempre globais/compartilhados entre telas) ────────────────────
 
 interface SessionTemplate {
   id: string;
@@ -62,12 +76,29 @@ function saveTemplates(templates: SessionTemplate[]): void {
   } catch {}
 }
 
+// ── Índice de modos (para resolver ids de sugestões sem abrir o picker) ───────
+
+function buildModeIndex(): Map<string, ModeConfig> {
+  const map = new Map<string, ModeConfig>();
+  for (const m of MODES as unknown as ModeConfig[]) map.set(m.id, m);
+  try {
+    for (const m of getCustomModes() as unknown as ModeConfig[]) map.set(m.id, m);
+  } catch {}
+  return map;
+}
+
 // ── Smart suggestions ──────────────────────────────────────────────────────
 
 interface Suggestion {
   ids: string[];
   label: string;
 }
+
+/** Sugestões curadas por contexto da pausa no Daily Focus. */
+const CONTEXT_SUGGESTIONS: Record<Exclude<SuggestContext, null>, Suggestion> = {
+  "long-pause": { ids: ["esticar", "agua", "meditar"], label: "Recarregar — pausa longa" },
+  "short-pause": { ids: ["respiracao", "momentum"], label: "Voltar ao foco" },
+};
 
 function computeSuggestions(): Suggestion[] {
   try {
@@ -118,18 +149,18 @@ const DEFAULT_SUGGESTIONS: Suggestion[] = [
   { ids: ["music_hundred", "pomodoro"], label: "Sugestao popular" },
 ];
 
-function loadSlots(): CardSlot[] {
+function loadSlots(key: string): CardSlot[] {
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as CardSlot[]) : [];
   } catch {
     return [];
   }
 }
 
-function saveSlots(slots: CardSlot[]): void {
+function saveSlots(key: string, slots: CardSlot[]): void {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(slots));
+    localStorage.setItem(key, JSON.stringify(slots));
   } catch {}
 }
 
@@ -138,12 +169,24 @@ function nextSlotId(): string {
   return `slot_${++_slotIdCounter}`;
 }
 
-export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps): JSX.Element {
-  const [slots, setSlotsRaw] = useState<CardSlot[]>(loadSlots);
+export default function SlotBoard({
+  onStartSession,
+  addModeRef,
+  storageNamespace,
+  suggestContext = null,
+  title = "Minha sessão",
+  subtitle = "Monte os modos que vai usar e inicie quando estiver pronto.",
+}: SlotBoardProps): JSX.Element {
+  // Chaves de storage — namespaced para slots+modo; templates são globais.
+  const nsSuffix = storageNamespace ? `.${storageNamespace}` : "";
+  const slotsKey = LS_KEY + nsSuffix;
+  const modeStorageKey = LS_MODE_KEY + nsSuffix;
+
+  const [slots, setSlotsRaw] = useState<CardSlot[]>(() => loadSlots(slotsKey));
   const [showPicker, setShowPicker] = useState<boolean>(false);
   const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
   const [sessionMode, setSessionMode] = useState<SessionMode>(() => {
-    const saved = localStorage.getItem(LS_MODE_KEY);
+    const saved = localStorage.getItem(modeStorageKey);
     return (saved === 'parallel' ? 'parallel' : 'sequential') as SessionMode;
   });
   const [showAnalytics, setShowAnalytics] = useState<boolean>(false);
@@ -153,14 +196,16 @@ export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps
   const [saveTemplateName, setSaveTemplateName] = useState<string>("");
   const [showSaveInput, setShowSaveInput] = useState<boolean>(false);
 
-  // Smart suggestions
-  const suggestions = useMemo(() => {
-    const computed = computeSuggestions();
-    return computed.length > 0 ? computed : DEFAULT_SUGGESTIONS;
-  }, []);
+  // Índice de modos conhecidos (para resolver sugestões sem abrir o picker)
+  const modeIndex = useMemo(buildModeIndex, []);
 
-  // Known modes cache (for suggestions → load)
-  const knownModes = useRef<Map<string, ModeConfig>>(new Map());
+  // Smart suggestions (com prioridade contextual quando aplicável)
+  const suggestions = useMemo(() => {
+    const base = computeSuggestions();
+    const list = base.length > 0 ? base : DEFAULT_SUGGESTIONS;
+    const ctx = suggestContext ? CONTEXT_SUGGESTIONS[suggestContext] : null;
+    return ctx ? [ctx, ...list].slice(0, 3) : list;
+  }, [suggestContext]);
 
   // Drag state (desktop HTML5)
   const dragIndex = useRef<number>(-1);
@@ -175,23 +220,23 @@ export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps
   const setSlots = useCallback((updater: CardSlot[] | ((prev: CardSlot[]) => CardSlot[])) => {
     setSlotsRaw((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      saveSlots(next);
+      saveSlots(slotsKey, next);
       return next;
     });
-  }, []);
+  }, [slotsKey]);
 
   // Expose addMode externally so parent can add a mode directly to this board
   useEffect(() => {
     if (addModeRef) {
       addModeRef.current = (mode: ModeConfig) => {
-        knownModes.current.set(mode.id, mode);
+        modeIndex.set(mode.id, mode);
         setSlots((prev) => [...prev, { slotId: nextSlotId(), mode }]);
       };
     }
     return () => {
       if (addModeRef) addModeRef.current = null;
     };
-  }, [addModeRef, setSlots]);
+  }, [addModeRef, setSlots, modeIndex]);
 
   // ── Mode picker ────────────────────────────────────────────────────────────
   const openPicker = (slotId?: string): void => {
@@ -200,7 +245,7 @@ export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps
   };
 
   const handleSelectMode = (mode: ModeConfig): void => {
-    knownModes.current.set(mode.id, mode);
+    modeIndex.set(mode.id, mode);
     setShowPicker(false);
     if (pickerSlotId) {
       // Replace existing slot
@@ -247,7 +292,7 @@ export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps
   // ── Suggestions ────────────────────────────────────────────────────────────
   const handleLoadSuggestion = (suggestion: Suggestion): void => {
     const modes: ModeConfig[] = suggestion.ids
-      .map((id) => knownModes.current.get(id))
+      .map((id) => modeIndex.get(id))
       .filter((m): m is ModeConfig => m !== undefined);
     if (modes.length === 0) {
       openPicker();
@@ -333,7 +378,7 @@ export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps
   // ── Session mode toggle ────────────────────────────────────────────────────
   const handleToggleMode = (mode: SessionMode): void => {
     setSessionMode(mode);
-    localStorage.setItem(LS_MODE_KEY, mode);
+    localStorage.setItem(modeStorageKey, mode);
   };
 
   // ── Start session ──────────────────────────────────────────────────────────
@@ -351,24 +396,11 @@ export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps
       .map((l: any) => l.modeId as string);
   }, [showPicker]); // recalcula toda vez que o picker abre
 
-  if (showPicker) {
-    return (
-      <ModePicker
-        onSelect={handleSelectMode}
-        onClose={() => { setShowPicker(false); setPickerSlotId(null); }}
-        selectedIds={selectedIds}
-        usedTodayIds={usedTodayIds}
-      />
-    );
-  }
-
   return (
     <div className={styles.root}>
       <div className={styles.header}>
-        <h2 className={styles.title}>Minha sessão</h2>
-        <p className={styles.subtitle}>
-          Monte os modos que vai usar e inicie quando estiver pronto.
-        </p>
+        <h2 className={styles.title}>{title}</h2>
+        <p className={styles.subtitle}>{subtitle}</p>
       </div>
 
       <div className={styles.cardsList}>
@@ -577,6 +609,17 @@ export default function SlotBoard({ onStartSession, addModeRef }: SlotBoardProps
       </div>
 
       {showAnalytics && <ComboAnalytics />}
+
+      {/* ModePicker é um overlay fixo (position: fixed) renderizado por cima,
+          mantendo o board montado por baixo — evita o "flash" de sumiço. */}
+      {showPicker && (
+        <ModePicker
+          onSelect={handleSelectMode}
+          onClose={() => { setShowPicker(false); setPickerSlotId(null); }}
+          selectedIds={selectedIds}
+          usedTodayIds={usedTodayIds}
+        />
+      )}
     </div>
   );
 }

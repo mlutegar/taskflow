@@ -48,6 +48,36 @@ export function getCheckinLog(): unknown[] {
   return storageGet(LS_KEY, []);
 }
 
+export interface ClearScope {
+  modeId?: string;
+  days?: number;
+}
+
+function cutoffIsoLocal(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+}
+
+/** Apaga o histórico local de check-ins/feedbacks (todo, ou com escopo por modo/período). */
+export function clearCheckinLog(scope: ClearScope = {}): void {
+  if (!scope.modeId && !scope.days) {
+    storageSet(LS_KEY, []);
+    storageSet(FEEDBACK_KEY, []);
+    return;
+  }
+  const cutoff = scope.days ? cutoffIsoLocal(scope.days) : null;
+  const inScope = (e: Record<string, unknown>): boolean => {
+    const matchesMode = !scope.modeId || e.modeId === scope.modeId;
+    const matchesDays = !cutoff || String(e.date ?? "") >= cutoff;
+    return matchesMode && matchesDays;
+  };
+  const checkins = storageGet<Array<Record<string, unknown>>>(LS_KEY, []);
+  storageSet(LS_KEY, checkins.filter((e) => !inScope(e)));
+  const feedbacks = storageGet<Array<Record<string, unknown>>>(FEEDBACK_KEY, []);
+  storageSet(FEEDBACK_KEY, feedbacks.filter((e) => !inScope(e)));
+}
+
 /** Total de check-ins realizados (para conquista "Auto-conhecimento"). */
 export function getCheckinCount(): number {
   return getCheckinLog().length;

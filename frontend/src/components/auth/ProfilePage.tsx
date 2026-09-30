@@ -1,11 +1,19 @@
-import { useState } from "react";
-import { formatBuildDate } from "../../version.js";
+import { useState, useRef, useEffect } from "react";
+import { User, Mail, Package, RefreshCw, LogOut, Copy, Check, Pencil, Sun, Moon } from "lucide-react";
+import { formatBuildDate, APP_VERSION } from "../../version.js";
 import { useConfirm } from "../ConfirmDialog";
+import { useToast } from "../shared/Toast";
+import { getStoredTheme, setTheme, type Theme } from "../../lib/theme.js";
+import styles from "./ProfilePage.module.css";
 
 const USER_KEY = "taskflow.authUser";
+const NAME_KEY = "taskflow.displayName";
 
-function getStoredUser(): { email?: string } | null {
+function getStoredUser(): { email?: string; name?: string } | null {
   try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch { return null; }
+}
+function getStoredName(): string {
+  try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; }
 }
 
 interface ProfilePageProps {
@@ -15,26 +23,84 @@ interface ProfilePageProps {
 export default function ProfilePage({ onSignOut }: ProfilePageProps) {
   const user = getStoredUser();
   const email = user?.email ?? "";
-  const [checking, setChecking] = useState<boolean>(false);
   const { confirm, ConfirmUI } = useConfirm();
+  const { showToast } = useToast();
+
+  const [checking, setChecking] = useState<boolean>(false);
+  const [copied, setCopied] = useState<boolean>(false);
+  const [theme, setThemeState] = useState<Theme>(getStoredTheme());
+
+  const [name, setName] = useState<string>(() => getStoredName() || user?.name || "");
+  const [editingName, setEditingName] = useState<boolean>(false);
+  const [nameDraft, setNameDraft] = useState<string>(name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingName) nameInputRef.current?.focus();
+  }, [editingName]);
+
+  const displayName = name || email.split("@")[0] || "Usuário";
+  const initial = (displayName.trim()[0] || "?").toUpperCase();
+
+  const handleChangeTheme = (next: Theme): void => {
+    setTheme(next);
+    setThemeState(next);
+    showToast(next === "light" ? "Tema claro ativado" : "Tema escuro ativado", "success");
+  };
+
+  const handleCopyEmail = async (): Promise<void> => {
+    if (!email) return;
+    try {
+      await navigator.clipboard.writeText(email);
+      setCopied(true);
+      showToast("Email copiado", "success");
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      showToast("Não foi possível copiar", "error");
+    }
+  };
+
+  const saveName = (): void => {
+    const trimmed = nameDraft.trim();
+    setName(trimmed);
+    try { localStorage.setItem(NAME_KEY, trimmed); } catch { /* ignore */ }
+    setEditingName(false);
+    showToast("Nome atualizado", "success");
+  };
 
   const handleCheckUpdates = async (): Promise<void> => {
-    const ok = await confirm({
-      title: "Buscar atualizações?",
-      message: "O app será recarregado e o cache local será limpo.",
-      confirmLabel: "Recarregar",
-    });
-    if (!ok) return;
     setChecking(true);
-    if ("caches" in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
+    try {
+      let hasUpdate = false;
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          await reg.update();
+          hasUpdate = Boolean(reg.waiting || reg.installing);
+        }
+      }
+
+      if (hasUpdate) {
+        const ok = await confirm({
+          title: "Nova versão disponível",
+          message: "O app será recarregado para aplicar a atualização.",
+          confirmLabel: "Atualizar agora",
+        });
+        if (!ok) { setChecking(false); return; }
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        window.location.reload();
+        return;
+      }
+
+      showToast("Você já está na última versão ✓", "success");
+    } catch {
+      showToast("Falha ao verificar atualizações", "error");
+    } finally {
+      setChecking(false);
     }
-    if ("serviceWorker" in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
-    }
-    window.location.reload(true as unknown as boolean);
   };
 
   const handleSignOut = async (): Promise<void> => {
@@ -46,59 +112,126 @@ export default function ProfilePage({ onSignOut }: ProfilePageProps) {
     if (ok) onSignOut();
   };
 
-  const card: React.CSSProperties = {
-    background: "var(--surface)",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius)",
-    padding: "16px 20px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-  };
-  const label: React.CSSProperties = { fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" };
-  const btnBase: React.CSSProperties = {
-    width: "100%", padding: "12px 16px", background: "none", border: "none",
-    borderRadius: "var(--radius-sm)", fontSize: 14, fontWeight: 600,
-    cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center",
-    gap: 10, transition: "background 0.15s",
-  };
-
   return (
-    <div style={{ maxWidth: 480, margin: "40px auto", padding: "0 20px", display: "flex", flexDirection: "column", gap: 20 }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>👤 Perfil</h2>
-
-      <div style={card}>
-        <div style={label}>Conta</div>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>{email || "—"}</div>
+    <div className={styles.page}>
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div className={styles.header}>
+        <div className={styles.avatar} aria-hidden="true">{initial}</div>
+        <div className={styles.headerInfo}>
+          {editingName ? (
+            <input
+              ref={nameInputRef}
+              className={styles.nameInput}
+              value={nameDraft}
+              maxLength={40}
+              aria-label="Nome de exibição"
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={saveName}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveName();
+                if (e.key === "Escape") { setNameDraft(name); setEditingName(false); }
+              }}
+            />
+          ) : (
+            <div className={styles.nameRow}>
+              <h2 className={styles.name}>{displayName}</h2>
+              <button
+                className={styles.iconBtn}
+                aria-label="Editar nome"
+                onClick={() => { setNameDraft(name); setEditingName(true); }}
+              >
+                <Pencil size={15} aria-hidden="true" />
+              </button>
+            </div>
+          )}
+          {email && <div className={styles.subtitle}>{email}</div>}
+        </div>
       </div>
 
-      <div style={card}>
-        <div style={label}>Versão instalada</div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-muted)" }}>{formatBuildDate()}</div>
-      </div>
+      {/* ── Conta ──────────────────────────────────────────── */}
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>Conta</div>
+        <div className={styles.card}>
+          <div className={styles.chip}><Mail size={20} aria-hidden="true" /></div>
+          <div className={styles.cardBody}>
+            <div className={styles.label}>Email</div>
+            <div className={styles.value}>{email || "—"}</div>
+          </div>
+          {email && (
+            <button
+              className={styles.iconBtn}
+              aria-label="Copiar email"
+              onClick={handleCopyEmail}
+            >
+              {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+            </button>
+          )}
+        </div>
+      </section>
 
-      <div style={{ ...card, padding: "4px" }}>
+      {/* ── Aparência ──────────────────────────────────────── */}
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>Aparência</div>
+        <div className={styles.card}>
+          <div className={styles.chip}>
+            {theme === "light" ? <Sun size={20} aria-hidden="true" /> : <Moon size={20} aria-hidden="true" />}
+          </div>
+          <div className={styles.cardBody}>
+            <div className={styles.label}>Tema</div>
+            <div className={`${styles.value} ${styles.valueMuted}`}>{theme === "light" ? "Claro" : "Escuro"}</div>
+          </div>
+          <div className={styles.toggle} role="group" aria-label="Selecionar tema">
+            <button
+              className={`${styles.toggleOpt} ${theme === "dark" ? styles.toggleActive : ""}`}
+              aria-pressed={theme === "dark"}
+              onClick={() => handleChangeTheme("dark")}
+            >
+              <Moon size={14} aria-hidden="true" /> Escuro
+            </button>
+            <button
+              className={`${styles.toggleOpt} ${theme === "light" ? styles.toggleActive : ""}`}
+              aria-pressed={theme === "light"}
+              onClick={() => handleChangeTheme("light")}
+            >
+              <Sun size={14} aria-hidden="true" /> Claro
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Sobre o app ────────────────────────────────────── */}
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>Sobre o app</div>
+        <div className={styles.card}>
+          <div className={styles.chip}><Package size={20} aria-hidden="true" /></div>
+          <div className={styles.cardBody}>
+            <div className={styles.label}>Versão instalada</div>
+            <div className={`${styles.value} ${styles.valueMuted}`}>{APP_VERSION} · {formatBuildDate()}</div>
+          </div>
+        </div>
         <button
+          className={styles.actionBtn}
           onClick={handleCheckUpdates}
           disabled={checking}
-          style={{ ...btnBase, color: "var(--text)", opacity: checking ? 0.6 : 1 }}
-          onMouseEnter={(e) => !checking && (e.currentTarget.style.background = "var(--surface-hover, rgba(0,0,0,0.05))")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+          aria-label="Buscar atualizações"
         >
-          {checking ? "⏳ Limpando cache..." : "🔄 Buscar atualizações"}
+          <RefreshCw size={18} aria-hidden="true" className={checking ? styles.spin : undefined} />
+          {checking ? "Verificando..." : "Buscar atualizações"}
         </button>
-      </div>
+      </section>
 
-      <div style={{ ...card, padding: "4px" }}>
+      {/* ── Sessão ─────────────────────────────────────────── */}
+      <section className={styles.section}>
+        <div className={styles.sectionTitle}>Sessão</div>
         <button
+          className={`${styles.actionBtn} ${styles.danger}`}
           onClick={handleSignOut}
-          style={{ ...btnBase, color: "var(--danger, #e05252)" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(224,82,82,0.08)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+          aria-label="Sair da conta"
         >
-          🚪 Sair da conta
+          <LogOut size={18} aria-hidden="true" />
+          Sair da conta
         </button>
-      </div>
+      </section>
 
       {ConfirmUI}
     </div>

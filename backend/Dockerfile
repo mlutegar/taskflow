@@ -16,5 +16,5 @@ RUN mkdir -p /data
 
 EXPOSE 3001
 
-# Roda as migrations e sobe o servidor
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node src/index.js"]
+# Aplica migrations versionadas (idempotente, sem apagar dados) e sobe o servidor
+CMD ["sh", "-c", "npx prisma migrate deploy && node src/index.js"]

@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { getHistory } from "../lib/dailyFocusHistory";
-import { getUsageLogs, getWeeklyFocusComparison } from "../lib/sessionUsageLog";
-import { usageStats } from "../lib/modeLog";
+import { getUsageLogs, getWeeklyFocusComparison, usageStats } from "../lib/sessionUsageLog";
 import { MODES } from "../data/modes";
 import { storageGet, storageSet } from "../lib/storage";
 import styles from "./WeeklyReview.module.css";

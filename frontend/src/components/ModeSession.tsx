@@ -3,8 +3,10 @@ import styles from "./ModeSession.module.css";
 import ModalOverlay from "./shared/ModalOverlay";
 import { useDialog } from "../lib/useDialog";
 import { logActivation } from "../lib/modeActivations";
+import { getModeFocusMinutes, getModeFocusStats } from "../lib/modeFocusTimer";
 import { storageGet, storageSet, storageRemove } from "../lib/storage";
 import { SK } from "../lib/storageKeys";
+import { MinimizeIcon } from "./shared/icons";
 import PostSessionForm from "./sessions/PostSessionForm";
 import SessionSummary from "./shared/SessionSummary";
 import MusicSession from "./sessions/MusicSession";
@@ -98,14 +100,20 @@ interface ModeSessionProps {
   onAddRoutineChecklist?: (parentId: string, description: string) => Promise<void>;
   onToggleRoutineChecklist?: (parentId: string, itemId: string) => Promise<void>;
   onTaskComplete?: (modeId: string) => void;
+  onMinimize?: () => void;
   onClose: () => void;
+  /** Quando true, ao montar/expandir dispara o fluxo de encerramento com registro
+   *  (resumo → PostSessionForm). Usado ao encerrar pelo card flutuante minimizado. */
+  autoEnd?: boolean;
+  /** Chamado logo após consumir `autoEnd`, para o pai resetar o sinal. */
+  onAutoEndConsumed?: () => void;
 }
 
 export interface ModeSessionHandle {
   triggerClose: () => void;
 }
 
-const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function ModeSession({ modeId, mode, tasks, routines = [], intention, onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onClose }, ref) {
+const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function ModeSession({ modeId, mode, tasks, routines = [], intention, onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist, onTaskComplete, onMinimize, onClose, autoEnd, onAutoEndConsumed }, ref) {
   const [quickAdd, setQuickAdd] = useState<boolean>(false);
   const [confirmingClose, setConfirmingClose] = useState<boolean>(false);
   const [showPostForm, setShowPostForm] = useState<boolean>(false);
@@ -139,7 +147,12 @@ const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function Mod
       modalRef.current.style.transform = "";
       modalRef.current.style.transition = "";
     }
-    if (swipeDelta.current > 100) handleClose();
+    // Swipe longo (>160px) encerra; swipe curto (>50px) minimiza (se disponível).
+    if (swipeDelta.current > 160) {
+      handleClose();
+    } else if (swipeDelta.current > 50 && onMinimize) {
+      onMinimize();
+    }
     swipeTouchY.current = null;
     swipeDelta.current = 0;
   };
@@ -160,6 +173,15 @@ const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function Mod
   // Intercepta o fechamento para mostrar confirmação (quando o usuário clica X no meio)
   const handleClose = useCallback(() => setConfirmingClose(true), []);
 
+  // Encerramento acionado pelo card flutuante: expande já direto no fluxo de registro
+  // (resumo → PostSessionForm), para que a sessão seja salva para análise.
+  useEffect(() => {
+    if (autoEnd) {
+      handleSessionDone(0);
+      onAutoEndConsumed?.();
+    }
+  }, [autoEnd]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Registra ativação do modo ao abrir a sessão e captura timestamp de início
   useEffect(() => {
     if (modeId) {
@@ -177,7 +199,21 @@ const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function Mod
   const [qaSaving, setQaSaving] = useState<boolean>(false);
   const [qaSuccess, setQaSuccess] = useState<string | null>(null); // "task" | "subtask" | null
 
-  const dialogRef = useDialog(handleClose);
+  // Esc minimiza quando a sessão é minimizável (mantém a sessão viva); senão fecha.
+  const dialogRef = useDialog(onMinimize ?? handleClose);
+
+  // Atalho de teclado "M" minimiza a sessão (ignora quando digitando em campos).
+  useEffect(() => {
+    if (!onMinimize) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key.toLowerCase() !== "m" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (["input", "textarea", "select"].includes(tag) || (e.target as HTMLElement)?.isContentEditable) return;
+      onMinimize();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onMinimize]);
 
   // Mescla tarefas + rotinas pendentes num array unificado
   const items: any[] = [
@@ -271,6 +307,25 @@ const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function Mod
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
+        {/* ── Minimizar para card flutuante ─────────────────── */}
+        {onMinimize && !showPostForm && !showSummary && (
+          <button
+            type="button"
+            onClick={onMinimize}
+            aria-label="Minimizar sessão"
+            title="Minimizar — continua ativa em segundo plano"
+            style={{
+              position: "absolute", top: 8, right: 8, zIndex: 20,
+              width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+              borderRadius: "var(--radius-sm)", border: "1px solid var(--border)",
+              background: "var(--surface-2)", color: "var(--text-muted)",
+              fontSize: 14, lineHeight: 1, cursor: "pointer",
+            }}
+          >
+            <MinimizeIcon />
+          </button>
+        )}
+
         {/* ── Resumo pós-sessão ────────────────────────────── */}
         {showSummary && summaryData && (
           <SessionSummary
@@ -289,6 +344,8 @@ const ModeSession = forwardRef<ModeSessionHandle, ModeSessionProps>(function Mod
             modeName={mode?.name}
             suggestedMinutes={summaryData?.durationMinutes ?? 0}
             sessionStartedAt={storageGet<string | null>(SK.SESSION_STARTED_AT, null)}
+            focusMinutes={getModeFocusMinutes()}
+            focusStats={getModeFocusStats()}
             intention={intention}
             onDone={() => { storageRemove(SK.SESSION_STARTED_AT); onClose(); }}
           />

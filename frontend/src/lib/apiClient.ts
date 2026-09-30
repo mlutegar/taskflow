@@ -22,6 +22,22 @@ const TIMEOUT_MS: number = API_TIMEOUT_MS;
 const TOKEN_KEY = "taskflow.authToken";
 const USER_KEY = "taskflow.authUser";
 
+export interface RequestOptions {
+  timeoutMs?: number;
+  idempotencyKey?: string;
+}
+
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public data: unknown) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export function apiConnection(): { baseUrl: string; token: string | null } {
+  return { baseUrl: BASE_URL, token: getToken() };
+}
+
 export const SESSION_REFRESHED_EVENT = "taskflow:session-refreshed";
 export const SESSION_EXPIRED_EVENT = "taskflow:session-expired";
 
@@ -77,24 +93,35 @@ export type RefreshResult =
   | { status: "auth" }      // token inválido/rejeitado → encerrar sessão
   | { status: "network" };  // offline/5xx → manter sessão, transitório
 
-// Single-flight: apenas 1 refresh por vez.
+// Single-flight: apenas 1 refresh por vez. Guardamos também o token que está
+// sendo renovado — se o token do localStorage mudar no meio (troca de conta ou
+// outra aba renovou), o refresh em voo é irrelevante e iniciamos um novo.
 let refreshInFlight: Promise<RefreshResult> | null = null;
+let refreshInFlightToken: string | null = null;
 
 export function refreshSession(): Promise<RefreshResult> {
-  if (refreshInFlight) return refreshInFlight;
+  const current = getToken();
+  if (refreshInFlight && refreshInFlightToken === current) return refreshInFlight;
 
-  refreshInFlight = (async (): Promise<RefreshResult> => {
+  refreshInFlightToken = current;
+  const p = (async (): Promise<RefreshResult> => {
     const token = getToken();
     if (!token) return { status: "auth" };
 
     let res: Response;
+    // Timeout via fetchWithTimeout (paridade com doFetch). Sem isso, um
+    // /auth/refresh travado (backend frio/rede lenta na primeira conexão)
+    // deixaria a Promise pendente para sempre → a query que aguarda o refresh
+    // nunca settla e a UI fica presa no skeleton. Abortando, cai em { network }.
     try {
-      res = await fetch(`${BASE_URL}/auth/refresh`, {
+      res = await fetchWithTimeout(`${BASE_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: "{}",
       });
     } catch {
-      // Erro de rede: não sabemos se o token é válido → NÃO encerrar sessão.
+      // Erro de rede OU abort por timeout: não sabemos se o token é válido →
+      // NÃO encerrar sessão (transitório).
       return { status: "network" };
     }
 
@@ -110,32 +137,69 @@ export function refreshSession(): Promise<RefreshResult> {
     return { status: "ok", token: data.token };
   })();
 
-  return refreshInFlight.finally(() => { refreshInFlight = null; });
+  refreshInFlight = p;
+  // Só limpa o singleton se ainda for este refresh (evita que o finally de um
+  // refresh antigo apague um novo iniciado após troca de token).
+  p.finally(() => {
+    if (refreshInFlight === p) { refreshInFlight = null; refreshInFlightToken = null; }
+  });
+  return p;
+}
+
+/**
+ * Aquece o backend com uma chamada leve e sem auth logo após o login,
+ * absorvendo a latência de cold start antes das queries pesadas. Best-effort:
+ * qualquer falha é ignorada (o retry/backoff do React Query cobre o resto).
+ */
+export function warmUpBackend(): void {
+  fetchWithTimeout(`${BASE_URL}/health`, { method: "GET" }).catch(() => {});
 }
 
 // ── HTTP ──────────────────────────────────────────────────────────────────────
+/**
+ * fetch com timeout via AbortController. Fonte única do padrão de timeout —
+ * usado por doFetch e refreshSession para evitar chamadas que "esquecem" o
+ * timeout (origem do bug de skeleton infinito).
+ */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number = TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function doFetch(
   method: string,
   path: string,
   body: unknown,
-  timeoutMs: number | undefined,
+  options: RequestOptions,
   token: string | null,
 ): Promise<Response> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs ?? TIMEOUT_MS);
+  if (options.idempotencyKey) headers["X-Idempotency-Key"] = options.idempotencyKey;
   try {
-    return await fetch(`${BASE_URL}${path}`, {
+    headers["X-Timezone"] = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
+  } catch {
+    headers["X-Timezone"] = "America/Sao_Paulo";
+  }
+
+  return fetchWithTimeout(
+    `${BASE_URL}${path}`,
+    {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
+    },
+    options.timeoutMs ?? TIMEOUT_MS,
+  );
 }
 
 function toError(err: unknown): Error {
@@ -145,12 +209,12 @@ function toError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
 }
 
-async function request(method: string, path: string, body?: unknown, timeoutMs?: number): Promise<unknown> {
+async function request(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<unknown> {
   const isRefreshCall = path === "/auth/refresh";
 
   let res: Response;
   try {
-    res = await doFetch(method, path, body, timeoutMs, getToken());
+    res = await doFetch(method, path, body, options, getToken());
   } catch (err: unknown) {
     throw toError(err);
   }
@@ -160,7 +224,7 @@ async function request(method: string, path: string, body?: unknown, timeoutMs?:
     const refresh = await refreshSession();
     if (refresh.status === "ok") {
       try {
-        res = await doFetch(method, path, body, timeoutMs, refresh.token);
+        res = await doFetch(method, path, body, options, refresh.token);
       } catch (err: unknown) {
         throw toError(err);
       }
@@ -179,7 +243,7 @@ async function request(method: string, path: string, body?: unknown, timeoutMs?:
 
   if (!res.ok) {
     const d = data as { message?: string; error?: string } | null;
-    throw new Error(d?.message || d?.error || `Erro ${res.status}`);
+    throw new ApiError(d?.message || d?.error || `Erro ${res.status}`, res.status, data);
   }
 
   return data;
@@ -187,8 +251,9 @@ async function request(method: string, path: string, body?: unknown, timeoutMs?:
 
 export const api = {
   get:    (path: string): Promise<unknown>               => request("GET",    path),
-  post:   (path: string, body?: unknown, timeoutMs?: number): Promise<unknown> => request("POST",   path, body, timeoutMs),
-  patch:  (path: string, body?: unknown): Promise<unknown> => request("PATCH",  path, body),
-  put:    (path: string, body?: unknown): Promise<unknown> => request("PUT",    path, body),
-  delete: (path: string): Promise<unknown>               => request("DELETE", path),
+  post:   (path: string, body?: unknown, timeoutOrOptions?: number | RequestOptions): Promise<unknown> =>
+    request("POST", path, body, typeof timeoutOrOptions === "number" ? { timeoutMs: timeoutOrOptions } : timeoutOrOptions),
+  patch:  (path: string, body?: unknown, options?: RequestOptions): Promise<unknown> => request("PATCH", path, body, options),
+  put:    (path: string, body?: unknown, options?: RequestOptions): Promise<unknown> => request("PUT", path, body, options),
+  delete: (path: string, options?: RequestOptions): Promise<unknown> => request("DELETE", path, undefined, options),
 };

@@ -1742,6 +1742,29 @@ export const MODES = [
     ],
     tips: "Ideal para manutenção ampla — você garante que nenhum conteúdo fica esquecido por mais de um ciclo.",
   },
+  // ── Órbita por Voz ──────────────────────────────────────────────────────
+  {
+    id: "orbita_voz",
+    type: "durante",
+    emoji: "🪐",
+    name: "Órbita por Voz",
+    tagline: "Dê comandos de voz ao Órbita sem parar a atividade",
+    color: "#00897b",
+    colorBg: "rgba(0,137,123,0.08)",
+    category: "Memória",
+    context: ["📱 Mobile", "🎙️ Voz", "🧠 Memória"],
+    prerequisite: "Órbita instalado com comando de voz habilitado e ao menos um grupo de conteúdo ativo para revisar.",
+    whyItWorks: "Falar os comandos mantém as mãos e os olhos livres para a tarefa — a revisão acontece em paralelo, sem quebra de fluxo. Responder por voz também força uma recuperação ativa mais explícita, reforçando a memória.",
+    whenToUse: "Quando você quer revisar com o Órbita mas está com as mãos ocupadas ou não quer interromper a atividade principal (movimento, tarefa manual, etc.).",
+    steps: [
+      "Ative o comando de voz do Órbita antes de começar a atividade",
+      "Enquanto realiza a tarefa, peça o próximo prompt por voz",
+      "Responda o prompt em voz alta, sem parar o que está fazendo",
+      "Use comandos falados para avançar, repetir ou marcar acerto/erro",
+      "Continue intercalando: cada comando de voz mantém a revisão viva durante o fluxo",
+    ],
+    tips: "Fale de forma clara e curta — comandos objetivos funcionam melhor. Se o ambiente for barulhento, combine com fones/microfone para não perder o reconhecimento.",
+  },
   // ── Sucessão de Abas do Navegador ───────────────────────────────────────
   {
     id: "aba_navegador_successao",
@@ -2101,7 +2124,7 @@ export const HELPER_GROUPS = [
   { label: "Música",        ids: ["music_hundred", "music_album", "music_playlist", "sing_one", "sing_ten", "cantar", "playlist_fixed", "playlist_prog"] },
   { label: "Ciclos",        ids: ["tiktok", "youtube_fixed", "twitter_fixed", "reddit_fixed", "whatsapp_fixed", "gamer_fixed", "netflix_episode", "splite", "lazyfal", "modo_aleatorio", "tiktok_salvos", "instagram_salvos"] },
   { label: "Foco",          ids: ["momentum", "espresso", "rpg", "pomodoro", "sprint_pendencias", "cold_turkey", "accountability", "dead_deadline", "papel_tela", "papel_caneta", "papel_caneta_frase", "papel_caneta_estimativa", "papel_caneta_revisao", "estatua", "em_pe", "aba_navegador_successao", "aba_navegador_igualdade", "aba_windows_successao", "aba_windows_igualdade", "modo_serie", "melhorar_taskflow"] },
-  { label: "Memória",       ids: ["anki_atividade", "orbita_atividade", "orbita_successao", "orbita_igualdade"] },
+  { label: "Memória",       ids: ["anki_atividade", "orbita_atividade", "orbita_successao", "orbita_igualdade", "orbita_voz"] },
   { label: "Ritual/Mobile", ids: ["caferitual", "tabhop"] },
   { label: "Ritual",        ids: ["agua", "meditar", "ler_diario", "diario_falado", "esticar", "caminhar", "livro", "exercicio", "morning_routine", "soneca_5", "soneca_15", "tomar_banho", "embaixadinha", "respiracao", "pausa_digital", "comer_algo", "recompensa", "diario_celular", "diario_pc", "diario_mao", "shot_dagua", "comprar_bala", "gratidao"] },
 ];
@@ -2139,6 +2162,7 @@ export const CATEGORY_BY_ID = {
   melhorar_taskflow: "Foco",
   diario_celular: "Ritual", diario_pc: "Ritual", diario_mao: "Ritual",
   shot_dagua: "Ritual", comprar_bala: "Ritual", gratidao: "Ritual",
+  orbita_atividade: "Memória", orbita_successao: "Memória", orbita_igualdade: "Memória", orbita_voz: "Memória",
 };
 
 export const CATEGORY_ORDER = ["Música", "Ciclos", "Foco", "Memória", "Ritual", "Mobile", "Personalizados"];

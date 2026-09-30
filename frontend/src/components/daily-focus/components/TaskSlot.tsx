@@ -20,6 +20,11 @@ interface TaskItem {
   [key: string]: unknown;
 }
 
+interface PriorityItem {
+  id: string;
+  title: string;
+}
+
 interface Slot {
   title: string;
   supabaseId: string | null | undefined;
@@ -44,9 +49,10 @@ interface TaskSlotProps {
   canMoveUp: boolean;
   canMoveDown: boolean;
   allModes?: ModeItem[];
-  usedModes?: string[];
+  usedModes?: Record<string, number>;
   suggestedModeId?: string | null;
   hideDuration?: boolean;
+  todayPriorities?: PriorityItem[];
 }
 
 function loadPresets(): ComboPreset[] {
@@ -61,7 +67,7 @@ function getModeById(id: string | undefined | null, allModes: ModeItem[]): ModeI
   return allModes.find((m) => m.id === id) || null;
 }
 
-function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes = [], usedModes = [], suggestedModeId = null, hideDuration = false }: TaskSlotProps) {
+function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveUp, canMoveDown, allModes = [], usedModes = {}, suggestedModeId = null, hideDuration = false, todayPriorities = [] }: TaskSlotProps) {
   const [query, setQuery] = useState<string>(slot.title);
   const [results, setResults] = useState<TaskItem[]>([]);
   const [todayTasks, setTodayTasks] = useState<TaskItem[]>([]);
@@ -78,14 +84,23 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
     tasksApi.listDueToday().then(setTodayTasks).catch(() => {});
   }, []);
 
+  const priorityIds = new Set(todayPriorities.map((p) => String(p.id)));
+
   const search = (val: string): void => {
     setQuery(val);
     clearTimeout(debounce.current!);
     if (!val.trim()) { setResults([]); return; }
     debounce.current = setTimeout(async () => {
       try {
-        const tasks = await tasksApi.list({ status: "active" });
-        setResults(tasks.filter((t: TaskItem) => t.title.toLowerCase().includes(val.toLowerCase())).slice(0, 6));
+        const tasks = await tasksApi.list({ status: "active" }) as unknown as TaskItem[];
+        const matched = tasks.filter((t) => t.title.toLowerCase().includes(val.toLowerCase()));
+        // Prioridades do dia primeiro.
+        matched.sort((a, b) => {
+          const pa = priorityIds.has(String(a.id)) ? 0 : 1;
+          const pb = priorityIds.has(String(b.id)) ? 0 : 1;
+          return pa - pb;
+        });
+        setResults(matched.slice(0, 6));
       } catch { setResults([]); }
     }, 300);
   };
@@ -115,6 +130,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
 
   const helperModeIds: string[] = slot.helperModeIds ?? [];
   const interModeIds: string[] = slot.interModeIds ?? [];
+  const showPrioritySuggestions = !query.trim() && results.length === 0 && todayPriorities.length > 0;
   const showTodaySuggestions = !query.trim() && todayTasks.length > 0;
 
   // ── Combo Presets ──
@@ -194,6 +210,18 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
         }}
       />
 
+      {showPrioritySuggestions && (
+        <div className={styles.slotResults}>
+          <div className={styles.slotResultsLabel}>⭐ prioridades de hoje</div>
+          {todayPriorities.map((p) => (
+            <div key={p.id} className={styles.slotResultItem} onMouseDown={() => select({ id: p.id, title: p.title })}>
+              <span className={styles.slotResultIcon}>⭐</span>
+              {p.title}
+            </div>
+          ))}
+        </div>
+      )}
+
       {showTodaySuggestions && results.length === 0 && (
         <div className={styles.slotResults}>
           <div className={styles.slotResultsLabel}>📅 vence hoje</div>
@@ -210,7 +238,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
         <div className={styles.slotResults}>
           {results.map((t) => (
             <div key={t.id as string} className={styles.slotResultItem} onMouseDown={() => select(t)}>
-              <span className={styles.slotResultIcon}>↳</span>
+              <span className={styles.slotResultIcon}>{priorityIds.has(String(t.id)) ? "⭐" : "↳"}</span>
               {t.title}
             </div>
           ))}

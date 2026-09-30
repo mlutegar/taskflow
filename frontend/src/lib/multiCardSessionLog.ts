@@ -30,6 +30,9 @@ export interface ActiveMultiCardSession {
   cards: string[];          // IDs dos modos
   startedAt: string;        // ISO timestamp
   currentCardIndex: number;
+  sessionMode?: 'sequential' | 'parallel';
+  intention?: string;
+  minimized?: boolean;      // sessão minimizada no card flutuante
 }
 
 // ── Sessão ativa ────────────────────────────────────────────────────────────
@@ -57,6 +60,14 @@ export function updateActiveSessionIndex(index: number): void {
   const session = loadActiveSession();
   if (!session) return;
   session.currentCardIndex = index;
+  storageSet(SK.ACTIVE_MULTI_CARD_SESSION, session);
+}
+
+/** Atualiza o flag `minimized` da sessão ativa (para o card flutuante). */
+export function updateActiveSessionMinimized(minimized: boolean): void {
+  const session = loadActiveSession();
+  if (!session) return;
+  session.minimized = minimized;
   storageSet(SK.ACTIVE_MULTI_CARD_SESSION, session);
 }
 

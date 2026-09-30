@@ -33,6 +33,8 @@ export default async function preferencesRoutes(fastify) {
       paperReminders: parseJson(row?.paperReminders, []),
       lastEstadoId:   row?.lastEstadoId ?? null,
       onboarded:      row?.onboarded ?? false,
+      timezone:       row?.timezone ?? "America/Sao_Paulo",
+      orbitaPromptTemplate: row?.orbitaPromptTemplate ?? "",
     };
   });
 
@@ -40,7 +42,8 @@ export default async function preferencesRoutes(fastify) {
   fastify.put("/", async (req, reply) => {
     const {
       customModes, deletedModeIds, hiddenModeIds, weeklyGoal, activities,
-      estadosCustom, paperReminders, lastEstadoId, onboarded,
+      estadosCustom, paperReminders, lastEstadoId, onboarded, timezone,
+      orbitaPromptTemplate,
     } = req.body ?? {};
 
     const existing = await prisma.userPreferences.findUnique({
@@ -57,6 +60,15 @@ export default async function preferencesRoutes(fastify) {
     if (paperReminders !== undefined) updateData.paperReminders = JSON.stringify(paperReminders);
     if (lastEstadoId   !== undefined) updateData.lastEstadoId   = lastEstadoId;
     if (onboarded      !== undefined) updateData.onboarded      = onboarded;
+    if (orbitaPromptTemplate !== undefined) updateData.orbitaPromptTemplate = String(orbitaPromptTemplate ?? "");
+    if (timezone !== undefined) {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
+        updateData.timezone = timezone;
+      } catch {
+        return reply.status(400).send({ error: "Fuso horário inválido." });
+      }
+    }
 
     if (existing) {
       await prisma.userPreferences.update({
@@ -76,6 +88,8 @@ export default async function preferencesRoutes(fastify) {
           paperReminders: updateData.paperReminders ?? "[]",
           lastEstadoId:   updateData.lastEstadoId   ?? null,
           onboarded:      updateData.onboarded      ?? false,
+          timezone:       updateData.timezone       ?? "America/Sao_Paulo",
+          orbitaPromptTemplate: updateData.orbitaPromptTemplate ?? "",
         },
       });
     }

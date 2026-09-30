@@ -11,6 +11,7 @@ services:
     environment:
       DATABASE_URL: file:/data/taskflow.db
       JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 3001
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5175}
       SUPABASE_URL: ${SUPABASE_URL}
@@ -41,6 +42,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
+        APP_COMMIT: ${APP_COMMIT:-}
     image: taskflow:latest
     container_name: taskflow
     restart: unless-stopped
@@ -49,6 +51,12 @@ services:
     depends_on:
       taskflow-api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   taskflow_data:

@@ -1,2 +1,0 @@
--- Migration inicial: tabelas já existem no Supabase
--- Este arquivo marca o estado inicial do banco para o Prisma.

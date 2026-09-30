@@ -1,33 +1,101 @@
 .form {
+  position: relative;
   background: var(--surface);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-radius: 14px;
   padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+/* Barra de acento no topo do card */
+.form::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+}
+
+/* ── Header ───────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
 }
 
 .heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   font-size: 15px;
   font-weight: 600;
-  color: var(--accent);
-  margin-bottom: 2px;
+  color: var(--text);
 }
 
+.heading::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(124, 110, 245, 0.7);
+}
+
+.btnClose {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btnClose:hover { color: var(--text); background: var(--surface-2); }
+
+/* ── Campos ───────────────────────────────────────────── */
 .input, .textarea, .select {
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text);
   font-size: 14px;
-  padding: 9px 12px;
+  padding: 11px 12px;
   border-radius: var(--radius-sm);
   outline: none;
   width: 100%;
-  transition: border-color 0.15s;
+  min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.input:focus, .textarea:focus, .select:focus { border-color: var(--accent); }
+/* Aparência nativa do input de data é neutralizada globalmente em index.css.
+   Aqui só garantimos altura consistente (evita colapso ao remover appearance
+   no iOS) e largura total dentro do card. */
+.input[type="date"] {
+  width: 100%;
+  min-height: 42px;
+  line-height: 1.2;
+}
+
+.inputTitle { font-size: 16px; font-weight: 500; }
+
+.input:focus, .textarea:focus, .select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124, 110, 245, 0.15);
+}
 .input::placeholder, .textarea::placeholder { color: var(--text-muted); }
 .textarea { resize: vertical; }
 
@@ -38,9 +106,10 @@
 
 .field {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
 .label {
@@ -51,46 +120,290 @@
   letter-spacing: 0.5px;
 }
 
-.actions {
+.fieldMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 14px;
+}
+
+.counter {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* ── Prioridade (pills) ───────────────────────────────── */
+.pills {
   display: flex;
   gap: 8px;
-  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pillDot { font-size: 11px; line-height: 1; }
+
+.pill:hover { color: var(--text); border-color: var(--text-muted); }
+
+.pillActive { color: var(--text); background: var(--surface); }
+.pillActive[data-priority="1"] { border-color: var(--critical); box-shadow: 0 0 0 1px var(--critical); }
+.pillActive[data-priority="2"] { border-color: var(--high); box-shadow: 0 0 0 1px var(--high); }
+.pillActive[data-priority="3"] { border-color: var(--medium); box-shadow: 0 0 0 1px var(--medium); }
+.pillActive[data-priority="4"] { border-color: var(--low); box-shadow: 0 0 0 1px var(--low); }
+
+/* ── Atalhos de data (chips) ──────────────────────────── */
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 13px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chip:hover { color: var(--text); border-color: var(--text-muted); }
+
+.chipActive {
+  color: var(--text-inverse);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Rótulo relativo do vencimento (ex.: "vence amanhã", "atrasada 2 dias") */
+.dueHint {
+  font-size: 12px;
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+.dueHint[data-tone="overdue"] { color: var(--danger); }
+.dueHint[data-tone="today"] { color: var(--warning); }
+.dueHint[data-tone="soon"] { color: var(--accent); }
+
+/* ── Seção avançada ───────────────────────────────────── */
+.advancedToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.chevron { display: inline-block; transition: transform 0.15s; font-size: 11px; }
+.chevronOpen { transform: rotate(90deg); }
+
+.advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  animation: slideDown 0.18s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Ações ────────────────────────────────────────────── */
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
 .btnSubmit {
+  flex: 1;
   background: var(--accent);
   color: #fff;
   font-size: 14px;
   font-weight: 600;
-  padding: 9px 20px;
+  padding: 11px 20px;
   border-radius: var(--radius-sm);
-  transition: background 0.15s;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
-.btnSubmit:hover:not(:disabled) { background: var(--accent-hover); }
+.btnSubmit:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(124, 110, 245, 0.35);
+}
+.btnSubmit:active:not(:disabled) { transform: translateY(0); }
 .btnSubmit:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btnCancel {
   color: var(--text-muted);
   font-size: 14px;
-  padding: 9px 14px;
+  padding: 11px 18px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
   transition: all 0.15s;
 }
 
 .btnCancel:hover { color: var(--text); border-color: var(--text-muted); }
 
-.inputError { border-color: #e53e3e !important; }
+.btnSecondary {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btnSecondary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.btnSecondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Checkbox "Adicionar às Tarefas de Hoje" */
+.todayToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.todayToggle input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+.hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: -2px;
+}
+
+.hint kbd {
+  font-size: 10px;
+  font-family: inherit;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* ── Quick-create de projeto inline ───────────────────── */
+.projectRow { display: flex; gap: 8px; align-items: center; }
+.projectRow .select { flex: 1; min-width: 0; }
+.qcToggle {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.qcToggle:hover { color: var(--text); border-color: var(--accent); }
+
+.qcSuccess { font-size: 12px; color: var(--low, #51cf66); animation: slideDown 0.18s ease; }
+
+/* ── Checklist / subtarefas (captura rápida) ──────────── */
+.checklist {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checklistItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+}
+
+.checklistText {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.checklistRemove {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.checklistRemove:hover { color: var(--danger); background: var(--surface); }
+
+.checklistAdd { display: flex; gap: 8px; align-items: center; }
+.checklistAdd .input { flex: 1; min-width: 0; }
+
+.inputError { border-color: var(--danger) !important; }
 
 .errorMsg {
   font-size: 12px;
-  color: #e53e3e;
-  margin-top: 2px;
+  color: var(--danger);
 }
 
 /* ── Mobile ───────────────────────────────────────────── */
 @media (max-width: 520px) {
-  .form { padding: 16px; gap: 10px; }
-  .row { flex-direction: column; }
+  .form { padding: 16px; gap: 12px; }
+  .row { flex-direction: column; gap: 12px; }
+  .hint { display: none; }
 }

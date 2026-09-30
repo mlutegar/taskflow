@@ -23,6 +23,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "self_aware",   emoji: "🧠", name: "Auto-conhecimento",   desc: "Usou o check-in de estado 5 vezes" },
   { id: "observador",  emoji: "🔭", name: "Observador",          desc: "7 dias seguidos de check-in de estado" },
   { id: "cycle_master", emoji: "🪟", name: "Multi-Tab Master",    desc: "Completou 3 ou mais ciclos em uma sessão de Abas" },
+  { id: "emotion_aware", emoji: "💗", name: "Sintonia Emocional",  desc: "Registrou 10 checkpoints emocionais no Daily Focus" },
 ];
 
 function getUnlocked(): string[] {

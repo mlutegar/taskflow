@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { tasksApi } from "../api/tasks";
+import { dailyTasksApi } from "../api/dailyTasks";
 import { getStreak } from "../lib/dailyFocusHistory";
 import { getDayLevel } from "../lib/dailyFocusDay";
 import { useTasks } from "../hooks/useTasks";
@@ -7,10 +9,28 @@ import { useUndoDelete } from "../hooks/useUndoDelete";
 import { useConfirm } from "../components/ConfirmDialog";
 import TaskList from "../components/TaskList";
 import AddTaskForm from "../components/AddTaskForm";
-import TodayPanel from "../components/TodayPanel";
+import TodayPanel, { DAILY_LIMIT } from "../components/TodayPanel";
+import { useToast } from "../components/shared/Toast";
+import DailyRoutinePanel from "../components/DailyRoutinePanel";
+import DueTodayPanel from "../components/DueTodayPanel";
+import ErrorBoundary from "../components/ErrorBoundary";
+import TaskDetailModal from "../components/TaskDetailModal";
+import { useTaskDetail } from "../hooks/useTaskDetail";
 import styles from "../App.module.css";
+import { todayISO } from "../lib/dateUtils";
+import { taskKeys } from "../lib/taskKeys";
+import { useProjects } from "../hooks/useProjects";
+import ProjectSelect from "../components/ProjectSelect";
+import ProjectManager from "../components/ProjectManager";
+import { TIME_BUCKETS, sumEstimated, formatMinutes } from "../lib/estimatedTime";
+import {
+  ListChecks, AlertCircle, Clock, RotateCw, Plus, X, Search,
+  Settings2, LayoutGrid, AlertTriangle,
+} from "lucide-react";
 
 const TASK_FILTERS: { label: string; value: string }[] = [
+  { label: "Hoje", value: "today" },
+  { label: "Próximas", value: "upcoming" },
   { label: "Todas", value: "" },
   { label: "Ativas", value: "active" },
   { label: "Concluídas", value: "completed" },
@@ -21,22 +41,34 @@ const TASK_SORTS: { label: string; value: string }[] = [
   { label: "Vencimento (mais próximo)", value: "due_date_asc" },
   { label: "Vencimento (mais distante)", value: "due_date_desc" },
   { label: "Vencidas primeiro", value: "overdue" },
+  { label: "Tempo estimado", value: "estimated" },
   { label: "Data criação", value: "created" },
 ];
 
 export default function TasksPage(): JSX.Element {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
   // UI state — inicializados a partir da query string para persistência via URL
-  const [taskFilter, setTaskFilter] = useState<string>(() =>
-    new URLSearchParams(window.location.search).get("filter") ?? ""
-  );
+  const [taskFilter, setTaskFilter] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.has("filter") ? (params.get("filter") || "") : (localStorage.getItem("taskflow.taskFilter") || "today");
+  });
   const [taskSort, setTaskSort] = useState<string>(() =>
     new URLSearchParams(window.location.search).get("sort") ?? "due_date_asc"
   );
   const [taskSearch, setTaskSearch] = useState<string>(() =>
     new URLSearchParams(window.location.search).get("q") ?? ""
   );
+  const [timeFilter, setTimeFilter] = useState<string>(() =>
+    new URLSearchParams(window.location.search).get("time") ?? ""
+  );
   const [grouped, setGrouped] = useState<boolean>(false);
   const [showTaskForm, setShowTaskForm] = useState<boolean>(false);
+  const [projectFilter, setProjectFilter] = useState<string>(() =>
+    new URLSearchParams(window.location.search).get("project") ?? localStorage.getItem("taskflow.projectFilter") ?? ""
+  );
+  const [showProjectManager, setShowProjectManager] = useState<boolean>(false);
+  const projectsHook = useProjects(true);
 
   // Sincronizar filtros na URL
   useEffect(() => {
@@ -47,10 +79,44 @@ export default function TasksPage(): JSX.Element {
     else                                         params.delete("filter");
     if (taskSort && taskSort !== "due_date_asc") params.set("sort",   taskSort);
     else                                         params.delete("sort");
+    if (projectFilter)                           params.set("project", projectFilter);
+    else                                         params.delete("project");
+    if (timeFilter)                              params.set("time", timeFilter);
+    else                                         params.delete("time");
     const qs = params.toString();
     const newUrl = window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash;
     window.history.replaceState(null, "", newUrl);
-  }, [taskSearch, taskFilter, taskSort]);
+    localStorage.setItem("taskflow.taskFilter", taskFilter);
+    localStorage.setItem("taskflow.projectFilter", projectFilter);
+  }, [taskSearch, taskFilter, taskSort, projectFilter, timeFilter]);
+
+  useEffect(() => {
+    if (projectFilter && projectFilter !== "none" && !projectsHook.loading && !projectsHook.projects.some((project) => project.id === projectFilter && !project.archived)) {
+      setProjectFilter("");
+    }
+  }, [projectFilter, projectsHook.loading, projectsHook.projects]);
+
+  // Reabre ocorrências no instante em que o dia muda, mesmo com a tela aberta.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let currentDay = todayISO();
+    const refreshDay = () => {
+      const nextDay = todayISO();
+      if (nextDay !== currentDay) {
+        currentDay = nextDay;
+        queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      }
+    };
+    const schedule = () => {
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+      timer = setTimeout(() => { refreshDay(); schedule(); }, midnight.getTime() - now.getTime());
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") refreshDay(); };
+    document.addEventListener("visibilitychange", onVisible);
+    schedule();
+    return () => { clearTimeout(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [queryClient]);
 
   // Pull-to-refresh
   const pullStartY = useRef<number>(0);
@@ -71,22 +137,70 @@ export default function TasksPage(): JSX.Element {
   }, [pullPct]);
 
   // Business logic
-  const tasksHook = useTasks(taskFilter, taskSort);
+  const tasksHook = useTasks(taskFilter, taskSort, projectFilter || undefined, timeFilter || undefined);
+  const { data: allTasksForToday = [] } = useQuery<any[]>({
+    queryKey: ["tasks", "today-panel-all"],
+    queryFn: () => tasksApi.list({ sort: "due_date_asc" }),
+    staleTime: 30_000,
+  });
   const {
-    tasks, tasksLoading, tasksError, completedToday,
+    tasks, tasksLoading, tasksError, refetchTasks, completedToday, completingIds,
+    mutationError, clearMutationError, retryLastMutation, syncState,
     removeTask, restoreTask, handleCompleteTask, handleReopenTask,
+    handleUndoCompleteTask,
     handleUpdateTask, handleAddTaskChecklist, handleToggleTaskChecklist,
     handleUpdateTaskChecklist, handleDeleteTaskChecklist,
   } = tasksHook;
 
+  // Salvaguarda de UX: se o carregamento demorar demais (rede degradada, cold
+  // start extremo), mostra aviso + botão de retry em vez de skeleton eterno.
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!tasksLoading) { setLoadTimedOut(false); return; }
+    const t = setTimeout(() => setLoadTimedOut(true), 12_000);
+    return () => clearTimeout(t);
+  }, [tasksLoading]);
+
   const undoHook = useUndoDelete((id: unknown) => tasksApi.delete(id).catch(() => {}));
   const { undoTask, handleDismiss } = undoHook;
   const { confirm, ConfirmUI } = useConfirm();
+  const [completionToast, setCompletionToast] = useState<null | {
+    taskId: string; completionId: string; message: string; expiresAt: number;
+  }>(null);
+
+  const handleCompleteWithFeedback = useCallback(async (id: string): Promise<void> => {
+    if (completingIds.has(String(id))) return;
+    const result = await handleCompleteTask(id) as any;
+    if (result?._completion_id) {
+      setCompletionToast({
+        taskId: String(id), completionId: result._completion_id,
+        message: result._completion_message || "Tarefa concluída.", expiresAt: Date.now() + 8_000,
+      });
+    }
+  }, [completingIds, handleCompleteTask]);
+
+  const handleUndoCompletion = useCallback(async () => {
+    if (!completionToast) return;
+    await handleUndoCompleteTask(completionToast.taskId, completionToast.completionId);
+    setCompletionToast(null);
+  }, [completionToast, handleUndoCompleteTask]);
 
   const handleCreateTask = async (data: unknown): Promise<void> => {
     await tasksHook.handleCreateTask(data);
     setShowTaskForm(false);
   };
+
+  // Envia uma tarefa para o painel de foco "Tarefas de Hoje" (persistido no BD).
+  const handleAddFocus = useCallback(async (id: string): Promise<void> => {
+    try {
+      await dailyTasksApi.add(id);
+      queryClient.invalidateQueries({ queryKey: ["tasks", "today-panel-all"] });
+      showToast("Adicionada ao foco de hoje", "success");
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      showToast(status === 409 ? `Limite diário de ${DAILY_LIMIT} tarefas atingido` : "Não foi possível adicionar ao foco", "error");
+    }
+  }, [queryClient, showToast]);
 
   const handleDeleteTask = (id: unknown): void => {
     const task = tasks.find((t: any) => t.id === id);
@@ -99,6 +213,9 @@ export default function TasksPage(): JSX.Element {
     const task = undoHook.handleUndoDelete();
     if (task) restoreTask(task);
   };
+
+  // Modal central de detalhes/edição (compartilhado por todos os painéis + deep-link ?task=)
+  const { detailTask, openDetail, closeDetail } = useTaskDetail(allTasksForToday as any);
 
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<unknown>>(new Set());
@@ -116,9 +233,9 @@ export default function TasksPage(): JSX.Element {
     setSelectedIds(new Set());
     for (const id of ids) {
       const task = tasks.find((t: any) => t.id === id);
-      if (task && !task.completed) await handleCompleteTask(id);
+      if (task && !task.completed) await handleCompleteWithFeedback(String(id));
     }
-  }, [selectedIds, tasks, handleCompleteTask]);
+  }, [selectedIds, tasks, handleCompleteWithFeedback]);
 
   const handleBulkDelete = useCallback(async () => {
     const ids = [...selectedIds];
@@ -141,7 +258,13 @@ export default function TasksPage(): JSX.Element {
 
   const activeTaskCnt    = tasks.filter((t: any) => !t.completed).length;
   const criticalTaskCnt  = tasks.filter((t: any) => !t.completed && t.priority === 1).length;
-  const isFiltered       = !!(taskFilter || taskSearch.trim());
+  const overdueTaskCnt   = (allTasksForToday as any[]).filter((t: any) => !t.completed && t.due_date && t.due_date < todayISO()).length;
+  const isFiltered       = !!(taskFilter || taskSearch.trim() || timeFilter);
+
+  // Soma do tempo estimado das tarefas visíveis não concluídas + alerta de sobrecarga.
+  const estimatedTotal   = sumEstimated(visibleTasks as any[]);
+  const overloadLimit    = Number(localStorage.getItem("taskflow.overloadMinutes") || 480); // 8 h
+  const isOverloaded     = taskFilter === "today" && estimatedTotal > overloadLimit;
 
   return (
     <div
@@ -157,14 +280,25 @@ export default function TasksPage(): JSX.Element {
       <header className={styles.header}>
         <div className={styles.headerInner} style={{ gridTemplateColumns: "1fr auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 4 }}>
-            <span style={{ fontSize: 18 }}>✅</span>
-            <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
+            <ListChecks size={18} color="var(--accent)" />
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
               Tarefas
               {activeTaskCnt > 0 && (
-                <span className={styles.tabBadge} style={{ marginLeft: 8 }}>{activeTaskCnt}</span>
+                <span className={styles.tabBadge}>{activeTaskCnt}</span>
               )}
               {criticalTaskCnt > 0 && (
-                <span className={styles.tabBadgeCritical} style={{ marginLeft: 4 }}>🔴 {criticalTaskCnt}</span>
+                <span className={styles.tabBadgeCritical} style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                  <AlertCircle size={12} /> {criticalTaskCnt}
+                </span>
+              )}
+              {overdueTaskCnt > 0 && (
+                <span
+                  className={styles.tabBadge}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "var(--critical)", color: "#fff" }}
+                  title="Tarefas atrasadas"
+                >
+                  <Clock size={12} /> {overdueTaskCnt}
+                </span>
               )}
             </span>
           </div>
@@ -175,14 +309,15 @@ export default function TasksPage(): JSX.Element {
               onClick={() => window.location.reload()}
               title="Recarregar"
             >
-              <span>🔄</span>
+              <RotateCw size={14} />
               <span className={styles.reloadText}>Atualizar</span>
             </button>
             <button
               className={`${styles.addBtn} ${showTaskForm ? styles.addBtnCancel : ""}`}
               onClick={() => setShowTaskForm((v) => !v)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
-              {showTaskForm ? "✕ Cancelar" : <><span>+</span> Nova tarefa</>}
+              {showTaskForm ? <><X size={15} /> Cancelar</> : <><Plus size={15} /> Nova tarefa</>}
             </button>
           </div>
         </div>
@@ -190,24 +325,67 @@ export default function TasksPage(): JSX.Element {
 
       <main className={styles.main}>
         <DailyWidget />
-        <TodayPanel
-          tasks={tasks}
-          completedToday={completedToday}
-          onComplete={handleCompleteTask}
-          onReopen={handleReopenTask}
-          onToggleChecklist={handleToggleTaskChecklist}
-          onUpdate={handleUpdateTask}
-        />
+        <ErrorBoundary compact label="painel Rotina Diária">
+          <DailyRoutinePanel
+            tasks={allTasksForToday}
+            onComplete={handleCompleteWithFeedback}
+            onReopen={handleReopenTask}
+            onToggleChecklist={handleToggleTaskChecklist}
+            completingIds={completingIds}
+            onOpenDetail={openDetail}
+          />
+        </ErrorBoundary>
+        <ErrorBoundary compact label="painel Hoje & Atrasadas">
+          <DueTodayPanel
+            tasks={allTasksForToday}
+            onComplete={handleCompleteWithFeedback}
+            onUpdate={handleUpdateTask}
+            onAddFocus={handleAddFocus}
+            onToggleChecklist={handleToggleTaskChecklist}
+            completingIds={completingIds}
+            onOpenDetail={openDetail}
+          />
+        </ErrorBoundary>
+        <ErrorBoundary compact label="painel Tarefas de Hoje">
+          <TodayPanel
+            tasks={allTasksForToday}
+            completedToday={completedToday}
+            onComplete={handleCompleteWithFeedback}
+            onReopen={handleReopenTask}
+            onToggleChecklist={handleToggleTaskChecklist}
+            onUpdate={handleUpdateTask}
+            projects={projectsHook.projects}
+            onOpenDetail={openDetail}
+          />
+        </ErrorBoundary>
+
+        {detailTask && (
+          <TaskDetailModal
+            task={detailTask}
+            onClose={closeDetail}
+            onComplete={(id) => handleCompleteWithFeedback(String(id))}
+            onReopen={(id) => handleReopenTask(String(id))}
+            onDelete={handleDeleteTask}
+            onUpdate={handleUpdateTask}
+            onAddChecklist={handleAddTaskChecklist}
+            onToggleChecklist={(taskId, itemId) => handleToggleTaskChecklist(String(taskId), String(itemId))}
+            onUpdateChecklist={handleUpdateTaskChecklist}
+            onDeleteChecklist={handleDeleteTaskChecklist}
+            completing={completingIds?.has(String(detailTask.id))}
+            projects={projectsHook.projects}
+            onCreateProject={projectsHook.createProject}
+          />
+        )}
 
         {showTaskForm && (
           <div className={styles.formWrapper}>
-            <AddTaskForm onSubmit={handleCreateTask} onCancel={() => setShowTaskForm(false)} />
+            <AddTaskForm projects={projectsHook.projects} onSubmit={handleCreateTask} onCancel={() => setShowTaskForm(false)} onCreateProject={projectsHook.createProject} />
           </div>
         )}
 
         <div className={styles.controls}>
           <div className={styles.searchWrapper}>
-            <span className={styles.searchIcon}>🔍</span>
+            <span className={styles.searchIcon}><Search size={15} /></span>
             <input
               type="text"
               className={styles.searchInput}
@@ -216,7 +394,7 @@ export default function TasksPage(): JSX.Element {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaskSearch(e.target.value)}
             />
             {taskSearch && (
-              <button className={styles.searchClear} onClick={() => setTaskSearch("")} aria-label="Limpar busca">✕</button>
+              <button className={styles.searchClear} onClick={() => setTaskSearch("")} aria-label="Limpar busca"><X size={13} /></button>
             )}
           </div>
           <div className={styles.filters}>
@@ -230,6 +408,17 @@ export default function TasksPage(): JSX.Element {
               </button>
             ))}
           </div>
+          <div className={styles.projectControls}>
+            <ProjectSelect
+              projects={projectsHook.projects}
+              value={projectFilter}
+              onChange={(value) => setProjectFilter(value || "")}
+              allowAll
+              allowNoneFilter
+              className={styles.projectSelect}
+            />
+            <button className={styles.projectManageBtn} onClick={() => setShowProjectManager(true)} title="Criar e organizar projetos" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Settings2 size={14} /> Projetos</button>
+          </div>
           <div className={styles.sortWrapper}>
             <span className={styles.sortLabel}>Ordenar:</span>
             <select
@@ -241,12 +430,24 @@ export default function TasksPage(): JSX.Element {
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </select>
+            <span className={styles.sortLabel}>Tempo:</span>
+            <select
+              className={styles.sortSelect}
+              value={timeFilter}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTimeFilter(e.target.value)}
+              aria-label="Filtrar por tempo estimado"
+            >
+              {TIME_BUCKETS.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
             <button
               className={`${styles.groupBtn} ${grouped ? styles.groupBtnActive : ""}`}
               onClick={() => setGrouped((v) => !v)}
               title={grouped ? "Desagrupar" : "Agrupar por prioridade"}
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
             >
-              ⊞
+              <LayoutGrid size={15} />
             </button>
           </div>
         </div>
@@ -254,18 +455,41 @@ export default function TasksPage(): JSX.Element {
         {isFiltered && !tasksLoading && (
           <div className={styles.filterCount}>
             Exibindo <strong>{visibleTasks.length}</strong> de {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""}
+            {estimatedTotal > 0 && <span> · ~{formatMinutes(estimatedTotal)} estimados</span>}
             {visibleTasks.length === 0 && <span> — tente outro filtro</span>}
           </div>
         )}
 
-        {tasksLoading && <div className={styles.loading}>Carregando...</div>}
-        {tasksError && <div className={styles.error}>Erro: {tasksError}</div>}
+        {isOverloaded && !tasksLoading && (
+          <div className={styles.overloadAlert} role="status" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <AlertTriangle size={14} style={{ flexShrink: 0 }} /> Dia sobrecarregado: ~{formatMinutes(estimatedTotal)} estimados (limite {formatMinutes(overloadLimit)}).
+            Considere adiar ou delegar algumas tarefas.
+          </div>
+        )}
+
+        {tasksLoading && !loadTimedOut && <div className={styles.loading}>Carregando...</div>}
+        {tasksLoading && loadTimedOut && (
+          <div className={styles.error} role="status">
+            Está demorando mais que o normal…
+            <button type="button" style={{ marginLeft: 8 }} onClick={() => refetchTasks()}>
+              Tentar novamente
+            </button>
+          </div>
+        )}
+        {tasksError && (
+          <div className={styles.error} role="alert">
+            Erro: {tasksError}
+            <button type="button" style={{ marginLeft: 8 }} onClick={() => refetchTasks()}>
+              Tentar novamente
+            </button>
+          </div>
+        )}
         {!tasksError && (
           <TaskList
             tasks={visibleTasks}
             loading={tasksLoading}
             grouped={grouped}
-            onComplete={handleCompleteTask}
+            onComplete={handleCompleteWithFeedback}
             onReopen={handleReopenTask}
             onDelete={handleDeleteTask}
             onUpdate={handleUpdateTask}
@@ -273,6 +497,9 @@ export default function TasksPage(): JSX.Element {
             onToggleChecklist={handleToggleTaskChecklist}
             onUpdateChecklist={handleUpdateTaskChecklist}
             onDeleteChecklist={handleDeleteTaskChecklist}
+            completingIds={completingIds}
+            projects={projectsHook.projects}
+            onCreateProject={projectsHook.createProject}
             selectedIds={selectedIds}
             onSelect={handleSelect}
             onBulkComplete={handleBulkComplete}
@@ -300,6 +527,39 @@ export default function TasksPage(): JSX.Element {
           onUndo={handleUndoDelete}
           onDismiss={handleDismiss}
         />
+      )}
+
+      {completionToast && (
+        <CompletionToast
+          message={completionToast.message}
+          expiresAt={completionToast.expiresAt}
+          onUndo={handleUndoCompletion}
+          onDismiss={() => setCompletionToast(null)}
+        />
+      )}
+
+      {showProjectManager && (
+        <ProjectManager
+          projects={projectsHook.projects}
+          onCreate={projectsHook.createProject}
+          onUpdate={projectsHook.updateProject}
+          onDelete={projectsHook.deleteProject}
+          onClose={() => setShowProjectManager(false)}
+        />
+      )}
+
+      {(syncState === "saving" || syncState === "saved" || syncState === "offline") && (
+        <div className={styles.syncIndicator} role="status" aria-live="polite">
+          {syncState === "saving" ? "Salvando…" : syncState === "saved" ? "✓ Salvo" : "Sem conexão"}
+        </div>
+      )}
+
+      {mutationError && (
+        <div className={styles.mutationError} role="alert">
+          <span>{mutationError}</span>
+          <button type="button" onClick={() => retryLastMutation().catch(() => {})}>Tentar novamente</button>
+          <button type="button" onClick={clearMutationError} aria-label="Fechar">×</button>
+        </div>
       )}
 
       {ConfirmUI}
@@ -363,6 +623,38 @@ function UndoToast({ task, expiresAt, onUndo, onDismiss }: UndoToastProps): JSX.
       <div className={styles.undoBar} style={{ width: `${pct}%` }} />
       <div className={styles.undoContent}>
         <span className={styles.undoText}>🗑 <strong>{task.title}</strong> excluída</span>
+        <div className={styles.undoActions}>
+          <button className={styles.undoBtn} onClick={onUndo}>↩ Desfazer</button>
+          <button className={styles.undoDismiss} onClick={onDismiss}>✕</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CompletionToastProps {
+  message: string;
+  expiresAt: number;
+  onUndo: () => void;
+  onDismiss: () => void;
+}
+
+function CompletionToast({ message, expiresAt, onUndo, onDismiss }: CompletionToastProps): JSX.Element {
+  const [pct, setPct] = useState<number>(100);
+  useEffect(() => {
+    const total = Math.max(1, expiresAt - Date.now());
+    const interval = setInterval(() => {
+      const remaining = expiresAt - Date.now();
+      setPct(Math.max(0, (remaining / total) * 100));
+      if (remaining <= 0) { clearInterval(interval); onDismiss(); }
+    }, 80);
+    return () => clearInterval(interval);
+  }, [expiresAt, onDismiss]);
+  return (
+    <div className={styles.undoToast} role="status" aria-live="polite">
+      <div className={`${styles.undoBar} ${styles.completionBar}`} style={{ width: `${pct}%` }} />
+      <div className={styles.undoContent}>
+        <span className={styles.undoText}>✅ <strong>{message}</strong></span>
         <div className={styles.undoActions}>
           <button className={styles.undoBtn} onClick={onUndo}>↩ Desfazer</button>
           <button className={styles.undoDismiss} onClick={onDismiss}>✕</button>

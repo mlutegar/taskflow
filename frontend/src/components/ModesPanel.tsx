@@ -1,19 +1,18 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useConfirm } from "./ConfirmDialog";
 import { useToast } from './shared/Toast';
-import { useFocusTrap } from "../hooks/useFocusTrap";
-import ModeSession from "./ModeSession";
 import ModeComboSession from "./ModeComboSession";
+import { useActiveMode, MODE_SESSION_CLOSED_EVENT } from "../contexts/ActiveModeContext";
 import styles from "./ModesPanel.module.css";
 import dfStyles from "./daily-focus/DailyFocus.module.css";
 import { modeStatsApi } from "../api/modeStats";
 import { getPinned, metaFor, pin, unpin } from "../lib/splitePinned";
-import { logCompletion, usageStats } from "../lib/modeLog";
 import { getAllActivations } from "../lib/modeActivations";
 import { getCustomModes, saveCustomMode, deleteCustomMode } from "../lib/customModes";
 import { MODES, CATEGORY_BY_ID, CATEGORY_ORDER } from "../data/modes";
 import { PRESET_COMBOS } from '../data/presetCombos';
 import {
+  usageStatsLive,
   getUsageLogs,
   getBestHourForMode,
   getModeSuccessRate,
@@ -27,8 +26,6 @@ import { getEstados } from "./daily-focus/stateToMode";
 import { getComboStats } from "../lib/modeComboLog";
 import { Task, Routine } from '../types/index';
 import SlotBoard from "./SlotBoard";
-import MultiCardSession from "./MultiCardSession";
-import { loadActiveSession, saveActiveSession, clearActiveSession } from "../lib/multiCardSessionLog";
 import { storageGet, storageSet, storageRemove } from "../lib/storage";
 import { SK } from "../lib/storageKeys";
 import ModeCard from "./modes/ModeCard";
@@ -184,7 +181,9 @@ interface ModesPanelProps {
 
 export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCompleteRoutine, onAddTask, onAddChecklist, onToggleChecklist, onAddRoutineChecklist, onToggleRoutineChecklist }: ModesPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [activeSession, setActiveSession] = useState<ModeConfig | null>(null); // objeto completo do modo
+  // Sessão de modo ativa vive no provider global (sobrevive à navegação e pode
+  // ser minimizada num card flutuante). Ver ActiveModeContext.
+  const { activeMode, activate, activateMultiCard, multiActive } = useActiveMode();
   const [showCreate, setShowCreate] = useState<boolean>(false);
   // Combo de modos: array com até 2 ids selecionados; activeCombo = { modeA, modeB }
   // Persiste no sessionStorage por ~10 min para sobreviver troca de tabs
@@ -211,7 +210,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   const [sortBy, setSortBy] = useState<string>(() => storageGet<string>(SK.MODES_SORT_BY, 'default')); // "default" | "tasks" | "random" | "smart"
   const [category, setCategory] = useState<string>(() => storageGet<string>(SK.MODES_CATEGORY, '')); // "" = todas
   const [pinnedSplite, setPinnedSplite] = useState<string[]>(() => getPinned());
-  const [weekly, setWeekly] = useState<WeeklyEntry[]>(() => usageStats(7));
+  const [weekly, setWeekly] = useState<WeeklyEntry[]>(() => usageStatsLive(7));
   const [activations, setActivations] = useState<Record<string, number>>(() => {
     const all = getAllActivations();
     return Object.fromEntries(all.map(({ modeId, count }: { modeId: string; count: number }) => [modeId, count]));
@@ -278,11 +277,31 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     return () => window.removeEventListener("customModesUpdated", handler);
   }, []);
 
+  // A sessão de modo único é encerrada no provider global; ao fechar, recarrega
+  // ativações e insights de uso (antes feito no onClose local do ModeSession).
+  useEffect(() => {
+    const onClosed = (): void => {
+      setPendingIntention("");
+      setPinnedSplite(getPinned());
+      const all = getAllActivations();
+      setActivations(Object.fromEntries(all.map(({ modeId, count }: { modeId: string; count: number }) => [modeId, count])));
+      refreshInsights();
+    };
+    const onStats = (): void => {
+      setModeStats(storageGet<Record<string, number>>(SK.MODE_STATS, {}));
+      setWeekly(usageStatsLive(7));
+    };
+    window.addEventListener(MODE_SESSION_CLOSED_EVENT, onClosed);
+    window.addEventListener("modeStatsUpdated", onStats);
+    return () => {
+      window.removeEventListener(MODE_SESSION_CLOSED_EVENT, onClosed);
+      window.removeEventListener("modeStatsUpdated", onStats);
+    };
+  }, []);
+
   const { confirm, ConfirmUI } = useConfirm();
   const { showToast } = useToast();
 
-  // Focus trap for the active ModeSession modal (sessionRef is the container div)
-  useFocusTrap(sessionRef, !!activeSession, () => (modeSessionRef as any).current?.triggerClose());
 
   // Registros de uso pós-sessão para insights nos cards
   const [usageLogs, setUsageLogs] = useState<any[]>(() => getUsageLogs());
@@ -300,42 +319,23 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     setAvgEffByMode(getAvgEfficiencyByMode());
   };
 
-  // ── Multi-card session (novo flow) ──────────────────────────────────────────
-  const [multiCardCards, setMultiCardCards] = useState<ModeConfig[] | null>(null);
-  const [multiCardStartedAt, setMultiCardStartedAt] = useState<string>("");
-  const [multiCardInitialIndex, setMultiCardInitialIndex] = useState<number>(0);
-  const [multiCardSessionMode, setMultiCardSessionMode] = useState<'sequential' | 'parallel'>('sequential');
-
-  // Restaurar sessão ativa ao montar (browser reload durante sessão)
-  useEffect(() => {
-    const active = loadActiveSession();
-    if (!active) return;
-    // Resolve ModeConfig a partir dos IDs salvos
-    const allModes: ModeConfig[] = [...(MODES as ModeConfig[]), ...getCustomModes()];
-    const resolved = active.cards
-      .map((id) => allModes.find((m) => m.id === id))
-      .filter(Boolean) as ModeConfig[];
-    if (resolved.length === 0) {
-      clearActiveSession();
-      return;
+  // ── Multi-card session ──────────────────────────────────────────────────────
+  // O estado/render da sessão multi-card vive agora no ActiveModeProvider (global,
+  // sobrevive à navegação e pode ser minimizada num card flutuante). Aqui só
+  // disparamos activateMultiCard() a partir dos fluxos de intenção.
+  const startMultiCardSession = async (cards: ModeConfig[], sessionMode: 'sequential' | 'parallel', intention: string): Promise<boolean> => {
+    // Confirma se já houver qualquer sessão (única ou multi) em andamento.
+    if (activeMode || multiActive) {
+      const ok = await confirm({
+        title: "Trocar de sessão?",
+        message: "Você tem uma sessão em andamento. Iniciar esta vai encerrá-la sem registrar.",
+        confirmLabel: "Trocar",
+      });
+      if (!ok) return false;
     }
-    setMultiCardCards(resolved);
-    setMultiCardStartedAt(active.startedAt);
-    setMultiCardInitialIndex(active.currentCardIndex);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const startMultiCardSession = (cards: ModeConfig[], sessionMode: 'sequential' | 'parallel', intention: string): void => {
-    const startedAt = new Date().toISOString();
-    saveActiveSession({
-      cards: cards.map((c) => c.id),
-      startedAt,
-      currentCardIndex: 0,
-    });
-    setMultiCardStartedAt(startedAt);
-    setMultiCardInitialIndex(0);
-    setMultiCardSessionMode(sessionMode);
     setPendingIntention(intention);
-    setMultiCardCards(cards);
+    activateMultiCard(cards, sessionMode, intention);
+    return true;
   };
 
   const handleStartMultiCard = (cards: ModeConfig[], mode: 'sequential' | 'parallel' = 'sequential'): void => {
@@ -350,14 +350,6 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     };
     setPendingMultiCard({ cards, sessionMode: mode });
     setIntentionDraft({ mode: syntheticMode, text: "" });
-  };
-
-  const handleMultiCardClose = (): void => {
-    clearActiveSession();
-    setMultiCardCards(null);
-    setMultiCardStartedAt("");
-    setMultiCardInitialIndex(0);
-    refreshInsights();
   };
 
   // Stats: { [modeId]: number }
@@ -382,41 +374,9 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
   useEffect(() => { storageSet(SK.MODES_SORT_BY, sortBy); }, [sortBy]);
   useEffect(() => { storageSet(SK.MODES_CATEGORY, category); }, [category]);
 
-  const handleModeTaskComplete = async (modeId: string): Promise<void> => {
-    // #4/#7: marcar como concluído na sequência aleatória
-    if (sortBy === "random") {
-      setStartedInSequence((prev) => {
-        const next = new Set(prev);
-        next.add(modeId);
-        storageSet(SK.MODES_SEQUENCE, [...next]);
-        return next;
-      });
-    }
-    // Log local para o painel "mais usados na semana"
-    logCompletion(modeId);
-    setWeekly(usageStats(7));
-    // Update otimista imediato na UI e no cache local
-    setModeStats((prev) => {
-      const updated = { ...prev, [modeId]: (prev[modeId] || 0) + 1 };
-      storageSet(SK.MODE_STATS, updated);
-      return updated;
-    });
-    // Persiste no banco (incremento atômico via RPC)
-    try {
-      const newCount: number = await modeStatsApi.increment(modeId);
-      // Sincroniza o valor exato retornado pelo banco
-      setModeStats((prev) => {
-        const updated = { ...prev, [modeId]: newCount };
-        storageSet(SK.MODE_STATS, updated);
-        return updated;
-      });
-      showToast('Progresso salvo!', 'success');
-    } catch (e: any) {
-      // Falhou no banco — localStorage já tem o valor otimista, ok por ora
-      console.warn("Falha ao salvar stat no banco:", e.message);
-      showToast('Falha ao salvar — dados mantidos localmente', 'error');
-    }
-  };
+  // A contabilização de conclusão de tarefa durante a sessão vive agora no
+  // ActiveModeProvider (sessão global, ativa mesmo em outras páginas). Aqui só
+  // reagimos ao evento "modeStatsUpdated" para atualizar a UI (ver useEffect acima).
 
   const toggle = (id: string): void => setExpanded((p) => (p === id ? null : id));
 
@@ -728,7 +688,6 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     return best;
   }, [sortBy, comboStats, allModes, smartScores]);
 
-  const modeSessionRef = useRef<any>(null);
 
   // ── Stable callbacks for ModeCard (React.memo only helps if refs are stable) ─
   const handleToggle = useCallback((id: string) => setExpanded((p) => p === id ? null : id), []);
@@ -775,17 +734,36 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
     setIntentionDraft({ mode, text: "" });
   }, [usageLogs, confirm]);
 
-  const confirmIntention = (): void => {
+  // Inicia um modo no provider global, confirmando antes se já houver outra sessão
+  // de modo único em andamento (evita descartar progresso sem querer).
+  const startMode = useCallback(async (mode: ModeConfig, intentionText: string = ""): Promise<boolean> => {
+    // Confirma se já houver outra sessão em andamento (modo único diferente OU multi-card).
+    const busyDifferent = (activeMode && activeMode.id !== mode.id) || multiActive;
+    if (busyDifferent) {
+      const ok = await confirm({
+        title: "Trocar de sessão?",
+        message: `Você tem uma sessão em andamento. Iniciar "${mode.name}" vai encerrá-la sem registrar.`,
+        confirmLabel: "Trocar",
+      });
+      if (!ok) return false;
+    }
+    setPendingIntention(intentionText);
+    activate(mode, intentionText);
+    return true;
+  }, [activeMode, multiActive, activate, confirm]);
+
+  const confirmIntention = async (): Promise<void> => {
     if (!intentionDraft) return;
     const text = intentionDraft.text.trim();
     if (pendingMultiCard) {
       // Multi-card session path
-      startMultiCardSession(pendingMultiCard.cards, pendingMultiCard.sessionMode, text);
+      const started = await startMultiCardSession(pendingMultiCard.cards, pendingMultiCard.sessionMode, text);
+      if (!started) return; // cancelou a troca — mantém o modal
       setPendingMultiCard(null);
     } else {
-      // Single-mode session path
-      setPendingIntention(text);
-      setActiveSession(intentionDraft.mode);
+      // Single-mode session path — abre no provider global (sessão persistente).
+      const started = await startMode(intentionDraft.mode, text);
+      if (!started) return; // usuário cancelou a troca — mantém o modal de intenção
     }
     setIntentionDraft(null);
   };
@@ -834,7 +812,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
           </span>
           <button
             className={styles.reminderRegisterBtn}
-            onClick={() => setActiveSession(null) || setReminders((prev) => {
+            onClick={() => setReminders((prev) => {
               clearPendingReminder(r.modeId);
               return prev.filter((x) => x.modeId !== r.modeId);
             })}
@@ -1085,7 +1063,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
           </span>
           <button
             className={styles.detoxBannerBtn}
-            onClick={() => setActiveSession(modeById[detoxSuggestion.detoxId])}
+            onClick={() => startMode(modeById[detoxSuggestion.detoxId])}
           >
             🧹 Iniciar Detox
           </button>
@@ -1180,7 +1158,7 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
           return {
             open: expanded === mode.id,
             compactView,
-            isActiveSession: activeSession?.id === mode.id,
+            isActiveSession: activeMode?.id === mode.id,
             sessionRef,
             sortBy,
             inRandomMode,
@@ -1315,64 +1293,8 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
         />
       )}
 
-      {activeSession && (
-        <div
-          ref={sessionRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label={activeSession.name ? `Sessão: ${activeSession.name}` : "Sessão ativa"}
-        >
-        <ModeSession
-          modeId={activeSession.id}
-          mode={activeSession}
-          tasks={tasks}
-          routines={routines}
-          intention={pendingIntention || undefined}
-          onCompleteTask={onCompleteTask}
-          onCompleteRoutine={onCompleteRoutine}
-          onAddTask={onAddTask}
-          onAddChecklist={onAddChecklist}
-          onToggleChecklist={onToggleChecklist}
-          onAddRoutineChecklist={onAddRoutineChecklist}
-          onToggleRoutineChecklist={onToggleRoutineChecklist}
-          onTaskComplete={handleModeTaskComplete}
-          onClose={() => {
-            setActiveSession(null);
-            setPendingIntention("");
-            setPinnedSplite(getPinned());
-            // Recarrega contagem de ativações ao fechar sessão
-            const all = getAllActivations();
-            setActivations(Object.fromEntries(all.map(({ modeId, count }: { modeId: string; count: number }) => [modeId, count])));
-            // Recarrega insights de uso pós-sessão
-            refreshInsights();
-          }}
-        />
-        </div>
-      )}
-
-      {/* Multi-card session overlay */}
-      {multiCardCards && (
-        <MultiCardSession
-          cards={multiCardCards}
-          startedAt={multiCardStartedAt}
-          initialIndex={multiCardInitialIndex}
-          sessionMode={multiCardSessionMode}
-          intention={pendingIntention || undefined}
-          tasks={tasks}
-          routines={routines}
-          onCompleteTask={onCompleteTask}
-          onCompleteRoutine={onCompleteRoutine}
-          onAddTask={onAddTask}
-          onAddChecklist={onAddChecklist}
-          onToggleChecklist={onToggleChecklist}
-          onAddRoutineChecklist={onAddRoutineChecklist}
-          onToggleRoutineChecklist={onToggleRoutineChecklist}
-          onClose={() => {
-            setPendingIntention("");
-            handleMultiCardClose();
-          }}
-        />
-      )}
+      {/* As sessões de modo único E multi-card agora são renderizadas globalmente
+          pelo ActiveModeProvider (persistem à navegação / podem ser minimizadas). */}
 
       {ConfirmUI}
 
@@ -1422,13 +1344,14 @@ export default function ModesPanel({ tasks, routines = [], onCompleteTask, onCom
                 ▶ Começar
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (pendingMultiCard) {
-                    startMultiCardSession(pendingMultiCard.cards, pendingMultiCard.sessionMode, "");
+                    const started = await startMultiCardSession(pendingMultiCard.cards, pendingMultiCard.sessionMode, "");
+                    if (!started) return;
                     setPendingMultiCard(null);
                   } else {
-                    setPendingIntention("");
-                    setActiveSession(intentionDraft.mode);
+                    const started = await startMode(intentionDraft.mode);
+                    if (!started) return;
                   }
                   setIntentionDraft(null);
                 }}

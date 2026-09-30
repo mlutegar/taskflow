@@ -7,8 +7,12 @@ import {
   logMultiCardSession,
 } from "../lib/multiCardSessionLog";
 import { logActivation } from "../lib/modeActivations";
-import { logCompletion } from "../lib/modeLog";
 import { logUsage } from "../lib/sessionUsageLog";
+import { liveModeFocusMs, isModeFocusRunning, getModeFocusStats, ModeFocusStats } from "../lib/modeFocusTimer";
+import { DAILY_FOCUS_LIVE_EVENT } from "../lib/dailyFocusLive";
+import { storageGet, storageSet } from "../lib/storage";
+import { SK } from "../lib/storageKeys";
+import { MinimizeIcon } from "./shared/icons";
 import styles from "./MultiCardSession.module.css";
 
 interface ModeConfig {
@@ -38,7 +42,15 @@ interface MultiCardSessionProps {
   onToggleChecklist?: (parentId: string, itemId: string) => Promise<void>;
   onAddRoutineChecklist?: (parentId: string, description: string) => Promise<void>;
   onToggleRoutineChecklist?: (parentId: string, itemId: string) => Promise<void>;
+  onMinimize?: () => void;
+  /** true quando a sessão está minimizada (oculta) — desativa atalhos globais. */
+  minimized?: boolean;
+  /** Notifica o índice do card atual (para o card flutuante mostrar o modo certo). */
+  onIndexChange?: (index: number) => void;
   onClose: () => void;
+  /** Contador que, ao incrementar (>0), dispara o encerramento com registro
+   *  (fase post-form). Usado ao encerrar pelo card flutuante minimizado. */
+  endSignal?: number;
 }
 
 type Phase = "session" | "between" | "end-confirm" | "post-form";
@@ -87,22 +99,34 @@ export default function MultiCardSession({
   onToggleChecklist,
   onAddRoutineChecklist,
   onToggleRoutineChecklist,
+  onMinimize,
+  minimized = false,
+  onIndexChange,
   onClose,
+  endSignal = 0,
 }: MultiCardSessionProps): JSX.Element {
   const [cards, setCards] = useState<ModeConfig[]>(initialCards);
   const [currentIndex, setCurrentIndex] = useState<number>(initialIndex);
   const [phase, setPhase] = useState<Phase>("session");
   const [focusedMinutes, setFocusedMinutes] = useState<number>(0);
   const sessionStartRef = useRef<number>(performance.now());
-  const globalStartRef = useRef<number>(Date.now());
 
-  // #4 - Global elapsed timer
+  // #4 - Global elapsed timer — mostra o TEMPO DE FOCO (só conta com o Daily Focus
+  // rodando; congela quando pausado). Atualiza por tick + eventos do snapshot live.
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const [focusPaused, setFocusPaused] = useState<boolean>(false);
   useEffect(() => {
-    const iv = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - globalStartRef.current) / 1000));
-    }, 1000);
-    return () => clearInterval(iv);
+    const tick = (): void => {
+      setElapsedSeconds(Math.floor(liveModeFocusMs() / 1000));
+      setFocusPaused(!isModeFocusRunning());
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+    window.addEventListener(DAILY_FOCUS_LIVE_EVENT, tick);
+    return () => {
+      clearInterval(iv);
+      window.removeEventListener(DAILY_FOCUS_LIVE_EVENT, tick);
+    };
   }, []);
 
   // #6 - Auto-advance setting
@@ -111,6 +135,15 @@ export default function MultiCardSession({
   const [autoCountdownSeconds, setAutoCountdownSeconds] = useState<number>(0);
   const [autoWarning, setAutoWarning] = useState<boolean>(false);
   const autoIvRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Dica "dá pra minimizar" (mostrada uma única vez, perto do botão)
+  const [showMinimizeHint, setShowMinimizeHint] = useState<boolean>(
+    () => !!onMinimize && !storageGet<boolean>(SK.MINIMIZE_HINT_SEEN, false)
+  );
+  const dismissMinimizeHint = useCallback((): void => {
+    setShowMinimizeHint(false);
+    storageSet(SK.MINIMIZE_HINT_SEEN, true);
+  }, []);
 
   // #13 - Over-3h banner
   const [longSessionBannerDismissed, setLongSessionBannerDismissed] = useState<boolean>(false);
@@ -172,9 +205,10 @@ export default function MultiCardSession({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCountdownSeconds]);
 
-  // Start countdown when phase becomes "session" and autoAdvanceMinutes is set
+  // Start countdown when phase becomes "session" and autoAdvanceMinutes is set.
+  // Pausado quando minimizada (não avança escondido em segundo plano).
   useEffect(() => {
-    if (phase === "session" && autoAdvanceMinutes > 0) {
+    if (phase === "session" && autoAdvanceMinutes > 0 && !minimized) {
       startAutoAdvanceCountdown(autoAdvanceMinutes);
     } else {
       clearAutoInterval();
@@ -183,7 +217,7 @@ export default function MultiCardSession({
     }
     return () => clearAutoInterval();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, autoAdvanceMinutes]);
+  }, [phase, autoAdvanceMinutes, minimized]);
 
   // Log activation on card change
   useEffect(() => {
@@ -193,11 +227,13 @@ export default function MultiCardSession({
 
   useEffect(() => {
     updateActiveSessionIndex(currentIndex);
-  }, [currentIndex]);
+    onIndexChange?.(currentIndex);
+  }, [currentIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // #8 - Keyboard shortcuts
+  // #8 - Keyboard shortcuts (desativados quando minimizada, para não capturar
+  // teclas enquanto o usuário navega em outra página)
   useEffect(() => {
-    if (phase !== "session") return;
+    if (phase !== "session" || minimized) return;
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -209,6 +245,8 @@ export default function MultiCardSession({
           setPhase("session");
           sessionStartRef.current = performance.now();
         }
+      } else if (e.key === "m" || e.key === "M") {
+        onMinimize?.();
       } else if (e.key === "Escape") {
         setPhase("end-confirm");
       }
@@ -216,7 +254,7 @@ export default function MultiCardSession({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentIndex, cards.length]);
+  }, [phase, currentIndex, cards.length, minimized, onMinimize]);
 
   const handleNextCard = (): void => {
     setCurrentIndex((prev) => prev + 1);
@@ -234,9 +272,14 @@ export default function MultiCardSession({
     setPhase("post-form");
   };
 
+  // Encerramento acionado pelo card flutuante minimizado: vai direto ao registro
+  // (fase post-form), para que a sessão seja salva para análise.
+  useEffect(() => {
+    if (endSignal > 0) handleConfirmEnd();
+  }, [endSignal]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handlePostDone = (): void => {
     clearActiveSession();
-    cards.forEach((c) => logCompletion(c.id));
     onClose();
   };
 
@@ -322,8 +365,9 @@ export default function MultiCardSession({
   // ── Post-session form ─────────────────────────────────────────────────────
   if (phase === "post-form") {
     const endedAt = new Date().toISOString();
-    const started = new Date(startedAt);
-    const durationMinutes = Math.max(1, Math.round((new Date().getTime() - started.getTime()) / 60000));
+    // Duração = tempo de FOCO efetivo (sincronizado ao Daily Focus), não wall-clock.
+    const focusStats = getModeFocusStats();
+    const durationMinutes = Math.max(1, focusStats.focusMinutes);
     const suggested = Math.min(focusedMinutes || durationMinutes, durationMinutes);
     return (
       <div className={styles.overlay}>
@@ -334,6 +378,7 @@ export default function MultiCardSession({
             endedAt={endedAt}
             durationMinutes={durationMinutes}
             suggestedFocusedMinutes={suggested}
+            focusStats={focusStats}
             intention={intention}
             onDone={handlePostDone}
           />
@@ -352,9 +397,9 @@ export default function MultiCardSession({
             {currentIndex + 1} / {cards.length}
           </span>
 
-          {/* #4 - Global elapsed timer */}
-          <span className={styles.elapsedTimer}>
-            {formatElapsed(elapsedSeconds)}
+          {/* #4 - Global elapsed timer (tempo de foco, pausa junto com o Daily Focus) */}
+          <span className={styles.elapsedTimer} title={focusPaused ? "Pausado — Daily Focus parado" : "Tempo de foco"}>
+            {focusPaused ? "⏸ " : ""}{formatElapsed(elapsedSeconds)}
           </span>
 
           <div className={styles.progressDots}>
@@ -404,14 +449,44 @@ export default function MultiCardSession({
             </div>
           </div>
 
-          <button className={styles.endBtn} onClick={handleEndSession}>
-            Encerrar
-          </button>
+          <div className={styles.topActions}>
+            {onMinimize && (
+              <div className={styles.minWrap}>
+                <button
+                  className={styles.minBtn}
+                  onClick={() => { dismissMinimizeHint(); onMinimize(); }}
+                  title="Minimizar (M) — continua ativa em segundo plano"
+                  aria-label="Minimizar sessão"
+                >
+                  <MinimizeIcon className={styles.minIcon} />
+                  <span className={styles.minLabel}>Minimizar</span>
+                </button>
+                {showMinimizeHint && (
+                  <div className={styles.minHint} role="status">
+                    <span>Dá pra minimizar e continuar navegando 👇</span>
+                    <button
+                      className={styles.minHintClose}
+                      onClick={dismissMinimizeHint}
+                      aria-label="Entendi"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <span className={styles.actionsDivider} aria-hidden="true" />
+
+            <button className={styles.endBtn} onClick={handleEndSession}>
+              Encerrar
+            </button>
+          </div>
         </div>
 
         {/* #8 - Keyboard hints */}
         <div className={styles.keyboardHint}>
-          → próximo · ← anterior · Esc sair
+          → próximo · ← anterior · M minimizar · Esc sair
         </div>
       </div>
 
@@ -588,6 +663,7 @@ interface MultiCardPostFormProps {
   endedAt: string;
   durationMinutes: number;
   suggestedFocusedMinutes: number;
+  focusStats?: ModeFocusStats;
   intention?: string;
   onDone: () => void;
 }
@@ -623,6 +699,7 @@ function MultiCardPostForm({
   endedAt,
   durationMinutes,
   suggestedFocusedMinutes,
+  focusStats,
   intention,
   onDone,
 }: MultiCardPostFormProps): JSX.Element {
@@ -668,6 +745,11 @@ function MultiCardPostForm({
         comboWith:        partner?.id,
         sessionStartedAt: startedAt,
         sessionEndedAt:   endedAt,
+        focusMinutes:     durationMinutes,
+        pauseCount:       focusStats?.pauseCount,
+        pausedMinutes:    focusStats?.pausedMinutes,
+        focusBlocks:      focusStats?.focusBlocks,
+        tasksCompleted:   focusStats?.tasksCompleted,
         note:             note.trim() || undefined,
         intention:        intention || undefined,
       });

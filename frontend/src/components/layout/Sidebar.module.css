@@ -24,13 +24,27 @@
 }
 
 .logo {
-  font-size: 22px;
   padding: 8px 0 16px;
   border-bottom: 1px solid var(--border);
   width: 100%;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   margin-bottom: 8px;
+}
+
+.logoSvg {
+  width: 22px;
+  height: 22px;
+  color: var(--accent);
+}
+
+/* Ícones SVG (herdam a cor do item via currentColor) */
+.navSvg {
+  width: 22px;
+  height: 22px;
+  color: currentColor;
 }
 
 .nav {
@@ -67,7 +81,19 @@
 
 .navItem.active {
   color: var(--accent);
-  background: rgba(124, 110, 245, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+/* Ponto indicador de sessão de modo ativa */
+.modeDot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
 }
 
 /* ── Icon + badge wrapper ───────────────────────────── */
@@ -160,6 +186,7 @@
   min-height: 100vh;
   min-width: 0;
   overflow-x: clip; /* clip não cria scroll container (diferente de hidden) */
+  touch-action: pan-y; /* gestos verticais continuam rolando mesmo com cards arrastáveis */
 }
 
 /* ════════════════════════════════════════════════════
@@ -173,7 +200,7 @@
 
   .pageArea {
     margin-left: 0;
-    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+    padding-bottom: calc(68px + env(safe-area-inset-bottom));
   }
 
   /* ── Bottom nav bar ───────────────────────────────── */
@@ -182,14 +209,52 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 64px;
-    padding-bottom: env(safe-area-inset-bottom);
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);
+    height: 68px;
+    padding: 0 6px env(safe-area-inset-bottom);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.32);
     display: flex;
     align-items: stretch;
+    gap: 2px;
     z-index: 100;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Auto-hide ao rolar para baixo */
+  .bottomNavHidden {
+    transform: translateY(calc(100% + 8px));
+  }
+
+  /* Pill deslizante (indicador de item ativo) */
+  .bottomNavPill {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    height: 30px;
+    pointer-events: none;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 0;
+  }
+
+  .bottomNavPill::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 52px;
+    height: 30px;
+    border-radius: 16px;
+    background: linear-gradient(
+      180deg,
+      rgba(var(--accent-rgb), 0.22),
+      rgba(var(--accent-rgb), 0.12)
+    );
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.22),
+                0 4px 16px rgba(var(--accent-rgb), 0.22);
   }
 
   .bottomNavItem {
@@ -198,14 +263,17 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 4px;
+    min-height: 48px;
     border: none;
     background: none;
     color: var(--text-muted);
     cursor: pointer;
-    padding: 6px 4px;
+    padding: 8px 2px;
     position: relative;
-    transition: color 0.15s;
+    z-index: 1;
+    transition: color 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .bottomNavItem:hover {
@@ -216,23 +284,36 @@
     color: var(--accent);
   }
 
-  /* Indicador ativo: barra no topo */
-  .bottomNavItem.active::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 36px;
-    height: 2px;
-    background: var(--accent);
-    border-radius: 0 0 3px 3px;
+  /* Área do ícone no bottom nav (a pill deslizante fica atrás) */
+  .bottomNav .navIconWrap {
+    width: 52px;
+    height: 30px;
+    transition: transform 0.2s ease;
+  }
+
+  .bottomNav .navSvg {
+    transition: transform 0.2s ease;
+  }
+
+  .bottomNavItem.active .navSvg {
+    transform: scale(1.08);
+  }
+
+  /* Feedback tátil no toque */
+  .bottomNavItem:active .navIconWrap {
+    transform: scale(0.9);
   }
 
   .bottomNavLabel {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 500;
+    letter-spacing: 0.02em;
     white-space: nowrap;
+    transition: font-weight 0.15s ease;
+  }
+
+  .bottomNavItem.active .bottomNavLabel {
+    font-weight: 600;
   }
 
   /* ── Drawer overlay ───────────────────────────────── */
@@ -278,6 +359,18 @@
     padding: 16px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+  }
+
+  .drawerLogo {
+    width: 20px;
+    height: 20px;
+    color: var(--accent);
+  }
+
+  .drawerTitle {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
   }
 
   .drawerClose {
@@ -326,7 +419,36 @@
 
   .drawerNavItem.active {
     color: var(--accent);
-    background: rgba(124, 110, 245, 0.1);
+    background: rgba(var(--accent-rgb), 0.1);
+  }
+
+  .drawerSvg {
+    width: 20px;
+    height: 20px;
+    color: currentColor;
+  }
+
+  .drawerNavLabel {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .drawerStreak {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--warning);
+  }
+
+  .drawerFooter {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+  }
+
+  .drawerBuildDate {
+    font-size: 11px;
+    color: var(--text-muted);
+    opacity: 0.5;
   }
 
   /* ── Badge no drawer ──────────────────────────────── */
@@ -334,6 +456,13 @@
     top: -5px;
     right: -7px;
     font-size: 9px;
+  }
+
+  /* Badge dentro da pill do bottom nav */
+  .bottomNav .streakBadge {
+    top: -2px;
+    right: 6px;
+    box-shadow: 0 0 0 2px var(--surface);
   }
 }
 
@@ -349,4 +478,11 @@
 @media (prefers-reduced-motion: reduce) {
   .drawer { transition: none !important; }
   .drawerOverlay { animation: none !important; }
+  .bottomNav,
+  .bottomNavPill,
+  .bottomNav .navIconWrap,
+  .bottomNav .navSvg,
+  .bottomNavItem:active .navIconWrap,
+  .bottomNavItem.active .navSvg { transition: none !important; }
+  .bottomNavItem.active .navSvg { transform: none !important; }
 }

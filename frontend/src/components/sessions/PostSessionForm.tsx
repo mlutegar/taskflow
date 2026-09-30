@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { logUsage, addPendingReminder } from "../../lib/sessionUsageLog";
-import { logCompletion } from "../../lib/modeLog";
+import { ModeFocusStats } from "../../lib/modeFocusTimer";
 import { useToast } from "../shared/Toast";
 import styles from "./PostSessionForm.module.css";
 
@@ -81,6 +81,14 @@ interface PostSessionFormProps {
   modeName?: string;
   suggestedMinutes?: number;
   sessionStartedAt?: string | null;
+  /**
+   * Tempo de foco EFETIVO do modo em minutos (acumulado só enquanto o Daily Focus
+   * esteve rodando). Quando presente, é a fonte de verdade da duração/eficiência,
+   * substituindo o wall-clock de `sessionStartedAt`.
+   */
+  focusMinutes?: number | null;
+  /** Métricas ricas do acumulador de foco (pausas, blocos, tarefas). */
+  focusStats?: ModeFocusStats;
   intention?: string;
   onDone: () => void;
 }
@@ -92,10 +100,12 @@ interface SavedResult {
   worked: boolean;
 }
 
-export default function PostSessionForm({ modeId, modeName, suggestedMinutes, sessionStartedAt, intention, onDone }: PostSessionFormProps): JSX.Element {
+export default function PostSessionForm({ modeId, modeName, suggestedMinutes, sessionStartedAt, focusMinutes, focusStats, intention, onDone }: PostSessionFormProps): JSX.Element {
   const { showToast } = useToast();
+  const hasFocusInit = typeof focusMinutes === "number" && focusMinutes > 0;
   const [worked,         setWorked]         = useState<boolean | null>(null);
-  const [focusedMinutes, setFocusedMinutes] = useState<number>(() => suggestedMinutes ?? 0);
+  // Pré-preenche com o FOCO MEDIDO (acumulador); o usuário só ajusta se quiser.
+  const [focusedMinutes, setFocusedMinutes] = useState<number>(() => (hasFocusInit ? Math.round(focusMinutes as number) : suggestedMinutes ?? 0));
   const [idleMinutes,    setIdleMinutes]    = useState<number>(0);
   const [idleReason,     setIdleReason]     = useState<string[]>([]);
   const [feeling,        setFeeling]        = useState<string[]>([]);
@@ -104,15 +114,19 @@ export default function PostSessionForm({ modeId, modeName, suggestedMinutes, se
   const [savedResult, setSavedResult] = useState<SavedResult | null>(null);
   const ivRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Duração estimada ao vivo (usada no banner do formulário)
-  const sessionDurationNow: number | null = sessionStartedAt
+  // Duração da sessão = tempo de FOCO efetivo (sincronizado ao Daily Focus) quando
+  // disponível; senão, fallback wall-clock desde o início.
+  const hasFocus = typeof focusMinutes === "number" && focusMinutes > 0;
+  const sessionDurationNow: number | null = hasFocus
+    ? Math.max(1, Math.round(focusMinutes as number))
+    : sessionStartedAt
     ? Math.max(1, Math.round((Date.now() - new Date(sessionStartedAt).getTime()) / 60000))
     : null;
 
   // Fix #9 — reseta campos se o modeId mudar (reutilização do componente sem desmontagem)
   useEffect(() => {
     setWorked(null);
-    setFocusedMinutes(suggestedMinutes ?? 0);
+    setFocusedMinutes(hasFocusInit ? Math.round(focusMinutes as number) : suggestedMinutes ?? 0);
     setIdleMinutes(0);
     setIdleReason([]);
     setFeeling([]);
@@ -132,21 +146,21 @@ export default function PostSessionForm({ modeId, modeName, suggestedMinutes, se
 
     const endedAt = new Date().toISOString();
 
-    // Calcula eficiência para exibir no card pós-sessão
+    // Calcula eficiência para exibir no card pós-sessão (base = tempo de foco efetivo
+    // quando disponível; senão, wall-clock).
     let sessionDurationMinutes: number | null = null;
     let efficiencyPct: number | null = null;
-    if (sessionStartedAt) {
+    if (hasFocus) {
+      sessionDurationMinutes = Math.max(1, Math.round(focusMinutes as number));
+    } else if (sessionStartedAt) {
       const diffMs = new Date(endedAt).getTime() - new Date(sessionStartedAt).getTime();
-      if (diffMs > 0) {
-        sessionDurationMinutes = Math.max(1, Math.round(diffMs / 60000));
-        if (focusedMinutes > 0) {
-          efficiencyPct = Math.min(100, Math.round((focusedMinutes / sessionDurationMinutes) * 100));
-        }
-      }
+      if (diffMs > 0) sessionDurationMinutes = Math.max(1, Math.round(diffMs / 60000));
+    }
+    if (sessionDurationMinutes != null && focusedMinutes > 0) {
+      efficiencyPct = Math.min(100, Math.round((focusedMinutes / sessionDurationMinutes) * 100));
     }
 
-    const saved = logUsage({ modeId, worked: worked ?? false, focusedMinutes, idleMinutes, idleReason, feeling, sessionStartedAt: sessionStartedAt ?? undefined, sessionEndedAt: endedAt, note: note.trim() || undefined, intention: intention || undefined });
-    logCompletion(modeId);
+    const saved = logUsage({ modeId, worked: worked ?? false, focusedMinutes, idleMinutes, idleReason, feeling, sessionStartedAt: sessionStartedAt ?? undefined, sessionEndedAt: endedAt, focusMinutes: hasFocus ? Math.round(focusMinutes as number) : undefined, pauseCount: focusStats?.pauseCount, pausedMinutes: focusStats?.pausedMinutes, focusBlocks: focusStats?.focusBlocks, tasksCompleted: focusStats?.tasksCompleted, note: note.trim() || undefined, intention: intention || undefined });
     if (!saved) {
       showToast("⚠️ Não foi possível salvar localmente (armazenamento cheio). Os dados foram enviados ao servidor.", "error");
     }
@@ -158,6 +172,24 @@ export default function PostSessionForm({ modeId, modeName, suggestedMinutes, se
   useEffect(() => () => clearInterval(ivRef.current!), []);
 
   const handleSkip = (): void => {
+    // #2 — mesmo ao "Pular", persiste um registro MÍNIMO com o foco já medido, para
+    // que a sessão nunca desapareça da análise. O lembrete continua para enriquecer depois.
+    logUsage({
+      modeId,
+      worked: false,
+      focusedMinutes: hasFocus ? Math.round(focusMinutes as number) : 0,
+      idleMinutes: 0,
+      idleReason: [],
+      feeling: [],
+      sessionStartedAt: sessionStartedAt ?? undefined,
+      sessionEndedAt: new Date().toISOString(),
+      focusMinutes: hasFocus ? Math.round(focusMinutes as number) : undefined,
+      pauseCount: focusStats?.pauseCount,
+      pausedMinutes: focusStats?.pausedMinutes,
+      focusBlocks: focusStats?.focusBlocks,
+      tasksCompleted: focusStats?.tasksCompleted,
+      intention: intention || undefined,
+    });
     addPendingReminder(modeId, modeName || modeId);
     onDone();
   };
@@ -322,10 +354,18 @@ export default function PostSessionForm({ modeId, modeName, suggestedMinutes, se
           />
         </div>
 
-        {/* Banner de contexto: duração automática da sessão */}
+        {/* Banner de contexto: foco medido automaticamente (sincronizado ao Daily Focus) */}
         {sessionDurationNow != null && (
           <div className={styles.sessionContextBanner}>
-            🕐 Sessão ativa por <strong>{sessionDurationNow} min</strong> — insira abaixo o tempo que você realmente ficou focado
+            {hasFocus ? (
+              <>⚡ Foco medido: <strong>{sessionDurationNow} min</strong>
+                {focusStats && focusStats.pauseCount > 0 && <> · {focusStats.pauseCount} pausa{focusStats.pauseCount > 1 ? "s" : ""}</>}
+                {focusStats && focusStats.tasksCompleted > 0 && <> · {focusStats.tasksCompleted} tarefa{focusStats.tasksCompleted > 1 ? "s" : ""}</>}
+                {" "}— ajuste abaixo se quiser
+              </>
+            ) : (
+              <>🕐 Sessão ativa por <strong>{sessionDurationNow} min</strong> — insira abaixo o tempo que você realmente ficou focado</>
+            )}
           </div>
         )}
 

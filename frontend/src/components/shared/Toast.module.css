@@ -41,6 +41,20 @@
 }
 .close:hover { opacity: 1; }
 
+.action {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.action:hover { background: rgba(255, 255, 255, 0.28); }
+
 @keyframes slideIn {
   from { transform: translateX(20px); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }

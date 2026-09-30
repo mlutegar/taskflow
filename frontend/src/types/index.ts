@@ -1,24 +1,7 @@
-// Tarefa
-export interface Task {
-  id: string
-  title: string
-  done: boolean
-  priority?: 'low' | 'medium' | 'high'
-  tags?: string[]
-  checklist?: ChecklistItem[]
-  created_at?: string
-  updated_at?: string
-  user_id?: string
-  due_date?: string | null
-  notes?: string | null
-  routine_id?: string | null
-}
-
-export interface ChecklistItem {
-  id: string
-  text: string
-  done: boolean
-}
+// Tarefa — contrato canônico da API. O alias preserva imports existentes.
+export type { TaskChecklistItem as ChecklistItem } from "./tasks";
+export type { TaskRecord, TaskCreateInput, TaskUpdateInput, TaskSyncState } from "./tasks";
+export type Task = import("./tasks").TaskRecord;
 
 // Rotina
 export interface Routine {
@@ -116,6 +99,31 @@ export interface CheckIn {
   time: string
   mood?: number | null
   note?: string | null
+  user_id?: string
+}
+
+// Checkpoint emocional do Daily Focus (Play / Retomar / Fim de tarefa)
+export type EmotionMoment = "start" | "resume" | "end"
+
+export interface SessionEmotion {
+  id?: string
+  emotion: string                 // id da emoção (ex.: "focado")
+  moment: EmotionMoment
+  intensity?: "leve" | "forte"
+  date: string                    // YYYY-MM-DD
+  hour: number                    // 0-23
+  timestamp: string               // ISO
+  taskTitle?: string
+  taskIndex?: number
+  taskId?: string
+  modeIds?: string[]
+  level?: number
+  rushMode?: boolean
+  tabMode?: boolean
+  pauseSecs?: number
+  completed?: boolean
+  usedSecs?: number
+  totalSecs?: number
   user_id?: string
 }
 

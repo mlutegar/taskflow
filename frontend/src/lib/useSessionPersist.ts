@@ -17,15 +17,15 @@
  */
 import { useRef } from "react";
 
-export function useSessionPersist(key: string): {
-  saved: unknown;
-  persist: (state: unknown) => void;
+export function useSessionPersist<T = any>(key: string): {
+  saved: T | undefined;
+  persist: (state: T) => void;
   clearSaved: () => void;
 } {
   const storageKey = `taskflow_sess_${key}`;
 
   // Lê uma única vez (sincrono, no momento do hook init)
-  const savedRef = useRef<unknown>(null);
+  const savedRef = useRef<T | undefined | null>(null);
   if (savedRef.current === null) {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -35,7 +35,7 @@ export function useSessionPersist(key: string): {
     }
   }
 
-  const persist = (state: unknown): void => {
+  const persist = (state: T): void => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(state));
     } catch {}
@@ -49,7 +49,7 @@ export function useSessionPersist(key: string): {
 
   return {
     /** Estado salvo anteriormente (undefined se não havia nada). */
-    saved: savedRef.current,
+    saved: savedRef.current ?? undefined,
     persist,
     clearSaved,
   };

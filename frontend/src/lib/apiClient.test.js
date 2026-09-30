@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { api } from './apiClient';
+import { api, warmUpBackend } from './apiClient';
 
 const TOKEN_KEY = 'taskflow.authToken';
 const USER_KEY = 'taskflow.authUser';
@@ -172,6 +172,50 @@ describe('refresh reativo em 401', () => {
     mockFetchOnce({ ok: false, status: 401, body: { message: 'Sem permissão.' } });  // retry ainda 401
 
     await expect(api.get('/protected')).rejects.toThrow('Sem permissão.');
+  });
+});
+
+describe('refresh com timeout (regressão do skeleton infinito)', () => {
+  it('aborta o /auth/refresh travado em vez de ficar pendente para sempre', async () => {
+    localStorage.setItem(TOKEN_KEY, 'expired-token');
+
+    global.fetch = vi.fn((url, opts) => {
+      // Requisição original → 401.
+      if (!String(url).includes('/auth/refresh')) {
+        return Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({ error: 'expirado' }) });
+      }
+      // /auth/refresh nunca responde — só rejeita quando o AbortController aborta.
+      return new Promise((_resolve, reject) => {
+        opts.signal.addEventListener('abort', () => {
+          const err = new Error('AbortError');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      });
+    });
+
+    vi.useFakeTimers();
+    const promise = api.get('/protected');
+    // Antes do fix: essa Promise nunca settlava (skeleton eterno). Agora o
+    // refresh aborta em ~9s e cai em erro transitório de rede.
+    const assertion = expect(promise).rejects.toThrow('Sem conexão para renovar a sessão. Tente novamente.');
+    await vi.advanceTimersByTimeAsync(9_001);
+    await assertion;
+    // Sessão preservada (timeout é transitório, não desloga).
+    expect(localStorage.getItem(TOKEN_KEY)).toBe('expired-token');
+    vi.useRealTimers();
+  }, 10_000);
+});
+
+describe('warmUpBackend', () => {
+  it('dispara GET /health e engole qualquer erro', async () => {
+    global.fetch = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    // Não deve lançar mesmo com fetch falhando.
+    expect(() => warmUpBackend()).not.toThrow();
+    await Promise.resolve();
+    const [url, opts] = fetch.mock.calls[0];
+    expect(String(url)).toContain('/health');
+    expect(opts.method).toBe('GET');
   });
 });
 

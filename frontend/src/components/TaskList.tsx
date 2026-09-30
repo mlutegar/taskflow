@@ -60,6 +60,8 @@
 import { useState, useEffect } from "react";
 import TaskCard from "./TaskCard";
 import styles from "./TaskList.module.css";
+import { Project, ProjectInput } from "../api/projects";
+import type { TaskUpdateInput } from "../types/tasks";
 
 interface TaskItem {
   id: string;
@@ -67,29 +69,38 @@ interface TaskItem {
   [key: string]: unknown;
 }
 
+// Os handlers recebem IDs (o TaskCard chama `onComplete(task.id)`, etc.), não o
+// objeto da tarefa. As assinaturas abaixo refletem o contrato real usado por
+// `useTasks` e pelo `TaskCard`.
+type TaskHandler = (id: string) => void | Promise<unknown>;
+type ItemHandler = (taskId: string, itemId: string) => void | Promise<unknown>;
+
 interface CardProps {
-  onComplete: ((task: TaskItem) => void) | undefined;
-  onReopen: ((task: TaskItem) => void) | undefined;
-  onDelete: ((task: TaskItem) => void) | undefined;
-  onUpdate: ((task: TaskItem) => void) | undefined;
-  onAddChecklist: ((task: TaskItem) => void) | undefined;
-  onToggleChecklist: ((task: TaskItem, itemId: string) => void) | undefined;
-  onUpdateChecklist: ((task: TaskItem, itemId: string, text: string) => void) | undefined;
-  onDeleteChecklist: ((task: TaskItem, itemId: string) => void) | undefined;
+  onComplete: TaskHandler | undefined;
+  onReopen: TaskHandler | undefined;
+  onDelete: TaskHandler | undefined;
+  onUpdate: ((id: string, payload: TaskUpdateInput) => void | Promise<unknown>) | undefined;
+  onAddChecklist: ((taskId: string, text: string, parentId?: string | null) => void | Promise<unknown>) | undefined;
+  onToggleChecklist: ItemHandler | undefined;
+  onUpdateChecklist: ((taskId: string, itemId: string, updates: unknown) => void | Promise<unknown>) | undefined;
+  onDeleteChecklist: ItemHandler | undefined;
 }
 
 interface TaskListProps {
   tasks: TaskItem[];
   loading?: boolean;
   grouped?: boolean;
-  onComplete?: (task: TaskItem) => void;
-  onReopen?: (task: TaskItem) => void;
-  onDelete?: (task: TaskItem) => void;
-  onUpdate?: (task: TaskItem) => void;
-  onAddChecklist?: (task: TaskItem) => void;
-  onToggleChecklist?: (task: TaskItem, itemId: string) => void;
-  onUpdateChecklist?: (task: TaskItem, itemId: string, text: string) => void;
-  onDeleteChecklist?: (task: TaskItem, itemId: string) => void;
+  onComplete?: TaskHandler;
+  onReopen?: TaskHandler;
+  onDelete?: TaskHandler;
+  onUpdate?: (id: string, payload: TaskUpdateInput) => void | Promise<unknown>;
+  onAddChecklist?: (taskId: string, text: string, parentId?: string | null) => void | Promise<unknown>;
+  onToggleChecklist?: ItemHandler;
+  onUpdateChecklist?: (taskId: string, itemId: string, updates: unknown) => void | Promise<unknown>;
+  onDeleteChecklist?: ItemHandler;
+  completingIds?: Set<string>;
+  projects?: Project[];
+  onCreateProject?: (data: ProjectInput) => Promise<Project>;
 }
 
 const PAGE_SIZE = 10;
@@ -119,6 +130,9 @@ export default function TaskList({
   grouped = false,
   onComplete, onReopen, onDelete, onUpdate,
   onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist,
+  completingIds = new Set(),
+  projects = [],
+  onCreateProject,
 }: TaskListProps): JSX.Element {
   const [page, setPage] = useState<number>(1);
 
@@ -158,7 +172,7 @@ export default function TaskList({
               </div>
               <div className={styles.list}>
                 {group.map((task) => (
-                  <TaskCard key={task.id} task={task} {...cardProps} />
+                  <TaskCard key={task.id} task={task} {...cardProps} projects={projects} onCreateProject={onCreateProject} completing={completingIds.has(String(task.id))} />
                 ))}
               </div>
             </div>
@@ -176,7 +190,7 @@ export default function TaskList({
     <>
       <div className={styles.list}>
         {paginated.map((task) => (
-          <TaskCard key={task.id} task={task} {...cardProps} />
+          <TaskCard key={task.id} task={task} {...cardProps} projects={projects} onCreateProject={onCreateProject} completing={completingIds.has(String(task.id))} />
         ))}
       </div>
       {tasks.length > PAGE_SIZE && (

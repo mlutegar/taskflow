@@ -1,17 +1,22 @@
-import { useState, useEffect, useMemo, FormEvent, ChangeEvent } from "react";
+import { useState, useEffect, useMemo, useCallback, FormEvent, ChangeEvent } from "react";
 import TaskSelector from "./TaskSelector";
 import { dailyTasksApi } from "../api/dailyTasks";
+import { useToast } from "./shared/Toast";
 import styles from "./TodayPanel.module.css";
+import RecurrenceFields, { RecurrenceRule } from "./RecurrenceFields";
+import { todayISO } from "../lib/dateUtils";
+import { Project } from "../api/projects";
+import ProjectSelect from "./ProjectSelect";
 
 /* Vibração tátil curta (ignorada se browser não suportar) */
 function haptic(ms: number = 10): void {
   try { if (navigator.vibrate) navigator.vibrate(ms); } catch { /* noop */ }
 }
 
-const DAILY_LIMIT = 5;
+export const DAILY_LIMIT = 5;
 
 function todayKey(): string {
-  return `todayTasks_${new Date().toISOString().split("T")[0]}`;
+  return `todayTasks_${todayISO()}`;
 }
 
 function loadCachedIds(): string[] {
@@ -48,6 +53,8 @@ interface TodayTask {
   priority: number;
   due_date?: string | null;
   recurrence?: string | null;
+  recurrence_rule?: RecurrenceRule | null;
+  project_id?: string | null;
   completed: boolean;
   checklist?: ChecklistItem[];
   _isRoutine?: boolean;
@@ -138,6 +145,8 @@ interface EditFormData {
   priority: number | string;
   due_date: string;
   recurrence: string;
+  recurrence_rule: RecurrenceRule | null;
+  project_id: string | null;
 }
 
 interface EditFormProps {
@@ -148,17 +157,22 @@ interface EditFormProps {
     priority: number;
     due_date: string | null;
     recurrence: string | null;
+    recurrence_rule: RecurrenceRule | null;
+    project_id: string | null;
   }) => Promise<void>;
   onCancel: () => void;
+  projects: Project[];
 }
 
-function EditForm({ task, onSave, onCancel }: EditFormProps) {
+function EditForm({ task, onSave, onCancel, projects }: EditFormProps) {
   const [data, setData] = useState<EditFormData>({
     title: task.title,
     description: task.description || "",
     priority: task.priority,
     due_date: task.due_date || "",
     recurrence: task.recurrence || "",
+    recurrence_rule: task.recurrence_rule || null,
+    project_id: task.project_id || null,
   });
   const [saving, setSaving] = useState<boolean>(false);
 
@@ -173,6 +187,8 @@ function EditForm({ task, onSave, onCancel }: EditFormProps) {
         priority: Number(data.priority),
         due_date: data.due_date || null,
         recurrence: data.recurrence || null,
+        recurrence_rule: data.recurrence_rule,
+        project_id: data.project_id,
       });
     } finally {
       setSaving(false);
@@ -213,17 +229,18 @@ function EditForm({ task, onSave, onCancel }: EditFormProps) {
           onChange={(e: ChangeEvent<HTMLInputElement>) => setData((d) => ({ ...d, due_date: e.target.value }))}
         />
       </div>
-      <select
+      <RecurrenceFields
+        recurrence={data.recurrence}
+        rule={data.recurrence_rule}
+        compact
+        onChange={(recurrence, recurrence_rule) => setData((d) => ({ ...d, recurrence, recurrence_rule }))}
+      />
+      <ProjectSelect
+        projects={projects}
+        value={data.project_id}
+        onChange={(project_id) => setData((d) => ({ ...d, project_id }))}
         className={styles.editSelect}
-        value={data.recurrence}
-        onChange={(e: ChangeEvent<HTMLSelectElement>) => setData((d) => ({ ...d, recurrence: e.target.value }))}
-      >
-        <option value="">Sem repetição</option>
-        <option value="daily">🔄 Todo dia</option>
-        <option value="weekly">🔄 Toda semana</option>
-        <option value="biweekly">🔄 A cada 2 semanas</option>
-        <option value="monthly">🔄 Todo mês</option>
-      </select>
+      />
       <div className={styles.editActions}>
         <button type="submit" className={styles.btnSave} disabled={saving || !data.title.trim()}>
           {saving ? "Salvando…" : "Salvar"}
@@ -243,10 +260,17 @@ interface TodayTaskItemProps {
   onReopen: (id: string) => void;
   onRemove: (id: string) => void;
   onToggleChecklist: (taskId: string, itemId: string) => void;
-  onUpdate: (id: string, payload: unknown) => Promise<void>;
+  onUpdate: (id: string, payload: unknown) => Promise<unknown>;
+  projects: Project[];
+  onOpenDetail?: (id: number | string) => void;
+  index?: number;
+  isDragging?: boolean;
+  onDragStart?: (index: number) => void;
+  onDragEnd?: () => void;
+  onDropAt?: (index: number) => void;
 }
 
-function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist, onUpdate }: TodayTaskItemProps) {
+function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist, onUpdate, projects, onOpenDetail, index, isDragging, onDragStart, onDragEnd, onDropAt }: TodayTaskItemProps) {
   const [expanded, setExpanded] = useState<boolean>(false);
   const [editing, setEditing] = useState<boolean>(false);
   const dotColor = PRIORITY_COLORS[task.priority] || "var(--text-muted)";
@@ -268,13 +292,34 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
     setEditing(false);
   };
 
+  const dndEnabled = index !== undefined && !editing;
+
   return (
-    <div className={styles.taskBlock}>
+    <div
+      className={styles.taskBlock}
+      style={isDragging ? { opacity: 0.5 } : undefined}
+      onDragOver={dndEnabled ? (e) => e.preventDefault() : undefined}
+      onDrop={dndEnabled ? (e) => { e.preventDefault(); onDropAt?.(index!); } : undefined}
+    >
       {/* ── Formulário de edição ── */}
       {editing ? (
-        <EditForm task={task} onSave={handleSave} onCancel={() => setEditing(false)} />
+        <EditForm task={task} projects={projects} onSave={handleSave} onCancel={() => setEditing(false)} />
       ) : (
         <div className={`${styles.taskItem} ${done ? styles.taskDone : ""}`}>
+          {/* Alça de arraste (reordenar) */}
+          {dndEnabled && (
+            <span
+              className={styles.dragHandle}
+              draggable
+              onDragStart={() => onDragStart?.(index!)}
+              onDragEnd={() => onDragEnd?.()}
+              title="Arraste para reordenar"
+              aria-label="Reordenar tarefa"
+              role="button"
+            >
+              ⠿
+            </span>
+          )}
           {/* Botão de conclusão */}
           <button
             className={styles.checkBtn}
@@ -293,9 +338,20 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
             ✓
           </button>
 
-          {/* Info da tarefa */}
-          <div className={styles.taskInfo}>
+          {/* Info da tarefa — clique abre o modal de detalhes/edição */}
+          <div
+            className={styles.taskInfo}
+            role={onOpenDetail ? "button" : undefined}
+            tabIndex={onOpenDetail ? 0 : undefined}
+            onClick={onOpenDetail ? () => onOpenDetail(task.id) : undefined}
+            onKeyDown={onOpenDetail ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenDetail(task.id); } } : undefined}
+            style={onOpenDetail ? { cursor: "pointer" } : undefined}
+          >
             <span className={styles.taskTitle}>{task.title}</span>
+            {task.project_id && (() => {
+              const project = projects.find((item) => item.id === task.project_id);
+              return project ? <span className={styles.taskSub}>{project.emoji} {project.name}</span> : null;
+            })()}
             {hasSubtasks && (
               <span className={styles.taskSub}>
                 {subDone}/{rootSubtasks.length} subtarefas
@@ -362,43 +418,89 @@ interface TodayPanelProps {
   onComplete: (id: string) => void;
   onReopen: (id: string) => void;
   onToggleChecklist: (taskId: string, itemId: string) => void;
-  onUpdate: (id: string, payload: unknown) => Promise<void>;
+  onUpdate: (id: string, payload: unknown) => Promise<unknown>;
+  projects?: Project[];
+  onOpenDetail?: (id: number | string) => void;
+  /** Força o painel iniciar expandido (usado na etapa de preparação do Daily Focus). */
+  forceExpanded?: boolean;
+  /** Notifica o pai sempre que a seleção de prioridades muda (ids ordenados). */
+  onSelectionChange?: (ids: string[]) => void;
+  /** Quando este número muda, recarrega a seleção do BD (ex.: após "Sugerir 5"). */
+  reloadSignal?: number;
 }
 
-export default function TodayPanel({ tasks, completedToday = 0, onComplete, onReopen, onToggleChecklist, onUpdate }: TodayPanelProps) {
+export default function TodayPanel({ tasks, completedToday = 0, onComplete, onReopen, onToggleChecklist, onUpdate, projects = [], onOpenDetail, forceExpanded = false, onSelectionChange, reloadSignal = 0 }: TodayPanelProps) {
   // Inicia com o cache local para evitar flash, depois sincroniza com o BD
   const [todayIds, setTodayIds] = useState<string[]>(loadCachedIds);
   const [showPicker, setShowPicker] = useState<boolean>(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem("todayPanel_collapsed") === "true"; } catch { return false; }
+    if (forceExpanded) return false;
+    try {
+      const v = localStorage.getItem("todayPanel_collapsed");
+      return v === null ? true : v === "true"; // default: minimizado
+    } catch { return true; }
   });
   const [_syncing, _setSyncing] = useState<boolean>(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const { showToast } = useToast();
 
-  // ── Carrega do BD ao montar ──────────────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false;
+  // Recarrega os IDs de foco do BD (fallback: mantém cache local).
+  const reloadFromDB = useCallback((): void => {
     dailyTasksApi.load().then((ids: string[]) => {
-      if (cancelled) return;
       setTodayIds(ids);
       saveCachedIds(ids);
     }).catch(() => {
       // BD indisponível: permanece com o cache local
     });
-    return () => { cancelled = true; };
   }, []);
 
-  // ── Atualiza cache local sempre que ids mudar ────────────────────────────
+  // ── Carrega do BD ao montar ──────────────────────────────────────────────
+  useEffect(() => {
+    reloadFromDB();
+  }, [reloadFromDB]);
+
+  // ── Rollover: quando o dia LOCAL vira, recarrega o foco do novo dia ───────
+  useEffect(() => {
+    let currentDay = todayISO();
+    const check = (): void => {
+      const now = todayISO();
+      if (now !== currentDay) {
+        currentDay = now;
+        setTodayIds(loadCachedIds()); // cache do novo dia (provavelmente vazio)
+        reloadFromDB();
+      }
+    };
+    const interval = setInterval(check, 60_000);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
+    };
+  }, [reloadFromDB]);
+
+  // ── Recarrega do BD sob demanda (ex.: após "Sugerir 5" no pai) ────────────
+  useEffect(() => {
+    if (reloadSignal > 0) reloadFromDB();
+  }, [reloadSignal, reloadFromDB]);
+
+  // ── Atualiza cache local + notifica o pai sempre que ids mudar ────────────
   useEffect(() => {
     saveCachedIds(todayIds);
-  }, [todayIds]);
+    onSelectionChange?.(todayIds);
+  }, [todayIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const todayTasks = useMemo<TodayTask[]>(() => {
     const map = new Map<string, TodayTask>(tasks.map((t) => [t.id, t]));
     return todayIds.map((id) => map.get(id)).filter(Boolean) as TodayTask[];
   }, [tasks, todayIds]);
 
-  // Remove do estado tarefas que foram deletadas do BD
+  // Remove do estado tarefas que foram deletadas do BD.
+  // Guard: só roda depois que `tasks` carregou — enquanto a query está vazia
+  // ([]), isto zeraria o painel por um instante (flash de "nenhuma tarefa").
   useEffect(() => {
+    if (tasks.length === 0) return;
     const validIds = new Set<string>(tasks.map((t) => t.id));
     const cleaned = todayIds.filter((id) => validIds.has(id));
     if (cleaned.length !== todayIds.length) {
@@ -414,16 +516,40 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
   const count = todayTasks.length;
 
   const handleSelect = async (item: TodayTask): Promise<void> => {
-    if (todayIds.includes(item.id) || count >= DAILY_LIMIT) return;
+    if (todayIds.includes(item.id)) return;
+    if (count >= DAILY_LIMIT) {
+      showToast(`Limite diário de ${DAILY_LIMIT} tarefas atingido`, "info");
+      return;
+    }
     // Otimista: atualiza UI imediatamente
     setTodayIds((prev) => [...prev, item.id]);
     if (count + 1 >= DAILY_LIMIT) setShowPicker(false);
     // Persiste no BD
     try {
       await dailyTasksApi.add(item.id);
-    } catch {
+    } catch (err) {
       // Reverte se falhar
       setTodayIds((prev) => prev.filter((i) => i !== item.id));
+      const status = (err as { status?: number })?.status;
+      showToast(status === 409 ? `Limite diário de ${DAILY_LIMIT} tarefas atingido` : "Não foi possível adicionar ao foco", "error");
+    }
+  };
+
+  // ── Reordenação por drag & drop (persiste posição no BD) ──────────────────
+  const handleDrop = async (targetIdx: number): Promise<void> => {
+    const from = dragIndex;
+    setDragIndex(null);
+    if (from === null || from === targetIdx) return;
+    const reordered = [...todayIds];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(targetIdx, 0, moved);
+    const previous = todayIds;
+    setTodayIds(reordered); // otimista
+    try {
+      await dailyTasksApi.reorder(reordered);
+    } catch {
+      setTodayIds(previous); // reverte
+      showToast("Não foi possível reordenar", "error");
     }
   };
 
@@ -522,15 +648,25 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
           {/* Tarefas selecionadas */}
           {todayTasks.length > 0 && (
             <div className={styles.list}>
-              {todayTasks.map((t) => (
+              {count > 0 && completedCount === count && (
+                <div className={styles.allDoneMsg}>🎉 Tudo concluído! Bom trabalho hoje.</div>
+              )}
+              {todayTasks.map((t, i) => (
                 <TodayTaskItem
                   key={t.id}
                   task={t}
+                  index={i}
+                  isDragging={dragIndex === i}
+                  onDragStart={setDragIndex}
+                  onDragEnd={() => setDragIndex(null)}
+                  onDropAt={handleDrop}
                   onComplete={onComplete}
                   onReopen={onReopen}
                   onRemove={handleRemove}
                   onToggleChecklist={onToggleChecklist}
                   onUpdate={onUpdate}
+                  projects={projects}
+                  onOpenDetail={onOpenDetail}
                 />
               ))}
               {count >= DAILY_LIMIT && (

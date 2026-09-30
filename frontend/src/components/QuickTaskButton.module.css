@@ -1,0 +1,68 @@
+/* ── FAB global "+ Nova tarefa" ────────────────────────────── */
+.fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: var(--z-fab, 900); /* abaixo do ModalOverlay (1000), acima do conteúdo */
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 20px 0 16px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(124, 110, 245, 0.4);
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.fab:hover {
+  background: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(124, 110, 245, 0.5);
+}
+.fab:active { transform: translateY(0); }
+
+.fabIcon { width: 22px; height: 22px; flex: 0 0 auto; }
+.fabLabel { white-space: nowrap; }
+
+/* Card do modal — limita largura e permite rolagem em telas baixas. */
+.modalCard {
+  width: 100%;
+  max-width: 560px;
+  max-height: min(90vh, 760px);
+  overflow-y: auto;
+}
+
+/* Dica de linguagem natural abaixo do formulário. */
+.nlHint {
+  margin: 10px 4px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: center;
+}
+.nlHint b { color: var(--text); font-weight: 600; }
+
+/* ── Mobile: círculo só com ícone, acima da bottom nav (68px) ── */
+@media (max-width: 640px) {
+  .fab {
+    bottom: calc(var(--bottomnav-h, 84px) + var(--safe-bottom, 0px));
+    right: 16px;
+    height: var(--fab-size, 56px);
+    width: var(--fab-size, 56px);
+    padding: 0;
+    justify-content: center;
+  }
+  .fabLabel { display: none; }
+  .fabIcon { width: 26px; height: 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab { transition: none; }
+  .fab:hover { transform: none; }
+}

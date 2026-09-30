@@ -6,7 +6,7 @@
  * Chamado no boot do app para mesclar dados remotos com localStorage.
  */
 
-import { fetchPreferences } from "../api/preferences";
+import { fetchPreferences, updatePreferences } from "../api/preferences";
 
 const LS_CUSTOM_MODES    = "customModes";
 const LS_DELETED_MODES   = "taskflow.deletedModeIds";
@@ -49,6 +49,12 @@ export async function loadRemotePreferences(): Promise<void> {
   try {
     const remote = await fetchPreferences();
     if (!remote) return;
+
+    // O calendário de recorrências segue o fuso real do dispositivo.
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
+    if (remote.timezone !== browserTimezone) {
+      updatePreferences({ timezone: browserTimezone }).catch(() => {});
+    }
 
     // deletedModeIds: union de local + remoto
     const localDeletedArr  = lsGet<string[]>(LS_DELETED_MODES, []);

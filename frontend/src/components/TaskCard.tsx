@@ -1,8 +1,18 @@
 import { useState, useEffect, useRef, useMemo, memo, FormEvent, KeyboardEvent, TouchEvent, MouseEvent } from "react";
 import styles from "./TaskCard.module.css";
+import RecurrenceFields, { RecurrenceRule } from "./RecurrenceFields";
+import { tasksApi } from "../api/tasks";
+import { Project, ProjectInput } from "../api/projects";
+import ProjectSelect from "./ProjectSelect";
+import QuickCreateProject from "./QuickCreateProject";
+import EstimatedTimeSelect from "./EstimatedTimeSelect";
+import { formatMinutes, bucketOf, recordEstimationSample } from "../lib/estimatedTime";
+import DescriptionEditor from "./DescriptionEditor";
+import ReactMarkdown from "react-markdown";
+import type { TaskUpdateInput } from "../types/tasks";
 
 interface ChecklistNodeItem {
-  id: number | string;
+  id: string;
   parent_id?: number | string | null;
   description: string;
   note?: string | null;
@@ -11,13 +21,18 @@ interface ChecklistNodeItem {
 }
 
 interface TaskData {
-  id: number | string;
+  id: string;
   title: string;
   description?: string | null;
   priority: number;
   due_date?: string | null;
   recurrence?: string | null;
+  recurrence_rule?: RecurrenceRule | null;
+  project_id?: string | null;
+  estimated_minutes?: number | null;
+  actual_minutes?: number | null;
   completed: boolean;
+  completed_at?: string | null;
   checklist: ChecklistNodeItem[];
   checklist_count?: number;
   checklist_completed_count?: number;
@@ -34,9 +49,9 @@ interface ChecklistNodeProps {
   taskCompleted: boolean;
   depth: number;
   onToggle: (taskId: number | string, itemId: number | string) => void;
-  onUpdate: (taskId: number | string, itemId: number | string, updates: Record<string, unknown>) => Promise<void>;
+  onUpdate: (taskId: number | string, itemId: number | string, updates: Record<string, unknown>) => Promise<unknown>;
   onDelete: (taskId: number | string, itemId: number | string) => void;
-  onAdd: (taskId: number | string, text: string, parentId?: number | string | null) => Promise<void>;
+  onAdd: (taskId: number | string, text: string, parentId?: number | string | null) => Promise<unknown>;
 }
 
 // Conta em quantos dias a tarefa apareceu no TodayPanel (chaves todayTasks_YYYY-MM-DD)
@@ -208,6 +223,9 @@ const RECURRENCE_LABELS: Record<string, string> = {
   weekly: "Toda semana",
   biweekly: "A cada 2 semanas",
   monthly: "Todo mês",
+  weekdays: "Dias úteis",
+  monthly_first: "Primeiro dia do mês",
+  custom: "Personalizada",
 };
 
 const PRIORITY_MAP: Record<number, { label: string; cls: string }> = {
@@ -221,6 +239,16 @@ function formatDate(str: string | null | undefined): string | null {
   if (!str) return null;
   const [y, m, d] = str.split("-");
   return `${d}/${m}/${y}`;
+}
+
+function completionLabel(completedAt: string | null | undefined): string {
+  if (!completedAt) return "Feita";
+  const completed = new Date(completedAt);
+  const now = new Date();
+  const sameDay = completed.getFullYear() === now.getFullYear()
+    && completed.getMonth() === now.getMonth()
+    && completed.getDate() === now.getDate();
+  return sameDay ? "Feita hoje" : `Feita em ${completed.toLocaleDateString("pt-BR")}`;
 }
 
 function isOverdue(dueDate: string | null | undefined, completed: boolean): boolean {
@@ -269,18 +297,22 @@ function pacePlan(days: number | null, pending: number): { text: string; urgent:
 
 interface TaskCardProps {
   task: TaskData;
-  onComplete: (id: number | string) => void;
-  onReopen: (id: number | string) => void;
-  onDelete: (id: number | string) => void;
-  onUpdate: (id: number | string, payload: Record<string, unknown>) => Promise<void>;
-  onAddChecklist: (taskId: number | string, text: string, parentId?: number | string | null) => Promise<void>;
-  onToggleChecklist: (taskId: number | string, itemId: number | string) => void;
-  onUpdateChecklist: (taskId: number | string, itemId: number | string, updates: Record<string, unknown>) => Promise<void>;
-  onDeleteChecklist: (taskId: number | string, itemId: number | string) => void;
+  onComplete: (id: string) => void | Promise<unknown>;
+  onReopen: (id: string) => void | Promise<unknown>;
+  onDelete: (id: string) => void | Promise<unknown>;
+  onUpdate: (id: string, payload: TaskUpdateInput) => void | Promise<unknown>;
+  onAddChecklist: (taskId: string, text: string, parentId?: string | null) => void | Promise<unknown>;
+  onToggleChecklist: (taskId: string, itemId: string) => void | Promise<unknown>;
+  onUpdateChecklist: (taskId: string, itemId: string, updates: unknown) => void | Promise<unknown>;
+  onDeleteChecklist: (taskId: string, itemId: string) => void | Promise<unknown>;
+  completing?: boolean;
+  projects?: Project[];
+  onCreateProject?: (data: ProjectInput) => Promise<Project>;
+  defaultExpanded?: boolean;
 }
 
-function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist }: TaskCardProps) {
-  const [expanded, setExpanded] = useState<boolean>(false);
+function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddChecklist, onToggleChecklist, onUpdateChecklist, onDeleteChecklist, completing = false, projects = [], onCreateProject, defaultExpanded = false }: TaskCardProps) {
+  const [expanded, setExpanded] = useState<boolean>(defaultExpanded);
   const [editing, setEditing] = useState<boolean>(false);
 
   // ── Swipe gestures (mobile) ──────────────────────────────────────────────
@@ -313,20 +345,32 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
     priority: number;
     due_date: string;
     recurrence: string;
+    recurrence_rule: RecurrenceRule | null;
+    project_id: string | null;
+    estimated_minutes: number | null;
+    actual_minutes: number | null;
   }>({
     title: task.title,
     description: task.description || "",
     priority: task.priority,
     due_date: task.due_date || "",
     recurrence: task.recurrence || "",
+    recurrence_rule: task.recurrence_rule || null,
+    project_id: task.project_id || null,
+    estimated_minutes: task.estimated_minutes ?? null,
+    actual_minutes: task.actual_minutes ?? null,
   });
   const [checklistInput, setChecklistInput] = useState<string>("");
+  const [creatingProject, setCreatingProject] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [rescheduleFlash, setRescheduleFlash] = useState<string | null>(null);
   const [doneFlash, setDoneFlash] = useState<boolean>(false);
+  const [history, setHistory] = useState<Array<{ id: string; date: string; undone: boolean }>>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const prevDueDateRef = useRef<string | null | undefined>(task.due_date);
 
   const handleComplete = (): void => {
+    if (completing) return;
     setDoneFlash(true);
     setTimeout(() => setDoneFlash(false), 600);
     onComplete(task.id);
@@ -341,6 +385,15 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
     }
     prevDueDateRef.current = task.due_date;
   }, [task.due_date, task.recurrence]);
+
+  useEffect(() => {
+    if (!expanded || !task.recurrence) return;
+    setHistoryLoading(true);
+    tasksApi.history(task.id)
+      .then((rows) => setHistory(rows as Array<{ id: string; date: string; undone: boolean }>))
+      .catch(() => setHistory([]))
+      .finally(() => setHistoryLoading(false));
+  }, [expanded, task.id, task.recurrence, task.completed_at]);
 
   const priority = PRIORITY_MAP[task.priority] || PRIORITY_MAP[4];
   const overdue = isOverdue(task.due_date, task.completed);
@@ -368,14 +421,20 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
   const handleSaveEdit = async (): Promise<void> => {
     setSaving(true);
     try {
-      const payload: Record<string, unknown> = {
+      const payload: TaskUpdateInput = {
         title: editData.title.trim(),
         description: editData.description.trim() || null,
         priority: Number(editData.priority),
         due_date: editData.due_date || null,
         recurrence: editData.recurrence || null,
+        recurrence_rule: editData.recurrence_rule,
+        project_id: editData.project_id,
+        estimated_minutes: editData.estimated_minutes,
+        actual_minutes: editData.actual_minutes,
       };
       await onUpdate(task.id, payload);
+      // Alimenta a calibração local quando há estimado e real informados.
+      recordEstimationSample(editData.estimated_minutes, editData.actual_minutes);
       setEditing(false);
     } finally {
       setSaving(false);
@@ -400,12 +459,13 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
             placeholder="Título"
             autoFocus
           />
-          <textarea
+          <DescriptionEditor
             className={styles.editTextarea}
             value={editData.description}
-            onChange={(e) => setEditData((d) => ({ ...d, description: e.target.value }))}
+            onChange={(v) => setEditData((d) => ({ ...d, description: v }))}
             placeholder="Descrição (opcional)"
             rows={2}
+            maxLength={10000}
           />
           <div className={styles.editRow}>
             <select
@@ -425,17 +485,46 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
               onChange={(e) => setEditData((d) => ({ ...d, due_date: e.target.value }))}
             />
           </div>
-          <select
+          <div className={styles.editRow}>
+            <label className={styles.editFieldLabel}>
+              <span>⏱ Estimado</span>
+              <EstimatedTimeSelect
+                className={styles.editSelect}
+                value={editData.estimated_minutes}
+                onChange={(estimated_minutes) => setEditData((d) => ({ ...d, estimated_minutes }))}
+              />
+            </label>
+            <label className={styles.editFieldLabel}>
+              <span>✅ Real gasto</span>
+              <EstimatedTimeSelect
+                className={styles.editSelect}
+                ariaLabel="Tempo real gasto"
+                value={editData.actual_minutes}
+                onChange={(actual_minutes) => setEditData((d) => ({ ...d, actual_minutes }))}
+              />
+            </label>
+          </div>
+          <RecurrenceFields
+            recurrence={editData.recurrence}
+            rule={editData.recurrence_rule}
+            compact
+            onChange={(recurrence, recurrence_rule) => setEditData((d) => ({ ...d, recurrence, recurrence_rule }))}
+          />
+          <ProjectSelect
+            projects={projects}
+            value={editData.project_id}
+            onChange={(project_id) => setEditData((d) => ({ ...d, project_id }))}
             className={styles.editSelect}
-            value={editData.recurrence}
-            onChange={(e) => setEditData((d) => ({ ...d, recurrence: e.target.value }))}
-          >
-            <option value="">Sem repetição</option>
-            <option value="daily">🔄 Todo dia</option>
-            <option value="weekly">🔄 Toda semana</option>
-            <option value="biweekly">🔄 A cada 2 semanas</option>
-            <option value="monthly">🔄 Todo mês</option>
-          </select>
+            onCreateNew={onCreateProject ? () => setCreatingProject(true) : undefined}
+          />
+          {onCreateProject && creatingProject && (
+            <QuickCreateProject
+              projects={projects}
+              onCreate={onCreateProject}
+              onCreated={(project) => { setEditData((d) => ({ ...d, project_id: project.id })); setCreatingProject(false); }}
+              onCancel={() => setCreatingProject(false)}
+            />
+          )}
           <div className={styles.editActions}>
             <button className={styles.btnSave} onClick={handleSaveEdit} disabled={saving || !editData.title.trim()}>
               {saving ? "Salvando..." : "Salvar"}
@@ -469,6 +558,7 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
         <button
           className={`${styles.checkbox} ${task.completed ? styles.checkboxDone : ""}`}
           onClick={() => task.completed ? onReopen(task.id) : handleComplete()}
+          disabled={completing}
           title={task.completed ? "Reabrir" : "Concluir"}
           aria-label={task.completed ? "Reabrir tarefa" : "Concluir tarefa"}
         >
@@ -490,9 +580,17 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
           </div>
 
           <div className={styles.meta}>
+            {task.project_id && (() => {
+              const project = projects.find((item) => item.id === task.project_id);
+              return project ? (
+                <span className={styles.projectBadge} style={{ borderColor: `${project.color}66`, color: project.color }}>
+                  {project.emoji} {project.name}
+                </span>
+              ) : null;
+            })()}
             {task.due_date && (
               <span className={`${styles.metaItem} ${overdue ? styles.overdue : ""}`}>
-                📅 {formatDate(task.due_date)}
+                📅 {formatDate(task.due_date)}{task.due_time ? ` ⏱ ${task.due_time}` : ""}
               </span>
             )}
             {countdown && (
@@ -500,7 +598,11 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
                 {countdown}
               </span>
             )}
-            {task.recurrence && (
+            {task.completed && task.recurrence ? (
+              <span className={styles.completedAtBadge}>
+                ✅ {completionLabel(task.completed_at)} · volta {task.due_date ? formatDate(task.due_date) : "na próxima data"}
+              </span>
+            ) : task.recurrence && (
               <span className={styles.recurrenceBadge}>
                 🔄 {RECURRENCE_LABELS[task.recurrence]}
               </span>
@@ -509,6 +611,30 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
               <span className={styles.metaItem}>
                 ☑ {task.checklist_completed_count}/{task.checklist_count}
               </span>
+            )}
+            {task.estimated_minutes != null && (
+              <span
+                className={`${styles.timeBadge} ${styles[`time_${bucketOf(task.estimated_minutes)}`]}`}
+                title="Tempo estimado"
+              >
+                ⏱ {formatMinutes(task.estimated_minutes)}
+              </span>
+            )}
+            {task.actual_minutes != null && task.estimated_minutes != null && (() => {
+              const diff = task.actual_minutes - task.estimated_minutes;
+              const pct = Math.round((diff / task.estimated_minutes) * 100);
+              const onTime = Math.abs(pct) <= 10;
+              return (
+                <span
+                  className={`${styles.varianceBadge} ${onTime ? styles.varianceOk : diff > 0 ? styles.varianceOver : styles.varianceUnder}`}
+                  title={`Real: ${formatMinutes(task.actual_minutes)} · estimado: ${formatMinutes(task.estimated_minutes)}`}
+                >
+                  {onTime ? "🎯 no alvo" : `${diff > 0 ? "▲" : "▼"} ${Math.abs(pct)}%`}
+                </span>
+              );
+            })()}
+            {task.actual_minutes != null && task.estimated_minutes == null && (
+              <span className={styles.metaItem} title="Tempo real gasto">✅ {formatMinutes(task.actual_minutes)}</span>
             )}
             {task.description && <span className={styles.metaItem}>📝</span>}
           </div>
@@ -587,7 +713,41 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
             );
           })()}
 
-          {task.description && <p className={styles.description}>{task.description}</p>}
+          {task.description && (
+            <div className={styles.description}>
+              <ReactMarkdown
+                allowedElements={["p", "a", "img", "strong", "em", "code", "pre", "ul", "ol", "li", "br", "h1", "h2", "h3", "blockquote"]}
+                components={{
+                  img: ({ node: _node, ...props }) => (
+                    <img {...props} style={{ maxWidth: "100%", height: "auto", borderRadius: 8, margin: "6px 0" }} loading="lazy" />
+                  ),
+                  a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+                }}
+              >
+                {task.description}
+              </ReactMarkdown>
+            </div>
+          )}
+
+          {task.recurrence && (
+            <div className={styles.historyBlock}>
+              <strong>Histórico recente</strong>
+              {historyLoading ? <span>Carregando…</span> : history.length === 0 ? (
+                <span>Nenhuma ocorrência registrada ainda.</span>
+              ) : (
+                <>
+                  <span>{history.filter((entry) => !entry.undone).length} conclusão(ões) registrada(s)</span>
+                  <div className={styles.historyDays}>
+                    {history.slice(0, 14).map((entry) => (
+                      <span key={entry.id} className={entry.undone ? styles.historyUndone : styles.historyDone}>
+                        {entry.undone ? "↩" : "✓"} {formatDate(entry.date)}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {pace && (
             <div className={`${styles.paceBanner} ${pace.urgent ? styles.paceUrgent : ""}`}>
@@ -639,9 +799,7 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
   );
 }
 
-// Wrap with React.memo — only re-render when task id or updatedAt changes.
-export default memo(TaskCard, (prev, next) => {
-  return prev.task.id === next.task.id &&
-    prev.task.updatedAt === next.task.updatedAt &&
-    prev.task.updated_at === next.task.updated_at;
-});
+// O cache do React Query substitui a tarefa por um novo objeto depois de cada
+// mutação. A comparação rasa padrão acompanha essa troca e também preserva a
+// memoização quando nenhuma prop mudou.
+export default memo(TaskCard);

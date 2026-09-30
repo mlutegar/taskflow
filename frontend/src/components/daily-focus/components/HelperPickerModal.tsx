@@ -1,5 +1,5 @@
 import { useState, memo } from "react";
-import { usageStats } from "../../../lib/modeLog";
+import { usageStats } from "../../../lib/sessionUsageLog";
 import { MODES, HELPER_GROUPS } from "../../../data/modes";
 import ModalOverlay from "../../shared/ModalOverlay";
 import styles from "../DailyFocus.module.css";

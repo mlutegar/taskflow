@@ -24,6 +24,7 @@ interface Routine {
   progress_percentage?: number | null;
   current_progress?: number | null;
   is_completed_today: boolean;
+  recurrence?: string | null;
   checklist_count?: number;
   checklist_completed_count?: number;
   checklist: ChecklistItem[];
@@ -189,6 +190,12 @@ function RoutineCard({
         >
           <div className={styles.titleRow}>
             <span className={styles.title}>{routine.title}</span>
+            {routine.recurrence === "daily" && (
+              <span className={styles.badge} title="Recorrência diária">🔁 diária</span>
+            )}
+            {routine.recurrence === "weekdays" && (
+              <span className={styles.badge} title="Somente dias úteis (seg–sex)">🔁 dias úteis</span>
+            )}
             <span className={`${styles.badge} ${routine.is_completed_today ? styles.badgeDone : styles.badgePending}`}>
               {routine.is_completed_today ? "✓ Hoje" : "Pendente"}
             </span>
