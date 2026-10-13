@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, memo } from "react";
+import { liveRemaining, type DailyFocusLive } from "../../../lib/dailyFocusLive";
 import styles from "../DailyFocus.module.css";
 
 function formatTime(secs: number): string {
@@ -9,42 +10,60 @@ function formatTime(secs: number): string {
 
 interface DailyTimerProps {
   totalSeconds: number;
-  initialRemaining?: number | null;
-  running: boolean;
+  snapshot: DailyFocusLive;
   onTick?: (next: number) => void;
   onComplete?: () => void;
 }
 
-function DailyTimer({ totalSeconds, initialRemaining, running, onTick, onComplete }: DailyTimerProps) {
-  const [remaining, setRemaining] = useState<number>(initialRemaining ?? totalSeconds);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+function DailyTimer({ totalSeconds, snapshot, onTick, onComplete }: DailyTimerProps) {
   const firedRef = useRef<boolean>(false);
 
+  // Calcula tempo inicial do snapshot usando a função que considera timestamps
+  const initialRemaining = liveRemaining(snapshot) ?? totalSeconds;
+  const [displayTime, setDisplayTime] = useState<number>(initialRemaining);
+
+  // Recalcula quando snapshot mudar (pausar/retomar, novo anchorTs)
   useEffect(() => {
-    if (initialRemaining != null) setRemaining(initialRemaining);
-  }, []);
+    const remaining = liveRemaining(snapshot);
+    if (remaining !== null) {
+      setDisplayTime(remaining);
+      firedRef.current = false; // Resetar flag ao mudar snapshot
+    }
+  }, [snapshot.anchorTs, snapshot.remainingSecs, snapshot.running]);
 
   useEffect(() => {
-    if (!running) { clearInterval(intervalRef.current!); return; }
-    intervalRef.current = setInterval(() => {
-      setRemaining((prev) => {
-        const next = prev - 1;
-        onTick?.(next);
-        if (next <= 0) {
-          clearInterval(intervalRef.current!);
-          if (!firedRef.current) { firedRef.current = true; setTimeout(() => onComplete?.(), 50); }
-          return 0;
+    if (!snapshot.running) {
+      // Pausado — congela no valor atual do snapshot
+      const frozen = liveRemaining(snapshot);
+      if (frozen !== null) setDisplayTime(frozen);
+      return;
+    }
+
+    // Em execução — atualiza UI a cada 1 segundo
+    const interval = setInterval(() => {
+      const actualRemaining = liveRemaining(snapshot);
+
+      if (actualRemaining === null || actualRemaining <= 0) {
+        setDisplayTime(0);
+        clearInterval(interval);
+        if (!firedRef.current) {
+          firedRef.current = true;
+          setTimeout(() => onComplete?.(), 50);
         }
-        return next;
-      });
+        return;
+      }
+
+      setDisplayTime(actualRemaining);
+      onTick?.(actualRemaining);
     }, 1000);
-    return () => clearInterval(intervalRef.current!);
-  }, [running]);
+
+    return () => clearInterval(interval);
+  }, [snapshot.running, snapshot.anchorTs, snapshot.remainingSecs, onTick, onComplete]);
 
   const r = 68;
   const circ = 2 * Math.PI * r;
-  const progress = Math.max(0, Math.min(1, (totalSeconds - remaining) / totalSeconds));
-  const isLow = remaining <= 60 && remaining > 0;
+  const progress = Math.max(0, Math.min(1, (totalSeconds - displayTime) / totalSeconds));
+  const isLow = displayTime <= 60 && displayTime > 0;
   const isWarning = progress >= 0.8 && !isLow;
 
   return (
@@ -59,11 +78,11 @@ function DailyTimer({ totalSeconds, initialRemaining, running, onTick, onComplet
         />
       </svg>
       <div className={styles.timeDisplay}>
-        <span className={styles.timeText}>{formatTime(remaining)}</span>
-        {!running && remaining < totalSeconds && remaining > 0 && (
+        <span className={styles.timeText}>{formatTime(displayTime)}</span>
+        {!snapshot.running && displayTime < totalSeconds && displayTime > 0 && (
           <span className={styles.timePaused}>pausado</span>
         )}
-        {remaining === 0 && <span className={styles.timePaused} style={{ color: "var(--success)" }}>pronto!</span>}
+        {displayTime === 0 && <span className={styles.timePaused} style={{ color: "var(--success)" }}>pronto!</span>}
       </div>
     </div>
   );

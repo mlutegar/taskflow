@@ -62,6 +62,7 @@ import TaskSlot from "./components/TaskSlot";
 import SlotBoard from "../SlotBoard";
 import { useActiveMode } from "../../contexts/ActiveModeContext";
 import { useConfirm } from "../ConfirmDialog";
+import { ChecklistInFocus } from "./components/ChecklistInFocusEnhanced";
 
 interface Task {
   title: string;
@@ -218,6 +219,8 @@ export default function DailyFocusPage() {
   const [_taskStartRemaining, setTaskStartRemaining] = useState<number | null>(null);
   // índice da próxima tarefa aguardando após a fase "between"
   const [pendingNextIdx, setPendingNextIdx] = useState<number | null>(saved?.pendingNextIdx ?? null);
+  // Modal de confirmação ao completar todos os itens do checklist
+  const [showChecklistCompleteModal, setShowChecklistCompleteModal] = useState<boolean>(false);
 
   // Modos usados hoje (bloqueados no picker)
   const [usedModes, setUsedModes] = useState<Record<string, number>>(() => getUsedModes());
@@ -709,6 +712,43 @@ export default function DailyFocusPage() {
     };
   }, []);
 
+  // Verifica se o timer completou enquanto estava fora (aba inativa, navegador fechado, etc)
+  useEffect(() => {
+    const checkTimerCompletion = (): void => {
+      // Só verifica em fase "work" com timer ativo (não rush/tab)
+      if (phase !== "work" || rushMode || tabMode) return;
+
+      const snap = loadDailyFocusLive();
+      if (!snap || !snap.running) return;
+
+      const remaining = liveRemaining(snap);
+
+      if (remaining !== null && remaining <= 0) {
+        // Tempo acabou enquanto estava fora — finalizar automaticamente
+        console.log('[DailyFocus] Timer completed while away, auto-completing task');
+        setTimerRemaining(0);
+        setTimerRunning(false);
+        handleTimerDone();
+      } else if (remaining !== null && remaining !== timerRemaining) {
+        // Atualiza com tempo correto calculado via timestamps
+        setTimerRemaining(remaining);
+      }
+    };
+
+    // Verifica na montagem (retornou à página)
+    checkTimerCompletion();
+
+    // Verifica ao retornar à aba
+    const onVisibilityChange = (): void => {
+      if (!document.hidden) {
+        checkTimerCompletion();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [phase, rushMode, tabMode]); // Dependências críticas
+
   // Flush imediato do estado em transições importantes (play/pause, troca de tarefa),
   // sem esperar o debounce — reduz a janela de perda ao trocar de device.
   useEffect(() => {
@@ -990,6 +1030,19 @@ export default function DailyFocusPage() {
     }
   };
 
+  const handleChecklistComplete = useCallback((): void => {
+    const askOnComplete = localStorage.getItem('dailyFocus_askOnChecklistComplete') !== 'false';
+
+    if (askOnComplete) {
+      setShowChecklistCompleteModal(true);
+    }
+  }, []);
+
+  const handleConfirmCompleteTask = useCallback((): void => {
+    setShowChecklistCompleteModal(false);
+    handleCompleteTask();
+  }, [handleCompleteTask]);
+
   const handlePutOnHold = (): void => {
     setTimerRunning(false);
     setTasks((prev) => prev.map((t, i) =>
@@ -1097,6 +1150,32 @@ export default function DailyFocusPage() {
     setNewRecord(isNewRecord || isNewCycleRecord);
     if (isNewRecord || isNewCycleRecord) playNewRecord();
 
+    // Calcular métricas de checklist
+    const checklistMetrics = (() => {
+      const tasksWithChecklist = completedTasks.filter(t => {
+        if (!t.supabaseId) return false;
+        const fullTask = tasks?.find(task => task.id === t.supabaseId);
+        return fullTask && (fullTask.checklist_count || 0) > 0;
+      });
+
+      const totalItems = tasksWithChecklist.reduce((sum, t) => {
+        const fullTask = tasks?.find(task => task.id === t.supabaseId);
+        return sum + (fullTask?.checklist_count || 0);
+      }, 0);
+
+      const completedItems = tasksWithChecklist.reduce((sum, t) => {
+        const fullTask = tasks?.find(task => task.id === t.supabaseId);
+        return sum + (fullTask?.checklist_completed_count || 0);
+      }, 0);
+
+      return {
+        tasksWithChecklist: tasksWithChecklist.length,
+        totalItems,
+        completedItems,
+        completionRate: totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
+      };
+    })();
+
     // Save history
     addSession({
       date: todayStr(),
@@ -1109,6 +1188,7 @@ export default function DailyFocusPage() {
       tabMode,
       cycleCount: tabMode ? tabCycleCount : undefined,
       tabsOpened: tabMode ? completedTasks.length : undefined,
+      checklistMetrics: checklistMetrics.totalItems > 0 ? checklistMetrics : undefined,
     });
 
     // Check achievements
@@ -1818,6 +1898,14 @@ export default function DailyFocusPage() {
                 </div>
               )}
               {!rushMode && !tabMode && <div className={styles.taskCardTime}>{currentTask.durationMin} min</div>}
+
+              {/* Checklist da tarefa em foco */}
+              {currentTask.supabaseId && (
+                <ChecklistInFocus
+                  taskId={currentTask.supabaseId}
+                  onAllCompleted={handleChecklistComplete}
+                />
+              )}
             </div>
 
             {/* Timer (only in timer mode, not rush, not tab) */}
@@ -1826,8 +1914,20 @@ export default function DailyFocusPage() {
                 <DailyTimer
                   key={`${currentIdx}-${totalSecs}`}
                   totalSeconds={totalSecs}
-                  initialRemaining={timerRemaining ?? totalSecs}
-                  running={timerRunning}
+                  snapshot={liveSnapRef.current ?? {
+                    taskTitle: currentTask?.title ?? "",
+                    phase,
+                    running: timerRunning,
+                    remainingSecs: timerRemaining,
+                    anchorTs: Date.now(),
+                    totalSecs,
+                    rushMode,
+                    tabMode,
+                    cycleCount: tabCycleCount,
+                    nextTaskTitle: tasks[currentIdx + 1]?.title ?? "",
+                    taskIndex: currentIdx,
+                    taskCount: tasks.length,
+                  }}
                   onTick={handleTimerTick}
                   onComplete={handleTimerDone}
                 />
@@ -1883,7 +1983,11 @@ export default function DailyFocusPage() {
                     }}
                     disabled={timerDone}
                   >
-                    {timerRunning ? "⏸ Pausar" : "▶ Iniciar"}
+                    {timerRunning
+                      ? "⏸ Pausar"
+                      : timerRemaining === totalSecs
+                        ? "▶ Iniciar"
+                        : "▶ Retomar"}
                   </button>
                 </div>
                 {!timerRunning && !timerDone && timerRemaining === totalSecs && (
@@ -2007,18 +2111,12 @@ export default function DailyFocusPage() {
                   <div className={styles.interPanelHeader}>
                     <span className={styles.interPanelIcon}>🧩</span>
                     <span className={styles.interPanelTitle}>
-                      {rushMode ? "Entre tarefas — monte sua sessão" : "Pausado — monte sua sessão"}
+                      {rushMode
+                        ? "Entre tarefas — monte sua sessão"
+                        : pausedLabel
+                          ? `Timer pausado há ${pausedLabel.replace('pausado há ', '')} — clique em Retomar para continuar`
+                          : "Timer pausado — clique em Retomar para continuar"}
                     </span>
-                    {!rushMode && pausedLabel && (
-                      <span className={styles.interPanelLongPause}>
-                        {pausedLabel}
-                      </span>
-                    )}
-                    {longPause && !timerDone && (
-                      <span className={styles.interPanelLongPause}>
-                        mais de 5 min
-                      </span>
-                    )}
                     {/* CTA para retomar a tarefa sem sair da pausa (#2) */}
                     {isPaused && (
                       <button
@@ -2342,6 +2440,32 @@ export default function DailyFocusPage() {
               );
             })()}
 
+            {/* Métricas de Checklist */}
+            {(() => {
+              const completedItems = tasks.reduce((sum, t) => {
+                if (!t.supabaseId || !t.done) return sum;
+                const fullTask = tasks?.find(task => task.id === t.supabaseId);
+                return sum + (fullTask?.checklist_completed_count || 0);
+              }, 0);
+
+              const totalItems = tasks.reduce((sum, t) => {
+                if (!t.supabaseId || !t.done) return sum;
+                const fullTask = tasks?.find(task => task.id === t.supabaseId);
+                return sum + (fullTask?.checklist_count || 0);
+              }, 0);
+
+              if (totalItems === 0) return null;
+
+              const completionRate = Math.round((completedItems / totalItems) * 100);
+
+              return (
+                <div className={styles.celebrateChecklistStat}>
+                  ☑ {completedItems} de {totalItems} itens de checklist concluídos ({completionRate}%)
+                  {completionRate === 100 && " — perfeito! 💯"}
+                </div>
+              );
+            })()}
+
             {/* Aderência ao plano: prioridades do dia executadas nesta sessão */}
             {dayPriorities.length > 0 && (() => {
               const plannedIds = new Set(dayPriorities.map((p) => String(p.id)));
@@ -2543,6 +2667,31 @@ export default function DailyFocusPage() {
       )}
 
       {ConfirmUI}
+
+      {showChecklistCompleteModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowChecklistCompleteModal(false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Checklist completo! 🎉</h3>
+            <p className={styles.modalMessage}>
+              Todos os itens de "{currentTask.title}" foram concluídos. Deseja concluir a tarefa e avançar?
+            </p>
+            <div className={styles.modalActions}>
+              <button
+                className={styles.modalBtnSecondary}
+                onClick={() => setShowChecklistCompleteModal(false)}
+              >
+                Continuar nesta
+              </button>
+              <button
+                className={styles.modalBtnPrimary}
+                onClick={handleConfirmCompleteTask}
+              >
+                ✓ Concluir tarefa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {emotionPrompt && (
         <EmotionCheckModal
