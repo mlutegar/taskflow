@@ -75,3 +75,27 @@ Data: 12/10/2026
 Arquivos: 2 modificados (~80 linhas total)
 Backend: Nenhuma alteração necessária
 Banco de dados: Nenhuma migração necessária
+
+## Melhorias Sugeridas (Fase 2)
+
+Documento completo: `MELHORIAS_CRONOMETRO_PERSISTENTE.md`
+
+### Alta Prioridade
+1. **Detecção de relógio alterado** — protege contra mudanças no relógio do sistema
+2. **Limite máximo de tempo transcorrido** — previne estados absurdos (ex: -100000s)
+3. **Validação de snapshot** (Zod) — previne crashes por dados corrompidos
+4. **Feedback visual ao retornar** — toast mostrando tempo transcorrido enquanto fora
+
+### Média Prioridade
+5. **Botão "Adicionar 5 minutos"** — estender timer sem pausar
+6. **Estimativa de conclusão** — "Termina às 15:30"
+7. **Vibração ao completar (mobile)** — feedback tátil
+8. **Histórico de pausas** — analytics de quando pausou durante sessão
+
+### Baixa Prioridade (Backlog)
+9. **Notificações push** — alertar quando timer acabar com app fechado
+10. **Modo Pomodoro estrito** — timer que não pode ser pausado
+11. **RequestAnimationFrame** — animação mais suave
+12. **Estatísticas de precisão** — página de debug/transparência
+
+ROI: Alta prioridade = alto impacto + baixo esforço ✅

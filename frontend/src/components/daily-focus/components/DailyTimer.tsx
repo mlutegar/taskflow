@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from "react";
+import { useState, useEffect, useRef, memo, useMemo } from "react";
 import { liveRemaining, type DailyFocusLive } from "../../../lib/dailyFocusLive";
 import styles from "../DailyFocus.module.css";
 
@@ -21,6 +21,18 @@ function DailyTimer({ totalSeconds, snapshot, onTick, onComplete }: DailyTimerPr
   // Calcula tempo inicial do snapshot usando a função que considera timestamps
   const initialRemaining = liveRemaining(snapshot) ?? totalSeconds;
   const [displayTime, setDisplayTime] = useState<number>(initialRemaining);
+
+  // Estimativa de horário de conclusão
+  const estimatedEndTime = useMemo(() => {
+    const remaining = liveRemaining(snapshot);
+    if (remaining === null || remaining <= 0 || !snapshot.running) return null;
+
+    const endMs = Date.now() + (remaining * 1000);
+    return new Date(endMs).toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, [snapshot, displayTime]); // Recalcula quando display atualizar
 
   // Recalcula quando snapshot mudar (pausar/retomar, novo anchorTs)
   useEffect(() => {
@@ -48,6 +60,12 @@ function DailyTimer({ totalSeconds, snapshot, onTick, onComplete }: DailyTimerPr
         clearInterval(interval);
         if (!firedRef.current) {
           firedRef.current = true;
+
+          // Vibração (mobile)
+          if ('vibrate' in navigator) {
+            navigator.vibrate([200, 100, 200]); // Padrão: bip-bip
+          }
+
           setTimeout(() => onComplete?.(), 50);
         }
         return;
@@ -83,6 +101,11 @@ function DailyTimer({ totalSeconds, snapshot, onTick, onComplete }: DailyTimerPr
           <span className={styles.timePaused}>pausado</span>
         )}
         {displayTime === 0 && <span className={styles.timePaused} style={{ color: "var(--success)" }}>pronto!</span>}
+        {estimatedEndTime && displayTime > 0 && (
+          <span className={styles.estimatedEnd}>
+            Termina às {estimatedEndTime}
+          </span>
+        )}
       </div>
     </div>
   );

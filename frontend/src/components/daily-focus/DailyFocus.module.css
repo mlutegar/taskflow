@@ -260,6 +260,16 @@
 
 .slotResultIcon { font-size: 11px; color: var(--text-muted); }
 
+.slotChecklistProgress {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  background: var(--surface-subtle, #f8f9fa);
+  border-radius: 4px;
+  display: inline-block;
+}
+
 .slotClear {
   margin-top: 6px;
   font-size: 11px;
@@ -518,6 +528,13 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  padding-bottom: 80px; /* Espaço para FAB flutuante (56px + margem) */
+}
+
+@media (max-width: 480px) {
+  .workLayout {
+    padding-bottom: 100px; /* Mais espaço em mobile */
+  }
 }
 
 .taskCard {
@@ -613,6 +630,14 @@
   color: var(--warning);
   text-transform: uppercase;
   letter-spacing: 0.07em;
+}
+
+.estimatedEnd {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  opacity: 0.8;
+  font-weight: 500;
 }
 
 .timerBtns {
@@ -1251,6 +1276,18 @@
 .emotionSummaryLabel {
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.celebrateChecklistStat {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text);
+  background: rgba(79, 70, 229, 0.05);
+  border: 1px solid rgba(79, 70, 229, 0.2);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  max-width: 460px;
+  line-height: 1.6;
 }
 
 .modal {
@@ -3498,4 +3535,127 @@
   border-radius: 12px;
   background: rgba(56, 189, 248, 0.1);
   font-size: 13px;
+}
+
+/* ── Modal de Confirmação de Checklist Completo ──────── */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modalContent {
+  background: var(--surface, white);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease-out;
+}
+
+.modalTitle {
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text, #000);
+  text-align: center;
+}
+
+.modalMessage {
+  margin: 0 0 24px 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-muted, #666);
+  text-align: center;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.modalBtnPrimary,
+.modalBtnSecondary {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.modalBtnPrimary {
+  background: var(--primary, #4f46e5);
+  color: white;
+}
+
+.modalBtnPrimary:hover {
+  background: var(--primary-dark, #4338ca);
+  transform: translateY(-1px);
+}
+
+.modalBtnSecondary {
+  background: var(--surface-2, #f3f4f6);
+  color: var(--text, #000);
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.modalBtnSecondary:hover {
+  background: var(--surface-hover, #e5e7eb);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .modalContent {
+    padding: 20px;
+  }
+
+  .modalTitle {
+    font-size: 18px;
+  }
+
+  .modalMessage {
+    font-size: 14px;
+  }
+
+  .modalActions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .modalBtnPrimary,
+  .modalBtnSecondary {
+    width: 100%;
+  }
 }

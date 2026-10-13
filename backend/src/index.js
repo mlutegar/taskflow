@@ -65,6 +65,9 @@ await fastify.register(cors, {
 // Health check
 fastify.get("/health", async () => ({ ok: true }));
 
+// Server time (para detecção de clock drift)
+fastify.get("/server-time", async () => ({ serverTime: Date.now() }));
+
 // Rotas
 fastify.register(authRoutes, { prefix: "/auth" });
 fastify.register(tasksRoutes, { prefix: "/tasks" });

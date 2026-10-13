@@ -11,9 +11,37 @@
  * card calcula o tempo ao vivo sem "possuir" o interval do timer, e a página rehidrata
  * o mesmo valor ao voltar, descontando o tempo decorrido em background.
  */
+import { z } from "zod";
 import { storageGet, storageSet, storageRemove } from "./storage";
 import { SK } from "./storageKeys";
 import { fetchActiveSession, upsertActiveSession, deleteActiveSession, beaconActiveSession } from "../api/dailyFocusActiveSession";
+
+// ── Constantes de segurança ──────────────────────────────────────────────────
+
+/** Máximo de horas offline antes de forçar conclusão da sessão */
+const MAX_ELAPSED_HOURS = 24;
+
+// ── Validação com Zod ────────────────────────────────────────────────────────
+
+const DailyFocusLiveSchema = z.object({
+  taskTitle: z.string(),
+  phase: z.string(),
+  running: z.boolean(),
+  remainingSecs: z.number().nullable(),
+  anchorTs: z.number(),
+  totalSecs: z.number(),
+  rushMode: z.boolean(),
+  tabMode: z.boolean(),
+  cycleCount: z.number(),
+  nextTaskTitle: z.string(),
+  taskIndex: z.number(),
+  taskCount: z.number(),
+  pauseHistory: z.array(z.object({
+    pausedAt: z.number(),
+    resumedAt: z.number().optional(),
+    duration: z.number().optional(),
+  })).optional(),
+});
 
 /** Chave (fora do prefixo "taskflow.") usada pelo useSessionPersist para o Daily Focus. */
 const SESSION_LS_KEY = "taskflow_sess_daily_focus";
@@ -30,6 +58,13 @@ function readSessionPayload(): unknown {
   } catch {
     return {};
   }
+}
+
+/** Entrada no histórico de pausas */
+export interface PauseEntry {
+  pausedAt: number;
+  resumedAt?: number;
+  duration?: number; // segundos pausados
 }
 
 export interface DailyFocusLive {
@@ -56,14 +91,27 @@ export interface DailyFocusLive {
   /** Índice da tarefa atual (0-based) e total — rótulo "Tarefa i/N". */
   taskIndex: number;
   taskCount: number;
+  /** Histórico de pausas durante a sessão (analytics) */
+  pauseHistory?: PauseEntry[];
 }
 
 /** Evento disparado sempre que o snapshot é gravado/limpo (o card escuta p/ atualizar). */
 export const DAILY_FOCUS_LIVE_EVENT = "daily-focus-live-updated";
 
-/** Lê o snapshot atual (ou null). */
+/** Lê o snapshot atual (ou null), com validação Zod. */
 export function loadDailyFocusLive(): DailyFocusLive | null {
-  return storageGet<DailyFocusLive | null>(SK.DAILY_FOCUS_LIVE, null);
+  try {
+    const raw = storageGet<DailyFocusLive | null>(SK.DAILY_FOCUS_LIVE, null);
+    if (!raw) return null;
+
+    // Validar snapshot com Zod
+    const validated = DailyFocusLiveSchema.parse(raw);
+    return validated;
+  } catch (error) {
+    console.error('[loadDailyFocusLive] Invalid snapshot, clearing:', error);
+    storageRemove(SK.DAILY_FOCUS_LIVE); // Limpar snapshot corrompido
+    return null;
+  }
 }
 
 /** Grava o snapshot e notifica ouvintes. */
@@ -234,10 +282,24 @@ export function endDailyFocusSession(): void {
  * Segundos restantes AO VIVO: se estiver rodando, desconta o tempo decorrido desde a
  * âncora; se pausado, retorna o valor congelado. Nunca abaixo de 0. Retorna null quando
  * a sessão não tem contagem regressiva (rush/tab).
+ *
+ * PROTEÇÃO: Se passou mais de MAX_ELAPSED_HOURS desde anchorTs, assume sessão expirada
+ * e retorna 0 (forçar conclusão).
  */
 export function liveRemaining(snap: DailyFocusLive, now: number = Date.now()): number | null {
   if (snap.remainingSecs == null) return null;
   if (!snap.running) return Math.max(0, snap.remainingSecs);
+
   const elapsed = (now - snap.anchorTs) / 1000;
+
+  // PROTEÇÃO: Limite máximo de tempo transcorrido (previne estados absurdos)
+  if (elapsed > MAX_ELAPSED_HOURS * 3600) {
+    console.warn('[liveRemaining] Session expired (>24h elapsed)', {
+      elapsed: `${(elapsed / 3600).toFixed(1)}h`,
+      anchorTs: new Date(snap.anchorTs).toISOString(),
+    });
+    return 0; // Forçar conclusão
+  }
+
   return Math.max(0, Math.round(snap.remainingSecs - elapsed));
 }

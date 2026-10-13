@@ -5,6 +5,7 @@ import { playBeep, playTimerDone, playNewRecord, playPaperReview } from "../../l
 import { tasksApi } from "../../api/tasks";
 import { useSessionPersist } from "../../lib/useSessionPersist";
 import { DailyFocusLive, loadDailyFocusLive, saveDailyFocusLive, clearDailyFocusLive, liveRemaining, DAILY_FOCUS_LIVE_EVENT, endRemoteActiveSession, loadRemoteActiveSession, flushActiveSessionPush, beaconActiveSessionNow } from "../../lib/dailyFocusLive";
+import { startClockDriftMonitoring, hasSignificantDrift } from "../../lib/clockDrift";
 import { getHelper } from "./helpers/index";
 import { addSession, getHistory, getMaxLevel, updateMaxLevel, getStreak, getWeeklyStats, getMaxLevelByMode, updateMaxLevelByMode, getLastDateByLevel, getMaxCycles, updateMaxCycles } from "../../lib/dailyFocusHistory";
 import { tryUnlock } from "../../lib/dailyFocusAchievements";
@@ -712,6 +713,28 @@ export default function DailyFocusPage() {
     };
   }, []);
 
+  // Monitoramento de clock drift (detecção de mudança de relógio do sistema)
+  useEffect(() => {
+    const cleanup = startClockDriftMonitoring();
+
+    const onClockDrift = (event: Event): void => {
+      const customEvent = event as CustomEvent<{ drift: number; previousDrift: number }>;
+      const { drift } = customEvent.detail;
+      console.warn('[DailyFocus] Clock drift detected:', drift);
+
+      if (hasSignificantDrift()) {
+        showToast('⚠️ Relógio do sistema alterado. Timer pode estar impreciso.', 'warning');
+      }
+    };
+
+    window.addEventListener('clock-drift-detected', onClockDrift);
+
+    return () => {
+      cleanup();
+      window.removeEventListener('clock-drift-detected', onClockDrift);
+    };
+  }, []);
+
   // Verifica se o timer completou enquanto estava fora (aba inativa, navegador fechado, etc)
   useEffect(() => {
     const checkTimerCompletion = (): void => {
@@ -722,6 +745,18 @@ export default function DailyFocusPage() {
       if (!snap || !snap.running) return;
 
       const remaining = liveRemaining(snap);
+      const elapsed = (snap.remainingSecs ?? 0) - (remaining ?? 0);
+
+      // Feedback visual: mostra quanto tempo passou enquanto estava fora
+      if (elapsed > 60) { // Mais de 1 minuto transcorrido
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        const timeStr = seconds > 0
+          ? `${minutes}m${seconds}s`
+          : `${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`;
+
+        showToast(`⏱️ Você esteve fora por ${timeStr}`, 'info');
+      }
 
       if (remaining !== null && remaining <= 0) {
         // Tempo acabou enquanto estava fora — finalizar automaticamente
@@ -850,6 +885,27 @@ export default function DailyFocusPage() {
     playTimerDone();
     sendNotif("⏰ Timer encerrado!", `Tarefa: ${tasks[currentIdx]?.title || ""}`);
   }, [tasks, currentIdx]);
+
+  // Adicionar tempo ao timer (útil quando tarefa está quase acabando)
+  const handleAddTime = useCallback((minutes: number): void => {
+    const snap = liveSnapRef.current;
+    if (!snap) return;
+
+    const currentRemaining = liveRemaining(snap) ?? 0;
+    const newRemaining = currentRemaining + (minutes * 60);
+
+    setTimerRemaining(newRemaining);
+
+    // Atualizar snapshot com novo tempo
+    saveDailyFocusLive({
+      ...snap,
+      remainingSecs: newRemaining,
+      anchorTs: Date.now(),
+    });
+
+    playBeep();
+    showToast(`⏱️ +${minutes} ${minutes === 1 ? 'minuto' : 'minutos'} adicionados`, 'success');
+  }, [showToast]);
 
   const handlePaperReviewDone = useCallback(() => {
     workSecsRef.current = 0;
@@ -1989,6 +2045,17 @@ export default function DailyFocusPage() {
                         ? "▶ Iniciar"
                         : "▶ Retomar"}
                   </button>
+
+                  {/* Botão +5 min (aparecer quando faltam < 2 min e está rodando) */}
+                  {timerRunning && timerRemaining !== null && timerRemaining < 120 && timerRemaining > 0 && (
+                    <button
+                      className={`${styles.timerBtn} ${styles.timerBtnSecondary}`}
+                      onClick={() => handleAddTime(5)}
+                      title="Adicionar 5 minutos ao timer"
+                    >
+                      +5 min
+                    </button>
+                  )}
                 </div>
                 {!timerRunning && !timerDone && timerRemaining === totalSecs && (
                   <div className={styles.timerHint}>Pressione Espaço para iniciar</div>
