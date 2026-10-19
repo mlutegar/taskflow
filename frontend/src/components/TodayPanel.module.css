@@ -625,3 +625,157 @@
   .progressFill, .checkBtn, .expandBtn, .subtaskExpandBtn,
   .editBtn, .removeBtn { transition: none !important; animation: none !important; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Redesign mobile (PWA) — cards "Rotina diária" e "Tarefas de hoje".
+   Tudo aqui dentro vale só abaixo de 640px; o desktop não é tocado.
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .panelMobile {
+    border-radius: var(--radius-lg);
+    margin-bottom: 16px;
+  }
+
+  /* Cabeçalho deixa de ser faixa cinza e vira o topo do card. */
+  .panelMobile .header {
+    background: transparent;
+    border-bottom: none;
+    padding: var(--card-pad) var(--card-pad) 12px;
+    align-items: flex-start;
+  }
+
+  .panelMobile .titleRow { align-items: flex-start; }
+
+  .titleBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .panelMobile .title { font-size: 16px; }
+
+  .cardSubtitle {
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  .headerRight {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .panelMobile .slot {
+    font-size: 12px;
+    padding: 5px 11px;
+  }
+
+  /* Menu "⋯" — recolhe Nova rotina / Ocultar feitas / Foco. */
+  .menuWrap { position: relative; }
+
+  .menuBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .menuBtn:active { background: var(--surface-2); }
+
+  .menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 20;
+    min-width: 178px;
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  }
+
+  .menuItem {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 11px;
+    font-size: 13.5px;
+    font-family: inherit;
+    text-align: left;
+    color: var(--text);
+    background: none;
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
+  }
+
+  .menuItem:active { background: rgba(var(--accent-rgb), 0.14); }
+
+  /* Itens da lista: mais ar, sem barra de prioridade. */
+  .panelMobile .list { padding: 0 var(--card-pad) 6px; }
+
+  .panelMobile .taskBlock {
+    border-bottom: none;
+    padding-left: 0;
+  }
+
+  .panelMobile .taskItem {
+    gap: 12px;
+    padding: 11px 0;
+    min-height: 50px;
+    border-bottom: none;
+  }
+
+  .panelMobile .checkBtn {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+  }
+
+  .panelMobile .taskTitle { font-size: 15px; }
+
+  /* Concluída: riscada e esmaecida. */
+  .panelMobile .taskDone .taskTitle {
+    text-decoration: line-through;
+    color: var(--text-muted);
+    opacity: 0.75;
+  }
+
+  /* Sequência da rotina, à direita, em laranja. */
+  .streakPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--streak);
+    white-space: nowrap;
+  }
+
+  /* "Tarefas de hoje": contador roxo e linha com chevron. */
+  .panelMobile .chevron {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--text-muted);
+  }
+
+  /* Ações de linha que não cabem no mobile. */
+  .panelMobile .editBtn,
+  .panelMobile .removeBtn,
+  .panelMobile .dragHandle { display: none; }
+}

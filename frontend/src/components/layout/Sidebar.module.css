@@ -200,7 +200,9 @@
 
   .pageArea {
     margin-left: 0;
-    padding-bottom: calc(68px + env(safe-area-inset-bottom));
+    /* 68px = altura da bottom nav. O +16 dá respiro para o último card não
+       encostar na barra (antes ele ficava colado/parcialmente atrás). */
+    padding-bottom: calc(68px + 16px + env(safe-area-inset-bottom));
   }
 
   /* ── Bottom nav bar ───────────────────────────────── */

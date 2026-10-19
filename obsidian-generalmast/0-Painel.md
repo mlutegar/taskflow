@@ -54,8 +54,37 @@ Vault de documentação do projeto **generalmast** (app de foco com "modos").
 - [[47-Fix-Encerrar-pelo-Card-Registra-Sessao]] — **fix + melhorias:** encerrar pelo **card minimizado** ("MODO ATIVO") não salvava para análise. Corrigido (expande/registra via `autoEnd`/`endSignal`) e evoluído: **registro rápido inline 👍/👎** (`logQuickUsage`), **Pular** agora persiste registro mínimo, **Descartar vs Detalhar**, preview do foco no card, toast de confirmação, nudge de sessão órfã (>6h) e testes (`FloatingModeCard.test.tsx`) — `ActiveModeContext`, `FloatingModeCard`, `sessionUsageLog`, `PostSessionForm`
 - [[51-Unificacao-Modos-e-Uso]] — abas "Modos" e "Uso" do Histórico unificadas numa só; logs fundidos em `session_usage_logs` (fonte única), `usageStats` derivado dela e remoção de `modeLog`/`/mode-log`
 - [[52-Botao-Apagar-Historico]] — botão **🗑 Apagar histórico** por aba (Sessões/Uso/Check-ins); apaga local (`clear*`) + banco (novos `DELETE`) com `confirm()` e `invalidateQueries`
+- [[53-Redesign-Filtros-e-Pagina-Tarefa]] — redesign completo dos filtros da tela de Tarefas (bottom sheet, chips removíveis, badges clicáveis), campo `assigned_to` preparando para multi-user e página completa da tarefa com autosave, checklist e histórico
+- [[54-Checklist-no-Daily-Focus]] — **checklist completo durante o foco**: barra de progresso animada, adicionar/editar/marcar itens (checkbox customizado com animação), **atalhos ⌘+1-9**, **colar múltiplas linhas** (batch endpoint), **templates** (Estudo/Codificação/Artigo), **toast com Desfazer**, draft persistente, modal ao completar 100%, métricas no resumo (celebrate), progresso na seleção ("☑ 2/6"), ajustes visuais (botão "Retomar" vs "Iniciar", banner de pausa unificado, padding para FAB) — `ChecklistInFocusEnhanced`, batch API, 9 melhorias implementadas
+- [[55-Cronometro-Persistente-Daily-Focus]] — **cronômetro persistente do Daily Focus**: state global (`cronometro_ativo`) sincronizado entre `DailyFocusPage` (tela cheia) e `DailyFocusFloatingCard` (minimizado); ao minimizar/navegar, cronômetro segue no card com reidratação por `activeDailyFocus` e `calculateRemaining(anchorTime, elapsed)`; ao expandir, valor flui de volta para tela cheia; timer síncrono via `useEffect`+`requestAnimationFrame`; botão "Fechar" no card flutuante encerra sessão igual "Encerrar Sessão" (`dailyFocusLive.ts`, `DailyFocusPage.tsx`, `DailyFocusFloatingCard.tsx`)
+- [[56-Recorrencia-Anual]] — **recorrência anual de tarefas**: nova opção "Todo ano" no dropdown de recorrências, repete no mesmo dia/mês, caso especial 29/02 em anos não bissextos (cai em 28/02), badge exibe "🔄 Todo ano em DD de MMM", helpers `addYears()`/`isLeapYear()`, 6 testes cobrindo casos normais e especiais (`taskRecurrence.js`, `RecurrenceFields.tsx`, `TaskCard.tsx`)
+- [[57-Melhorias-Recorrencia-Anual]] — **10 melhorias para recorrência anual**: correção edge case 31 de meses curtos, contagem regressiva (⏳ em N dias), filtro dedicado "📅 Anuais", exibição com ano de criação (Nº ano), notificação antecipada (lembrar N dias antes), suporte a aniversários (🎂 idade automática), histórico anual com timeline visual e streak, exportar .ics para calendário externo — 8 de 10 implementadas, 35 testes passando (`YearlyTimeline.tsx`, `ical.js`, `exportIcal.ts`)
+- [[58-Heatmap-Consistencia-Rotinas]] — card **"Consistência das Rotinas"** no topo da aba Tarefas (estilo contribuições do GitHub): endpoint agregado `GET /tasks/routines/consistency` lendo `task_completions`, 5 níveis de verde por % de rotinas esperadas, seletor de período persistido, sequência atual/melhor/% de dias concluídos, tooltip hover+toque, scroll interno no mobile e 28 testes da lógica pura (`routineConsistency.ts`, `RoutineConsistencyCard`, `HeatmapGrid`, `HeatmapStats`)
+- [[59-Botao-Nova-Rotina-e-Fix-UserId]] — botão **"+ Nova rotina"** no card Rotina Diária (form inline com recorrência já pré-selecionada; painel deixa de sumir quando não há rotina) + **fix crítico** `createdBy`→`userId` em `TaskCompletion`/`TaskChange`/`UserPreferences`, que derrubava criar/concluir tarefa com 500 + **fix de cache**: `today-panel-all` e `routine-consistency` ficam fora de `taskKeys.lists()`, então a rotina criada só aparecia após reload — agora têm chave própria em `taskKeys` e invalidação explícita, com testes-guard (`tasks.js`, `AddTaskForm.tsx`, `DailyRoutinePanel.tsx`, `taskKeys.ts`, `taskOwnerField.test.js`, `taskSync.test.ts`)
+- [[60-Redesign-Mobile-Tela-Tarefas]] — **novo layout mobile (PWA) da aba Tarefas**: cabeçalho "Meu dia" + data, card "Seu progresso hoje", heatmap com célula responsiva (6 meses sem scroll) e pill único abrindo bottom sheet, rodapé em uma linha, Rotina diária com badge e menu "⋯", FAB removido, "Foco" na nav. Inclui o **fix do heatmap que colapsava para uma célula** (era dado, não CSS). Desktop intacto via `useIsMobile()` + `@media (max-width: 640px)` (`useIsMobile.ts`, `tasks-mobile/*`, `HeatmapOptionsSheet.tsx`, `tasks.js`)
 
 ## Feature recente
+**Redesign mobile da tela de Tarefas**: no celular a tela virou "Meu dia" — cabeçalho com
+a data, card de progresso das rotinas, heatmap que finalmente mostra os 6 meses inteiros
+(o bug da célula única era de dados, não de CSS), um seletor só abrindo bottom sheet, e o
+FAB saiu de cima do conteúdo. O desktop continua exatamente como estava.
+Ver [[60-Redesign-Mobile-Tela-Tarefas]].
+
+**Botão "Nova rotina" + fix que destravou o app**: dava para ver rotinas na aba Tarefas,
+mas não **criar** uma — agora tem o botão no card "Rotina Diária", com o formulário já
+pré-configurado como diária. No caminho apareceu um bug sério: o código usava `createdBy`
+em models cujo dono é `userId`, e **criar ou concluir qualquer tarefa devolvia 500**.
+Corrigido em 25 pontos + teste-guard para não voltar. Ver [[59-Botao-Nova-Rotina-e-Fix-UserId]].
+
+**Heatmap de consistência das rotinas**: a aba Tarefas ganhou, no topo, um gráfico estilo
+GitHub mostrando **quanto das rotinas do dia eu completei** — verde mais forte = dia 100%.
+Período configurável (30 dias a 1 ano, persistido), 🔥 sequência atual (hoje incompleto não
+quebra), 🏆 melhor sequência de todo o histórico e ✅ % de dias concluídos. Atualiza na hora
+ao marcar/desmarcar no card "Rotina Diária". Ver [[58-Heatmap-Consistencia-Rotinas]].
+
+**Checklist no Daily Focus**: agora você pode **ver, adicionar, marcar e editar itens do checklist** durante a sessão de foco! Recursos: **atalhos ⌘+1-9** para marcar rapidamente, **colar lista** (detecta múltiplas linhas), **templates** (Estudo/Codificação/Artigo com 5-7 itens), **toast com Desfazer**, draft automático, checkbox animado, barra de progresso com celebração ao 100%, modal de confirmação, e métricas no resumo final. Ver [[54-Checklist-no-Daily-Focus]].
+
+**Apagar histórico por aba**: a tela **Histórico** ganhou um botão **🗑 Apagar histórico**
 **Apagar histórico por aba**: a tela **Histórico** ganhou um botão **🗑 Apagar histórico**
 em cada aba (Sessões, Uso, Check-ins). Ele limpa tanto o `localStorage` quanto o banco
 (novos endpoints `DELETE`), com confirmação antes. Útil quando os registros foram gravados

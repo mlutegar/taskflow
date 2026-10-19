@@ -10,9 +10,16 @@ import {
   isQueuedOfflineError,
   subscribeTaskQueue,
 } from "../lib/taskOfflineQueue";
+import { bumpTodayConsistency } from "./useRoutineConsistency";
+import { DAILY_RECURRENCES } from "../lib/dailyRoutine";
 import type { TaskChecklistItem, TaskCreateInput, TaskRecord, TaskSyncState, TaskUpdateInput } from "../types/tasks";
 
 type TaskItem = TaskRecord;
+
+/** Só tarefas diárias/dias úteis entram no heatmap de consistência. */
+function isRoutineTask(task: TaskItem | undefined): boolean {
+  return Boolean(task?.recurrence && DAILY_RECURRENCES.has(task.recurrence));
+}
 type ChecklistItemFull = TaskChecklistItem;
 
 /**
@@ -39,7 +46,15 @@ function keepNewer(existing: TaskItem | undefined, incoming: TaskItem): TaskItem
  * - Optimistic updates via setQueryData
  * - Mutations tipadas com callbacks onSuccess
  */
-export function useTasks(taskFilter: string | undefined, taskSort: string | undefined, projectId?: string, timeFilter?: string) {
+export function useTasks(
+  taskFilter: string | undefined,
+  taskSort: string | undefined,
+  projectId?: string,
+  timeFilter?: string,
+  assignedTo?: string,
+  priorities?: string,
+  dueFilter?: string
+) {
   const queryClient = useQueryClient();
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -76,8 +91,8 @@ export function useTasks(taskFilter: string | undefined, taskSort: string | unde
 
   // Campos que podem mudar filtro/ordenação da lista → exigem revalidação.
   const affectsListShape = useCallback((data: TaskUpdateInput): boolean =>
-    ["due_date", "priority", "completed", "recurrence", "project_id"].some((k) => k in (data as object)), []);
-  const queryKey    = taskKeys.list(taskFilter, taskSort, projectId, timeFilter);
+    ["due_date", "priority", "completed", "recurrence", "project_id", "assigned_to"].some((k) => k in (data as object)), []);
+  const queryKey    = taskKeys.list(taskFilter, taskSort, projectId, timeFilter, assignedTo, priorities, dueFilter);
   const todayKey    = taskKeys.completedToday();
   const pendingMutations = useIsMutating({ mutationKey: taskKeys.mutations() });
 
@@ -86,7 +101,15 @@ export function useTasks(taskFilter: string | undefined, taskSort: string | unde
   const { data: rawTasks = [], isLoading: tasksLoading, error: tasksErrorObj, refetch: refetchTasksQuery } = useQuery<TaskItem[]>({
     queryKey,
     queryFn: async () => {
-      const fresh = await tasksApi.list({ status: taskFilter, sort: taskSort, projectId, time: timeFilter });
+      const fresh = await tasksApi.list({
+        status: taskFilter,
+        sort: taskSort,
+        projectId,
+        time: timeFilter,
+        assignedTo,
+        priorities,
+        dueFilter,
+      });
       // Mescla por versão: um refetch/polling que chegue com dado antigo logo
       // após um save não pode reverter a tarefa recém atualizada no cache.
       const prev = queryClient.getQueryData<TaskItem[]>(queryKey);
@@ -198,16 +221,34 @@ export function useTasks(taskFilter: string | undefined, taskSort: string | unde
 
   // ── Helpers de cache (para delete otimista + undo em App.jsx) ─────────────
 
+  /**
+   * A lista que alimenta os painéis da aba Tarefas (`todayPanelAll`) e o
+   * heatmap de rotinas vivem FORA de `taskKeys.lists()`. Sem invalidá-las
+   * explicitamente, uma tarefa criada/removida só aparecia (ou sumia) depois de
+   * recarregar a página.
+   */
+  const invalidatePanelViews = useCallback((affectsRoutines: boolean) => {
+    queryClient.invalidateQueries({ queryKey: taskKeys.todayPanelAll() });
+    if (affectsRoutines) queryClient.invalidateQueries({ queryKey: taskKeys.routineConsistency() });
+  }, [queryClient]);
+
   const removeTask = useCallback(
-    (id: string) => queryClient.setQueryData<TaskItem[]>(queryKey, (old = []) => old.filter((t) => t.id !== id)),
+    (id: string) => {
+      const cached = queryClient.getQueryData<TaskItem[]>(queryKey)?.find((t) => t.id === id);
+      queryClient.setQueryData<TaskItem[]>(queryKey, (old = []) => old.filter((t) => t.id !== id));
+      invalidatePanelViews(isRoutineTask(cached));
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [queryClient, JSON.stringify(queryKey)]
+    [queryClient, invalidatePanelViews, JSON.stringify(queryKey)]
   );
 
   const restoreTask = useCallback(
-    (task: TaskItem) => queryClient.setQueryData<TaskItem[]>(queryKey, (old = []) => [task, ...old]),
+    (task: TaskItem) => {
+      queryClient.setQueryData<TaskItem[]>(queryKey, (old = []) => [task, ...old]);
+      invalidatePanelViews(isRoutineTask(task));
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [queryClient, JSON.stringify(queryKey)]
+    [queryClient, invalidatePanelViews, JSON.stringify(queryKey)]
   );
 
   // ── Helpers internos ───────────────────────────────────────────────────────
@@ -296,7 +337,12 @@ export function useTasks(taskFilter: string | undefined, taskSort: string | unde
       markSynced();
     },
     onError: (err, _data, ctx) => rollback(ctx?.previous, err),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: taskKeys.lists() }),
+    onSettled: (task, _err, variables) => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
+      // A recorrência vem do payload enviado; o retorno confirma (offline → só o payload).
+      const recurrence = task?.recurrence ?? (variables as TaskCreateInput)?.recurrence;
+      invalidatePanelViews(Boolean(recurrence && DAILY_RECURRENCES.has(recurrence)));
+    },
   });
 
   const completeMutation = useMutation<TaskItem, Error, string>({
@@ -306,6 +352,8 @@ export function useTasks(taskFilter: string | undefined, taskSort: string | unde
     onSuccess: (task) => {
       updateCache(task);
       markSynced();
+      // Heatmap de consistência: célula de hoje + estatísticas na hora.
+      if (isRoutineTask(task)) bumpTodayConsistency(queryClient, String(task.id), true);
       // Mantém os caches de Todas/Hoje/Ativas/Concluídas coerentes depois
       // que uma recorrência passa o restante do dia como concluída.
       queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
@@ -323,6 +371,7 @@ export function useTasks(taskFilter: string | undefined, taskSort: string | unde
     onSuccess: (task) => {
       updateCache(task);
       markSynced();
+      if (isRoutineTask(task)) bumpTodayConsistency(queryClient, String(task.id), false);
       queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
     },
     onError: reportError,
@@ -334,6 +383,7 @@ export function useTasks(taskFilter: string | undefined, taskSort: string | unde
     onSuccess: (task) => {
       updateCache(task);
       markSynced();
+      if (isRoutineTask(task)) bumpTodayConsistency(queryClient, String(task.id), false);
       queryClient.invalidateQueries({ queryKey: todayKey });
     },
     onError: reportError,
@@ -374,6 +424,9 @@ export function useTasks(taskFilter: string | undefined, taskSort: string | unde
       // `updateCache` já é a fonte de verdade — evita refetch a cada tecla.
       if (affectsListShape(variables.data)) {
         queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
+        // Editar a recorrência promove/rebaixa a tarefa a rotina: os painéis e o
+        // heatmap precisam reavaliar quem entra.
+        invalidatePanelViews("recurrence" in (variables.data as object));
       }
     },
   });
@@ -476,6 +529,92 @@ export function useTasks(taskFilter: string | undefined, taskSort: string | unde
         old.map((t) =>
           t.id === taskId
             ? { ...t, checklist: t.checklist.map((c) => (c.id === itemId ? { ...c, ...patch } : c)) }
+            : t
+        )
+      );
+      return { previous };
+    },
+    onSuccess: (item, { taskId, itemId }) => {
+      queryClient.setQueryData<TaskItem[]>(queryKey, (old = []) =>
+        old.map((t) => {
+          if (t.id !== taskId) return t;
+          return { ...t, checklist: t.checklist.map((c) => (c.id === itemId ? item : c)) };
+        })
+      );
+      markSynced();
+    },
+    onError: (err, _v, ctx) => rollback(ctx?.previous, err),
+  });
+
+  const addChecklistBatchMutation = useMutation<
+    ChecklistItemFull[],
+    Error,
+    { taskId: string; items: Array<{ description: string; parent_id?: string | number | null; order?: number }> },
+    { previous?: TaskItem[]; tempIds: string[] }
+  >({
+    mutationKey: taskKeys.mutation("checklist-batch-add"),
+    mutationFn: ({ taskId, items }) => tasksApi.addChecklistBatch(taskId, items),
+    onMutate: async ({ taskId, items }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = snapshot();
+      const tempIds = items.map((_, i) => `temp-batch-${Date.now()}-${i}`);
+      const optimisticItems = items.map((item, i) => ({
+        id: tempIds[i],
+        description: item.description,
+        parent_id: item.parent_id,
+        completed: false,
+        order: item.order ?? i,
+      } as ChecklistItemFull));
+
+      queryClient.setQueryData<TaskItem[]>(queryKey, (old = []) =>
+        old.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                checklist: [...t.checklist, ...optimisticItems],
+                checklist_count: t.checklist_count + optimisticItems.length,
+              }
+            : t
+        )
+      );
+      return { previous, tempIds };
+    },
+    onSuccess: (newItems, { taskId }, ctx) => {
+      queryClient.setQueryData<TaskItem[]>(queryKey, (old = []) =>
+        old.map((t) => {
+          if (t.id !== taskId) return t;
+          let checklist = [...t.checklist];
+          // Substituir tempIds pelos IDs reais
+          ctx?.tempIds.forEach((tempId, index) => {
+            const realItem = newItems[index];
+            if (realItem) {
+              checklist = checklist.map(c => c.id === tempId ? realItem : c);
+            }
+          });
+          return { ...t, checklist };
+        })
+      );
+      markSynced();
+    },
+    onError: (err, _v, ctx) => rollback(ctx?.previous, err),
+  });
+
+  const reorderChecklistMutation = useMutation<
+    ChecklistItemFull,
+    Error,
+    { taskId: string; itemId: string; newOrder: number },
+    { previous?: TaskItem[] }
+  >({
+    mutationKey: taskKeys.mutation("checklist-reorder"),
+    mutationFn: ({ taskId, itemId, newOrder }) =>
+      tasksApi.reorderChecklistItem(taskId, itemId, newOrder),
+    onMutate: async ({ taskId, itemId, newOrder }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = snapshot();
+      queryClient.setQueryData<TaskItem[]>(queryKey, (old = []) =>
+        old.map((t) =>
+          t.id === taskId
+            ? { ...t, checklist: t.checklist.map((c) => (c.id === itemId ? { ...c, order: newOrder } : c)) }
             : t
         )
       );
@@ -602,8 +741,18 @@ export function useTasks(taskFilter: string | undefined, taskSort: string | unde
     handleUpdateTask:          (id: string, data: TaskUpdateInput)   => remember(() => runSerialUpdate(id, () => updateMutation.mutateAsync({ id, data }))),
     handleAddTaskChecklist:    (taskId: string, description: string, parentId: string | null = null) =>
       remember(() => addChecklistMutation.mutateAsync({ taskId, description, parentId })),
+    handleAddTaskChecklistBatch: (taskId: string, items: Array<{ description: string; parent_id?: string | number | null; order?: number }>) =>
+      remember(() => addChecklistBatchMutation.mutateAsync({ taskId, items })),
     handleToggleTaskChecklist: (taskId: string, itemId: string)      => remember(() => toggleChecklistMutation.mutateAsync({ taskId, itemId })),
     handleUpdateTaskChecklist: (taskId: string, itemId: string, fields: unknown) => remember(() => updateChecklistMutation.mutateAsync({ taskId, itemId, fields })),
+    handleReorderTaskChecklist: (taskId: string, itemId: string, newOrder: number) => remember(() => reorderChecklistMutation.mutateAsync({ taskId, itemId, newOrder })),
     handleDeleteTaskChecklist: (taskId: string, itemId: string)      => remember(() => deleteChecklistMutation.mutateAsync({ taskId, itemId })),
+    // Mutations para acesso direto (ChecklistInFocus)
+    addChecklistMutation,
+    addChecklistBatchMutation,
+    toggleChecklistMutation,
+    updateChecklistMutation,
+    reorderChecklistMutation,
+    deleteChecklistMutation,
   };
 }

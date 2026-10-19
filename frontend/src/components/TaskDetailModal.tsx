@@ -4,6 +4,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import { useDialog } from "../lib/useDialog";
 import TaskCard from "./TaskCard";
 import OrbitaLauncher from "./OrbitaLauncher";
+import YearlyTimeline from "./YearlyTimeline";
 import { TaskRecord } from "../types/tasks";
 import { Project, ProjectInput } from "../api/projects";
 import styles from "./TaskDetailModal.module.css";
@@ -65,6 +66,7 @@ export default function TaskDetailModal({
             onDelete={handleDelete}
             {...handlers}
           />
+          {task.recurrence === "yearly" && <YearlyTimeline taskId={task.id} dueDate={task.due_date} />}
           <OrbitaLauncher task={task} onUpdate={handlers.onUpdate} />
         </ErrorBoundary>
       </div>

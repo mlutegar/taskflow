@@ -16,6 +16,7 @@ import aiRoutes from "./routes/ai.js";
 import projectsRoutes from "./routes/projects.js";
 import uploadsRoutes from "./routes/uploads.js";
 import orbitaRoutes from "./routes/orbita.js";
+import icalRoutes from "./routes/ical.js";
 
 const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5175";
@@ -84,6 +85,7 @@ fastify.register(modeComboLogRoutes, { prefix: "/mode-combo-log" });
 fastify.register(aiRoutes, { prefix: "/ai" });
 fastify.register(uploadsRoutes, { prefix: "/uploads" });
 fastify.register(orbitaRoutes, { prefix: "/orbita" });
+fastify.register(icalRoutes, { prefix: "/ical" });
 
 // Erro global
 fastify.setErrorHandler((error, request, reply) => {

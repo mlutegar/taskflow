@@ -19,6 +19,8 @@ export interface TaskChecklistItem {
 
 export interface TaskRecord {
   id: string;
+  created_by: string;
+  assigned_to?: string | null;
   title: string;
   description?: string | null;
   priority: number;
@@ -61,6 +63,7 @@ export interface TaskCreateInput {
   actual_minutes?: number | null;
   orbita_projects?: string[] | null;
   orbita_prompt?: string | null;
+  assigned_to?: string | null;
 }
 
 export type TaskUpdateInput = Partial<TaskCreateInput> & {

@@ -44,6 +44,11 @@ interface AddTaskFormProps {
   draftKey?: string;
   // Placeholder do campo título (permite sugerir linguagem natural na captura rápida).
   titlePlaceholder?: string;
+  // Recorrência pré-selecionada (ex.: "daily" ao criar uma rotina pelo painel
+  // Rotina Diária). Quando preenchida, "Mais opções" já abre expandido para o
+  // usuário ver que a repetição está marcada.
+  initialRecurrence?: string | null;
+  initialRecurrenceRule?: RecurrenceRule | null;
 }
 
 interface QuickDraft { title?: string; description?: string }
@@ -76,7 +81,7 @@ const PRIORITIES = [
   { value: 4, label: "Baixa", dot: "🟢" },
 ];
 
-export default function AddTaskForm({ onSubmit, onCancel, projects = [], onCreateProject, enableChecklist = false, initialProjectId = null, allowAddAnother = false, enableAddToday = false, draftKey, titlePlaceholder = "Título da tarefa *" }: AddTaskFormProps) {
+export default function AddTaskForm({ onSubmit, onCancel, projects = [], onCreateProject, enableChecklist = false, initialProjectId = null, allowAddAnother = false, enableAddToday = false, draftKey, titlePlaceholder = "Título da tarefa *", initialRecurrence = null, initialRecurrenceRule = null }: AddTaskFormProps) {
   const initialDraft = loadDraft(draftKey);
   const [title, setTitle] = useState<string>(initialDraft.title ?? "");
   const [description, setDescription] = useState<string>(initialDraft.description ?? "");
@@ -87,13 +92,15 @@ export default function AddTaskForm({ onSubmit, onCancel, projects = [], onCreat
   // após o POST /tasks retornar o id.
   const [checklist, setChecklist] = useState<string[]>([]);
   const [checklistDraft, setChecklistDraft] = useState<string>("");
-  const [recurrence, setRecurrence] = useState<string>("");
-  const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(null);
+  const [recurrence, setRecurrence] = useState<string>(initialRecurrence ?? "");
+  const [recurrenceRule, setRecurrenceRule] = useState<RecurrenceRule | null>(initialRecurrenceRule);
   const [projectId, setProjectId] = useState<string | null>(initialProjectId);
   const [estimatedMinutes, setEstimatedMinutes] = useState<number | null>(null);
   const [addToToday, setAddToToday] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
-  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  // Com recorrência pré-definida, abre expandido: o usuário precisa ver que a
+  // repetição já está marcada (e poder trocá-la).
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(Boolean(initialRecurrence));
   const [errors, setErrors] = useState<FieldErrors>({});
   const titleRef = useRef<HTMLInputElement>(null);
 

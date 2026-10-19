@@ -12,6 +12,11 @@ import AddTaskForm from "../components/AddTaskForm";
 import TodayPanel, { DAILY_LIMIT } from "../components/TodayPanel";
 import { useToast } from "../components/shared/Toast";
 import DailyRoutinePanel from "../components/DailyRoutinePanel";
+import RoutineConsistencyCard from "../components/routine-heatmap/RoutineConsistencyCard";
+import MobileHeader from "../components/tasks-mobile/MobileHeader";
+import TodayProgressCard from "../components/tasks-mobile/TodayProgressCard";
+import { useIsMobile } from "../hooks/useIsMobile";
+import { isDailyToday } from "../lib/dailyRoutine";
 import DueTodayPanel from "../components/DueTodayPanel";
 import ErrorBoundary from "../components/ErrorBoundary";
 import TaskDetailModal from "../components/TaskDetailModal";
@@ -19,14 +24,21 @@ import { useTaskDetail } from "../hooks/useTaskDetail";
 import styles from "../App.module.css";
 import { todayISO } from "../lib/dateUtils";
 import { taskKeys } from "../lib/taskKeys";
+import type { TaskCreateInput } from "../types/tasks";
 import { useProjects } from "../hooks/useProjects";
 import ProjectSelect from "../components/ProjectSelect";
 import ProjectManager from "../components/ProjectManager";
 import { TIME_BUCKETS, sumEstimated, formatMinutes } from "../lib/estimatedTime";
 import {
   ListChecks, AlertCircle, Clock, RotateCw, Plus, X, Search,
-  Settings2, LayoutGrid, AlertTriangle,
+  Settings2, LayoutGrid, AlertTriangle, Filter, ArrowUpDown, Calendar,
 } from "lucide-react";
+import { exportYearlyTasksToCalendar } from "../lib/exportIcal";
+import { FilterSheet } from "../components/FilterSheet";
+import { FilterChips } from "../components/FilterChips";
+import { SegmentedControl } from "../components/SegmentedControl";
+import { useTaskFilters } from "../hooks/useTaskFilters";
+import { TaskDetailPage } from "./TaskDetailPage";
 
 const TASK_FILTERS: { label: string; value: string }[] = [
   { label: "Hoje", value: "today" },
@@ -34,6 +46,7 @@ const TASK_FILTERS: { label: string; value: string }[] = [
   { label: "Todas", value: "" },
   { label: "Ativas", value: "active" },
   { label: "Concluídas", value: "completed" },
+  { label: "📅 Anuais", value: "yearly" },
 ];
 
 const TASK_SORTS: { label: string; value: string }[] = [
@@ -48,6 +61,7 @@ const TASK_SORTS: { label: string; value: string }[] = [
 export default function TasksPage(): JSX.Element {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const isMobile = useIsMobile();
   // UI state — inicializados a partir da query string para persistência via URL
   const [taskFilter, setTaskFilter] = useState<string>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -69,6 +83,19 @@ export default function TasksPage(): JSX.Element {
   );
   const [showProjectManager, setShowProjectManager] = useState<boolean>(false);
   const projectsHook = useProjects(true);
+
+  // Novo sistema de filtros
+  const { filters, setFilters, activeCount, clearAll, removeFilter, toAPIParams } = useTaskFilters();
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  // Hash routing para TaskDetailPage
+  const [taskDetailId, setTaskDetailId] = useState<string | null>(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith("#task-")) {
+      return hash.substring(6); // Remove "#task-"
+    }
+    return null;
+  });
 
   // Sincronizar filtros na URL
   useEffect(() => {
@@ -95,6 +122,20 @@ export default function TasksPage(): JSX.Element {
       setProjectFilter("");
     }
   }, [projectFilter, projectsHook.loading, projectsHook.projects]);
+
+  // Hash routing listener
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith("#task-")) {
+        setTaskDetailId(hash.substring(6));
+      } else {
+        setTaskDetailId(null);
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   // Reabre ocorrências no instante em que o dia muda, mesmo com a tela aberta.
   useEffect(() => {
@@ -137,9 +178,18 @@ export default function TasksPage(): JSX.Element {
   }, [pullPct]);
 
   // Business logic
-  const tasksHook = useTasks(taskFilter, taskSort, projectFilter || undefined, timeFilter || undefined);
+  const apiParams = toAPIParams();
+  const tasksHook = useTasks(
+    taskFilter,
+    taskSort,
+    projectFilter || apiParams.projectId || undefined,
+    apiParams.time || undefined,
+    apiParams.assignedTo || undefined,
+    apiParams.priorities || undefined,
+    apiParams.dueFilter || undefined
+  );
   const { data: allTasksForToday = [] } = useQuery<any[]>({
-    queryKey: ["tasks", "today-panel-all"],
+    queryKey: taskKeys.todayPanelAll(),
     queryFn: () => tasksApi.list({ sort: "due_date_asc" }),
     staleTime: 30_000,
   });
@@ -190,11 +240,29 @@ export default function TasksPage(): JSX.Element {
     setShowTaskForm(false);
   };
 
+  /**
+   * Cria uma rotina pelo botão "Nova rotina" do painel Rotina Diária. É uma
+   * tarefa normal com recorrência — só o ponto de entrada é dedicado. As
+   * subtarefas vêm "staged" do formulário e são anexadas após o POST.
+   */
+  const handleCreateRoutine = useCallback(async (data: TaskCreateInput & { checklist?: string[] }): Promise<void> => {
+    const { checklist = [], ...rest } = data;
+    const created = await tasksHook.handleCreateTask(rest as TaskCreateInput) as { id?: string } | undefined;
+    const taskId = created?.id;
+    if (!taskId) return; // offline: create enfileirado sem id, sem como anexar subtarefas
+    for (const item of checklist) {
+      const description = item.trim();
+      if (description) {
+        try { await tasksHook.handleAddTaskChecklist(taskId, description); } catch { /* segue com as demais */ }
+      }
+    }
+  }, [tasksHook]);
+
   // Envia uma tarefa para o painel de foco "Tarefas de Hoje" (persistido no BD).
   const handleAddFocus = useCallback(async (id: string): Promise<void> => {
     try {
       await dailyTasksApi.add(id);
-      queryClient.invalidateQueries({ queryKey: ["tasks", "today-panel-all"] });
+      queryClient.invalidateQueries({ queryKey: taskKeys.todayPanelAll() });
       showToast("Adicionada ao foco de hoje", "success");
     } catch (err) {
       const status = (err as { status?: number })?.status;
@@ -261,6 +329,12 @@ export default function TasksPage(): JSX.Element {
   const overdueTaskCnt   = (allTasksForToday as any[]).filter((t: any) => !t.completed && t.due_date && t.due_date < todayISO()).length;
   const isFiltered       = !!(taskFilter || taskSearch.trim() || timeFilter);
 
+  // Progresso das rotinas do dia — mesma fonte e mesmo critério do painel
+  // "Rotina Diária", para o card de progresso nunca divergir dele.
+  const routinesToday    = (allTasksForToday as any[]).filter((t: any) => isDailyToday(t.recurrence));
+  const routineTotal     = routinesToday.length;
+  const routineDone      = routinesToday.filter((t: any) => t.completed).length;
+
   // Soma do tempo estimado das tarefas visíveis não concluídas + alerta de sobrecarga.
   const estimatedTotal   = sumEstimated(visibleTasks as any[]);
   const overloadLimit    = Number(localStorage.getItem("taskflow.overloadMinutes") || 480); // 8 h
@@ -277,6 +351,9 @@ export default function TasksPage(): JSX.Element {
         <div className={styles.pullIndicator} style={{ opacity: pullPct, transform: `scaleX(${pullPct})` }} />
       )}
 
+      {isMobile ? (
+        <MobileHeader formOpen={showTaskForm} onToggleForm={() => setShowTaskForm((v) => !v)} />
+      ) : (
       <header className={styles.header}>
         <div className={styles.headerInner} style={{ gridTemplateColumns: "1fr auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 4 }}>
@@ -322,9 +399,14 @@ export default function TasksPage(): JSX.Element {
           </div>
         </div>
       </header>
+      )}
 
       <main className={styles.main}>
+        {isMobile && <TodayProgressCard done={routineDone} total={routineTotal} />}
         <DailyWidget />
+        <ErrorBoundary compact label="card Consistência das Rotinas">
+          <RoutineConsistencyCard />
+        </ErrorBoundary>
         <ErrorBoundary compact label="painel Rotina Diária">
           <DailyRoutinePanel
             tasks={allTasksForToday}
@@ -333,6 +415,7 @@ export default function TasksPage(): JSX.Element {
             onToggleChecklist={handleToggleTaskChecklist}
             completingIds={completingIds}
             onOpenDetail={openDetail}
+            onCreateRoutine={handleCreateRoutine}
           />
         </ErrorBoundary>
         <ErrorBoundary compact label="painel Hoje & Atrasadas">
@@ -383,7 +466,9 @@ export default function TasksPage(): JSX.Element {
           </div>
         )}
 
-        <div className={styles.controls}>
+        {/* Nova barra de filtros - 3 linhas */}
+        <div className={styles.filtersContainer}>
+          {/* Linha 1: Busca */}
           <div className={styles.searchWrapper}>
             <span className={styles.searchIcon}><Search size={15} /></span>
             <input
@@ -397,66 +482,105 @@ export default function TasksPage(): JSX.Element {
               <button className={styles.searchClear} onClick={() => setTaskSearch("")} aria-label="Limpar busca"><X size={13} /></button>
             )}
           </div>
-          <div className={styles.filters}>
-            {TASK_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                className={`${styles.filterBtn} ${taskFilter === f.value ? styles.filterActive : ""}`}
-                onClick={() => setTaskFilter(f.value)}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className={styles.projectControls}>
-            <ProjectSelect
-              projects={projectsHook.projects}
-              value={projectFilter}
-              onChange={(value) => setProjectFilter(value || "")}
-              allowAll
-              allowNoneFilter
-              className={styles.projectSelect}
+
+          {/* Linha 2: Abas segmented control + chip "Minhas" */}
+          <div className={styles.tabsRow}>
+            <SegmentedControl
+              options={[
+                { label: `Hoje (${tasks.filter((t: any) => !t.completed && (!t.due_date || t.due_date <= todayISO())).length})`, value: "today" },
+                { label: `Próximas (${tasks.filter((t: any) => !t.completed && t.due_date && t.due_date > todayISO()).length})`, value: "upcoming" },
+                { label: "Todas", value: "" },
+                { label: `Ativas (${tasks.filter((t: any) => !t.completed).length})`, value: "active" },
+                { label: `Concluídas (${tasks.filter((t: any) => t.completed).length})`, value: "completed" },
+              ]}
+              value={taskFilter}
+              onChange={setTaskFilter}
             />
-            <button className={styles.projectManageBtn} onClick={() => setShowProjectManager(true)} title="Criar e organizar projetos" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Settings2 size={14} /> Projetos</button>
-          </div>
-          <div className={styles.sortWrapper}>
-            <span className={styles.sortLabel}>Ordenar:</span>
-            <select
-              className={styles.sortSelect}
-              value={taskSort}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTaskSort(e.target.value)}
-            >
-              {TASK_SORTS.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-            <span className={styles.sortLabel}>Tempo:</span>
-            <select
-              className={styles.sortSelect}
-              value={timeFilter}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTimeFilter(e.target.value)}
-              aria-label="Filtrar por tempo estimado"
-            >
-              {TIME_BUCKETS.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
             <button
-              className={`${styles.groupBtn} ${grouped ? styles.groupBtnActive : ""}`}
-              onClick={() => setGrouped((v) => !v)}
-              title={grouped ? "Desagrupar" : "Agrupar por prioridade"}
-              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+              className={`${styles.chipToggle} ${filters.assignedTo === "me" ? styles.chipToggleActive : ""}`}
+              onClick={() =>
+                setFilters({ ...filters, assignedTo: filters.assignedTo === "me" ? null : "me" })
+              }
+              type="button"
             >
-              <LayoutGrid size={15} />
+              Minhas {filters.assignedTo === "me" && "×"}
             </button>
           </div>
+
+          {/* Linha 3: Filtros + Ordenar + View */}
+          <div className={styles.controlsRow}>
+            <button
+              className={styles.filterBtn}
+              onClick={() => setIsFilterSheetOpen(true)}
+              type="button"
+            >
+              <Filter size={16} />
+              Filtros
+              {activeCount > 0 && <span className={styles.badge}>{activeCount}</span>}
+            </button>
+
+            <button className={styles.sortBtn} onClick={() => {/* TODO: Menu de ordenação */}} type="button">
+              <ArrowUpDown size={16} />
+              Ordenar: {TASK_SORTS.find((s) => s.value === taskSort)?.label || "Prioridade"}
+            </button>
+
+            <div className={styles.viewToggle}>
+              <button
+                className={`${styles.viewBtn} ${!grouped ? styles.viewBtnActive : ""}`}
+                onClick={() => setGrouped(false)}
+                type="button"
+                title="Lista"
+              >
+                Lista
+              </button>
+              <button
+                className={`${styles.viewBtn} ${grouped ? styles.viewBtnActive : ""}`}
+                onClick={() => setGrouped(true)}
+                type="button"
+                title="Grade"
+              >
+                <LayoutGrid size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Chips de filtros ativos */}
+          <FilterChips filters={filters} onRemove={removeFilter} onClearAll={clearAll} />
         </div>
 
+        {/* FilterSheet (bottom sheet mobile / sidebar desktop) */}
+        <FilterSheet
+          isOpen={isFilterSheetOpen}
+          onClose={() => setIsFilterSheetOpen(false)}
+          filters={filters}
+          onApply={(newFilters) => {
+            setFilters(newFilters);
+            setIsFilterSheetOpen(false);
+          }}
+          taskCount={visibleTasks.length}
+        />
+
         {isFiltered && !tasksLoading && (
-          <div className={styles.filterCount}>
-            Exibindo <strong>{visibleTasks.length}</strong> de {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""}
-            {estimatedTotal > 0 && <span> · ~{formatMinutes(estimatedTotal)} estimados</span>}
-            {visibleTasks.length === 0 && <span> — tente outro filtro</span>}
+          <div className={styles.filterCount} style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between" }}>
+            <span>
+              Exibindo <strong>{visibleTasks.length}</strong> de {tasks.length} tarefa{tasks.length !== 1 ? "s" : ""}
+              {estimatedTotal > 0 && <span> · ~{formatMinutes(estimatedTotal)} estimados</span>}
+              {visibleTasks.length === 0 && <span> — tente outro filtro</span>}
+            </span>
+            {taskFilter === "yearly" && visibleTasks.length > 0 && (
+              <button
+                onClick={() => {
+                  exportYearlyTasksToCalendar().then(() => {
+                    showToast("📅 Tarefas anuais exportadas com sucesso!");
+                  }).catch(() => {
+                    showToast("❌ Erro ao exportar tarefas anuais");
+                  });
+                }}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "var(--accent)", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 500 }}
+              >
+                <Calendar size={14} /> Exportar para calendário (.ics)
+              </button>
+            )}
           </div>
         )}
 
@@ -509,8 +633,9 @@ export default function TasksPage(): JSX.Element {
         )}
       </main>
 
-      {/* FAB mobile */}
-      {!showTaskForm && (
+      {/* FAB: no mobile quem cria tarefa é o "+" do cabeçalho, que não cobre o
+          conteúdo. No desktop o .fab já é display:none — fica só por segurança. */}
+      {!isMobile && !showTaskForm && (
         <button
           className={styles.fab}
           onClick={() => { setShowTaskForm(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
@@ -563,6 +688,17 @@ export default function TasksPage(): JSX.Element {
       )}
 
       {ConfirmUI}
+
+      {/* TaskDetailPage via hash routing */}
+      {taskDetailId && (
+        <TaskDetailPage
+          taskId={taskDetailId}
+          onClose={() => {
+            window.location.hash = "";
+            setTaskDetailId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

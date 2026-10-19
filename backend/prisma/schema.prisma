@@ -13,12 +13,16 @@ model User {
   passwordHash String   @map("password_hash")
   createdAt    DateTime @default(now()) @map("created_at")
 
+  createdTasks  Task[] @relation("CreatedTasks")
+  assignedTasks Task[] @relation("AssignedTasks")
+
   @@map("users")
 }
 
 model Task {
   id               String    @id @default(uuid())
-  userId           String    @map("user_id")
+  createdBy        String    @map("created_by")
+  assignedTo       String?   @map("assigned_to")
   title            String
   description      String?
   completed        Boolean   @default(false)
@@ -45,12 +49,17 @@ model Task {
   dailyTasks  DailyTask[]
   completions TaskCompletion[]
   project     Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  creator     User             @relation("CreatedTasks", fields: [createdBy], references: [id], onDelete: Cascade)
+  assignee    User?            @relation("AssignedTasks", fields: [assignedTo], references: [id], onDelete: SetNull)
 
-  @@index([userId])
-  @@index([userId, completed])
-  @@index([userId, dueDate])
-  @@index([userId, deletedAt])
-  @@index([userId, projectId])
+  @@index([createdBy])
+  @@index([assignedTo])
+  @@index([createdBy, assignedTo])
+  @@index([createdBy, completed])
+  @@index([assignedTo, completed])
+  @@index([createdBy, dueDate])
+  @@index([createdBy, deletedAt])
+  @@index([createdBy, projectId])
   @@map("tasks")
 }
 

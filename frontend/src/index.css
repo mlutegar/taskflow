@@ -42,6 +42,22 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   --low: #4ecca3;
   --radius: 10px;
   --radius-sm: 6px;
+  /* Cards do layout mobile (redesign da tela de Tarefas) */
+  --radius-lg: 24px;
+  --card-pad: 20px;
+
+  /* ── Aliases semânticos ───────────────────────────────────────────────────
+     Use ESTES nos componentes, não o hex nem o token de cor cru: deixa claro o
+     papel da cor e faz o tema claro seguir junto de graça. */
+  --progress: var(--success);   /* verde-água: progresso e conclusão */
+  --streak:   var(--warning);   /* laranja: sequência (chama) */
+
+  /* Escala de 5 níveis do heatmap de rotinas (0% → 100%). */
+  --hm-0: var(--surface-2);
+  --hm-1: rgba(78, 204, 163, 0.22);
+  --hm-2: rgba(78, 204, 163, 0.42);
+  --hm-3: rgba(78, 204, 163, 0.68);
+  --hm-4: var(--progress);
 
   /* ── Layout flutuante (mobile) ────────────────────────────────────────────
      Constantes de UI compartilhadas entre o FAB "Nova tarefa", a bottom nav e
@@ -91,6 +107,11 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   --warning-border: rgba(214, 142,  40, 0.30);
   --danger-border:  rgba(210,  64,  64, 0.25);
   --text-inverse:   #ffffff;
+
+  /* Sobre fundo claro os verdes translúcidos somem; precisam de mais corpo. */
+  --hm-1: rgba(56, 168, 130, 0.30);
+  --hm-2: rgba(56, 168, 130, 0.52);
+  --hm-3: rgba(56, 168, 130, 0.76);
 }
 
 @media (max-width: 480px) {

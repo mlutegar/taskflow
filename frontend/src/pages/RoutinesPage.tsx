@@ -7,6 +7,7 @@ import { useTasks } from "../hooks/useTasks";
 import { useTaskDetail } from "../hooks/useTaskDetail";
 import { useProjects } from "../hooks/useProjects";
 import { useUndoDelete } from "../hooks/useUndoDelete";
+import { taskKeys } from "../lib/taskKeys";
 import RoutineList from "../components/RoutineList";
 import RoutineHeatmap from "../components/RoutineHeatmap";
 import AddRoutineForm from "../components/AddRoutineForm";
@@ -60,7 +61,7 @@ export default function RoutinesPage(): JSX.Element {
   //   (navegar entre Tarefas ⇆ Rotinas não refaz o fetch). Alimenta o painel e o modal.
   // - `useTasks`: fornece as mutações (concluir/reabrir/checklist/editar) e o feedback.
   const { data: allTasksForToday = [] } = useQuery<any[]>({
-    queryKey: ["tasks", "today-panel-all"],
+    queryKey: taskKeys.todayPanelAll(),
     queryFn: () => tasksApi.list({ sort: "due_date_asc" }),
     staleTime: 30_000,
   });

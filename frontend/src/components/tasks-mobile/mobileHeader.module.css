@@ -1,0 +1,49 @@
+/* Cabeçalho "Meu dia" — só existe no mobile (renderizado atrás de useIsMobile). */
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) var(--card-pad) 16px;
+}
+
+.titleBlock { min-width: 0; }
+
+.title {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+.date {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 16px;
+  background: var(--accent);
+  color: var(--text-inverse);
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.35);
+  transition: background 0.15s, transform 0.1s;
+}
+
+.addBtn:active { transform: scale(0.95); }
+.addBtn:hover { background: var(--accent-hover); }
+
+@media (max-width: 360px) {
+  .title { font-size: 26px; }
+  .addBtn { width: 44px; height: 44px; }
+}

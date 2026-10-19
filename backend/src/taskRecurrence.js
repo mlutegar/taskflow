@@ -37,6 +37,27 @@ function addMonths(date, months, forceFirst = false) {
   const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
   return iso(target.getUTCFullYear(), target.getUTCMonth() + 1, forceFirst ? 1 : Math.min(day, lastDay));
 }
+function isLeapYear(year) {
+  return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+}
+function addYears(date, years) {
+  const [year, month, day] = parts(date);
+  let nextYear = year + years;
+  let nextDay = day;
+
+  // Caso especial: 29/02 em ano não bissexto
+  if (month === 2 && day === 29 && !isLeapYear(nextYear)) {
+    nextDay = 28;
+  }
+
+  // Caso especial: dia excede o último dia do mês (ex: 31 em meses com 30 dias)
+  const daysInMonth = new Date(Date.UTC(nextYear, month, 0)).getUTCDate();
+  if (nextDay > daysInMonth) {
+    nextDay = daysInMonth;
+  }
+
+  return iso(nextYear, month, nextDay);
+}
 function weekday(date) {
   const [year, month, day] = parts(date);
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
@@ -92,6 +113,7 @@ export function computeNextDueDate(currentDueDate, recurrence, rule = {}, now = 
 
   if (recurrence === "monthly") next = addMonths(base, 1);
   else if (recurrence === "monthly_first") next = addMonths(base, 1, true);
+  else if (recurrence === "yearly") next = addYears(base, 1);
   else if (recurrence === "weekly") next = addDays(base, 7);
   else if (recurrence === "biweekly") next = addDays(base, 14);
   else if (recurrence === "weekdays") {

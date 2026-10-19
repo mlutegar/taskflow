@@ -75,6 +75,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
   const [showHelperPicker, setShowHelperPicker] = useState<"durante" | "entre" | false>(false);
   const [editingDuration, setEditingDuration] = useState<boolean>(false);
   const [durationInput, setDurationInput] = useState<string>(String(slot.durationMin));
+  const [taskDetails, setTaskDetails] = useState<any>(null);
 
   useEffect(() => { setQuery(slot.title); }, [slot.title]);
   useEffect(() => { setDurationInput(String(slot.durationMin)); }, [slot.durationMin]);
@@ -83,6 +84,15 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
   useEffect(() => {
     tasksApi.listDueToday().then(setTodayTasks).catch(() => {});
   }, []);
+
+  // Carrega detalhes da tarefa quando supabaseId muda
+  useEffect(() => {
+    if (slot.supabaseId) {
+      tasksApi.getTask(slot.supabaseId as string).then(setTaskDetails).catch(() => setTaskDetails(null));
+    } else {
+      setTaskDetails(null);
+    }
+  }, [slot.supabaseId]);
 
   const priorityIds = new Set(todayPriorities.map((p) => String(p.id)));
 
@@ -242,6 +252,12 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
               {t.title}
             </div>
           ))}
+        </div>
+      )}
+
+      {taskDetails && taskDetails.checklist_count > 0 && (
+        <div className={styles.slotChecklistProgress}>
+          ☑ {taskDetails.checklist_completed_count}/{taskDetails.checklist_count}
         </div>
       )}
 

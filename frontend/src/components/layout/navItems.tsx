@@ -11,6 +11,11 @@ import {
 export interface NavItem {
   Icon: LucideIcon;
   label: string;
+  /**
+   * Rótulo curto usado SÓ na bottom nav do mobile, onde cada item tem ~25% da
+   * largura da tela. A sidebar do desktop continua usando `label`.
+   */
+  shortLabel?: string;
   hash: string;
 }
 
@@ -18,7 +23,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { Icon: CheckSquare, label: "Tarefas",     hash: "#/tasks" },
   { Icon: Repeat,      label: "Hábitos",     hash: "#/routines" },
-  { Icon: Target,      label: "Daily Focus", hash: "#/daily-focus" },
+  { Icon: Target,      label: "Daily Focus", shortLabel: "Foco", hash: "#/daily-focus" },
   { Icon: Gamepad2,    label: "Modos",       hash: "#/modes" },
   { Icon: BarChart3,   label: "Análises",    hash: "#/dashboard" },
   { Icon: User,        label: "Perfil",      hash: "#/profile" },

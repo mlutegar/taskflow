@@ -18,3 +18,10 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+# Órbita — anexos do chat
+.orbita/
+
+# Worktrees temporários de agentes (scratch local, nunca versionar).
+# Sem isto, worktrees abandonados com .git apontando para caminhos antigos
+# quebram o `git status` com "not a git repository".
+.claude/worktrees/

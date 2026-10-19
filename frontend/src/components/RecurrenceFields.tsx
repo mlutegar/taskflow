@@ -6,6 +6,8 @@ export interface RecurrenceRule {
   weekdays?: number[];
   skipWeekends?: boolean;
   skipHolidays?: boolean;
+  reminderDaysBefore?: number;
+  birthdayYear?: number;
 }
 
 interface Props {
@@ -49,6 +51,7 @@ export default function RecurrenceFields({ recurrence, rule = {}, onChange, comp
         <option value="biweekly">A cada 2 semanas</option>
         <option value="monthly">Todo mês</option>
         <option value="monthly_first">Primeiro dia do mês</option>
+        <option value="yearly">Todo ano</option>
         <option value="custom_interval">A cada X dias</option>
         <option value="custom_weekdays">Dias específicos</option>
       </select>
@@ -75,6 +78,27 @@ export default function RecurrenceFields({ recurrence, rule = {}, onChange, comp
             >{day.label}</button>
           ))}
         </div>
+      )}
+
+      {recurrence === "yearly" && (
+        <>
+          <label className={styles.inlineLabel}>
+            🔔 Lembrar
+            <input
+              type="number" min={0} max={365} value={rule?.reminderDaysBefore ?? 7}
+              onChange={(e) => patchRule({ reminderDaysBefore: Number(e.target.value) })}
+            />
+            {(rule?.reminderDaysBefore ?? 7) === 1 ? "dia antes" : "dias antes"}
+          </label>
+          <label className={styles.inlineLabel}>
+            🎂 Aniversário (ano de nascimento)
+            <input
+              type="number" min={1900} max={new Date().getFullYear()} value={rule?.birthdayYear || ""}
+              placeholder="Opcional"
+              onChange={(e) => patchRule({ birthdayYear: e.target.value ? Number(e.target.value) : undefined })}
+            />
+          </label>
+        </>
       )}
 
       {recurrence && (

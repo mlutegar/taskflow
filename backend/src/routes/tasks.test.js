@@ -57,6 +57,49 @@ test("data do usuário respeita o fuso horário", () => {
   assert.equal(dateInTimeZone(instant, "America/Sao_Paulo"), "2026-09-15");
 });
 
+// ── Recorrência anual ───────────────────────────────────────────────────────
+test("recorrência anual avança um ano", () => {
+  const now = new Date("2026-10-13T15:00:00");
+  assert.equal(computeNextDueDate("2026-10-13", "yearly", {}, now), "2027-10-13");
+});
+
+test("recorrência anual em 29/02 cai em 28/02 em ano não bissexto", () => {
+  const now = new Date("2024-02-29T15:00:00");
+  assert.equal(computeNextDueDate("2024-02-29", "yearly", {}, now), "2025-02-28");
+});
+
+test("recorrência anual em 29/02 mantém 29/02 em próximo ano bissexto", () => {
+  const now = new Date("2027-02-28T15:00:00");
+  assert.equal(computeNextDueDate("2028-02-29", "yearly", {}, now), "2029-02-28");
+});
+
+test("recorrência anual em 31/12 vira 31/12 do ano seguinte", () => {
+  const now = new Date("2026-12-31T15:00:00");
+  assert.equal(computeNextDueDate("2026-12-31", "yearly", {}, now), "2027-12-31");
+});
+
+test("recorrência anual atrasada agenda a partir de hoje", () => {
+  const now = new Date("2026-10-15T15:00:00");
+  const old = "2025-10-13";
+  const next = computeNextDueDate(old, "yearly", {}, now);
+  assert.equal(next, "2027-10-15");
+});
+
+test("recorrência mensal ainda funciona após adicionar yearly", () => {
+  const now = new Date("2026-10-13T15:00:00");
+  assert.equal(computeNextDueDate("2026-10-13", "monthly", {}, now), "2026-11-13");
+});
+
+test("recorrência anual em 31/01 mantém 31/01", () => {
+  const now = new Date("2026-01-31T15:00:00");
+  assert.equal(computeNextDueDate("2026-01-31", "yearly", {}, now), "2027-01-31");
+});
+
+test("recorrência anual respeita último dia do mês", () => {
+  const now = new Date("2026-05-31T15:00:00");
+  assert.equal(computeNextDueDate("2026-05-31", "yearly", {}, now), "2027-05-31");
+});
+
 // ── Tempo estimado: faixas ──────────────────────────────────────────────────
 test("bucketOf classifica pelos limites (inclusivos no topo)", () => {
   assert.equal(bucketOf(null), null);

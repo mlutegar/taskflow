@@ -1,9 +1,11 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useQueries } from "@tanstack/react-query";
 import {
-  Repeat, Check, Eye, EyeOff, Play, PartyPopper, GripVertical, Flame,
+  Repeat, Check, Eye, EyeOff, Play, PartyPopper, GripVertical, Flame, Plus, X, MoreHorizontal,
 } from "lucide-react";
 import styles from "./TodayPanel.module.css";
+import AddTaskForm from "./AddTaskForm";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { TaskRecord } from "../types/tasks";
 import { tasksApi } from "../api/tasks";
 import {
@@ -42,6 +44,9 @@ interface ChecklistLite {
   completed: boolean;
 }
 
+/** Payload do AddTaskForm — reaproveita a assinatura dele para não duplicar o tipo. */
+type NewRoutineInput = Parameters<React.ComponentProps<typeof AddTaskForm>["onSubmit"]>[0];
+
 interface DailyRoutinePanelProps {
   tasks: TaskRecord[];
   onComplete: (id: string) => void;
@@ -50,6 +55,12 @@ interface DailyRoutinePanelProps {
   completingIds?: Set<string>;
   /** Abre o modal de detalhes/edição (gerido pela página). */
   onOpenDetail?: (id: number | string) => void;
+  /**
+   * Cria uma rotina (tarefa com recorrência) a partir do próprio painel.
+   * Quando ausente, o botão "Nova rotina" não aparece — é assim que a página
+   * de Hábitos reusa este painel apenas como leitura.
+   */
+  onCreateRoutine?: (task: NewRoutineInput) => Promise<void>;
 }
 
 export default function DailyRoutinePanel({
@@ -59,7 +70,11 @@ export default function DailyRoutinePanel({
   onToggleChecklist,
   completingIds,
   onOpenDetail,
+  onCreateRoutine,
 }: DailyRoutinePanelProps): JSX.Element | null {
+  const isMobile = useIsMobile();
+  const [showForm, setShowForm] = useState<boolean>(false);
+  const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(COLLAPSE_KEY) === "true"; } catch { return false; }
   });
@@ -147,63 +162,179 @@ export default function DailyRoutinePanel({
 
   const startFocus = (): void => { window.location.hash = "#/daily-focus"; };
 
-  // Não mostra o painel se o usuário não tem nenhuma rotina diária para hoje.
-  if (total === 0) return null;
+  // No mobile não existe botão de recolher, então um "recolhido" herdado do
+  // desktop deixaria o card travado sem conteúdo e sem saída.
+  const isCollapsed = isMobile ? false : collapsed;
+
+  // Toque fora fecha o menu "⋯".
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setMenuOpen(false);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [menuOpen]);
+
+  // Sem nenhuma rotina: o painel some, A NÃO SER que ele saiba criar — nesse
+  // caso ele continua como o ponto de entrada para cadastrar a primeira.
+  if (total === 0 && !onCreateRoutine) return null;
 
   return (
-    <div className={styles.panel}>
+    <div className={`${styles.panel} ${isMobile ? styles.panelMobile : ""}`}>
       {/* Cabeçalho */}
       <div className={styles.header}>
         <div className={styles.titleRow}>
-          <button
-            className={`${styles.collapseBtn} ${collapsed ? styles.collapseBtnClosed : ""}`}
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? "Expandir painel" : "Recolher painel"}
-            title={collapsed ? "Expandir" : "Recolher"}
-          >
-            ‹
-          </button>
-          <span className={styles.title} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <Repeat size={15} /> Rotina Diária
-          </span>
-          <span className={`${styles.slot} ${allDone ? styles.slotFull : ""}`}>
-            {done}/{total}
-          </span>
-          {allDone && (
+          {!isMobile && (
+            <button
+              className={`${styles.collapseBtn} ${collapsed ? styles.collapseBtnClosed : ""}`}
+              onClick={toggleCollapsed}
+              aria-label={collapsed ? "Expandir painel" : "Recolher painel"}
+              title={collapsed ? "Expandir" : "Recolher"}
+            >
+              ‹
+            </button>
+          )}
+          {isMobile ? (
+            <span className={styles.titleBlock}>
+              <span className={styles.title}>Rotina diária</span>
+              <span className={styles.cardSubtitle}>Suas atividades recorrentes</span>
+            </span>
+          ) : (
+            <span className={styles.title} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <Repeat size={15} /> Rotina Diária
+            </span>
+          )}
+          {!isMobile && (
+            <span className={`${styles.slot} ${allDone ? styles.slotFull : ""}`}>
+              {done}/{total}
+            </span>
+          )}
+          {allDone && !isMobile && (
             <span className={styles.doneToday} title="Todas as rotinas de hoje concluídas" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
               <Check size={13} /> tudo feito hoje
             </span>
           )}
         </div>
-        {!collapsed && (
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <button
-              className={styles.addBtn}
-              onClick={toggleHideDone}
-              title={hideDone ? "Mostrar feitas" : "Ocultar feitas"}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-            >
-              {hideDone ? <><Eye size={14} /> Mostrar feitas</> : <><EyeOff size={14} /> Ocultar feitas</>}
-            </button>
-            <button className={styles.addBtn} onClick={startFocus} title="Iniciar sessão de foco" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <Play size={14} /> Foco
-            </button>
+
+        {/* Mobile: badge "2 / 5" + menu "⋯" (os botões saem do cabeçalho). */}
+        {isMobile ? (
+          <div className={styles.headerRight}>
+            <span className={`${styles.slot} ${allDone ? styles.slotFull : ""}`}>
+              {done} / {total}
+            </span>
+            {/* stopPropagation: sem isso o listener de "clique fora" desmonta o
+                menu no pointerdown e o onClick do item nunca chega a disparar. */}
+            <div className={styles.menuWrap} onPointerDown={(e) => e.stopPropagation()}>
+              <button
+                className={styles.menuBtn}
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Mais opções da rotina"
+                aria-expanded={menuOpen}
+              >
+                <MoreHorizontal size={18} />
+              </button>
+              {menuOpen && (
+                <div className={styles.menu} role="menu">
+                  {onCreateRoutine && (
+                    <button
+                      className={styles.menuItem}
+                      role="menuitem"
+                      onClick={() => { setMenuOpen(false); setShowForm((v) => !v); }}
+                    >
+                      {showForm ? <><X size={15} /> Cancelar</> : <><Plus size={15} /> Nova rotina</>}
+                    </button>
+                  )}
+                  {total > 0 && (
+                    <>
+                      <button
+                        className={styles.menuItem}
+                        role="menuitem"
+                        onClick={() => { setMenuOpen(false); toggleHideDone(); }}
+                      >
+                        {hideDone ? <><Eye size={15} /> Mostrar feitas</> : <><EyeOff size={15} /> Ocultar feitas</>}
+                      </button>
+                      <button
+                        className={styles.menuItem}
+                        role="menuitem"
+                        onClick={() => { setMenuOpen(false); startFocus(); }}
+                      >
+                        <Play size={15} /> Foco
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+        ) : (
+          !isCollapsed && (
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              {onCreateRoutine && (
+                <button
+                  className={styles.addBtn}
+                  onClick={() => setShowForm((v) => !v)}
+                  title={showForm ? "Cancelar" : "Criar uma nova rotina"}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  {showForm ? <><X size={14} /> Cancelar</> : <><Plus size={14} /> Nova rotina</>}
+                </button>
+              )}
+              {total > 0 && (
+                <>
+                  <button
+                    className={styles.addBtn}
+                    onClick={toggleHideDone}
+                    title={hideDone ? "Mostrar feitas" : "Ocultar feitas"}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    {hideDone ? <><Eye size={14} /> Mostrar feitas</> : <><EyeOff size={14} /> Ocultar feitas</>}
+                  </button>
+                  <button className={styles.addBtn} onClick={startFocus} title="Iniciar sessão de foco" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <Play size={14} /> Foco
+                  </button>
+                </>
+              )}
+            </div>
+          )
         )}
       </div>
 
       {/* Corpo colapsável */}
-      {!collapsed && (
+      {!isCollapsed && (
         <>
-          {/* Barra de progresso */}
-          <div className={styles.progressWrap}>
-            <div className={styles.progressBar}>
-              <div className={`${styles.progressFill} ${allDone ? styles.progressFillDone : ""}`} style={{ width: `${pct}%` }} />
+          {/* Formulário inline de nova rotina (recorrência já pré-selecionada) */}
+          {showForm && onCreateRoutine && (
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+              <AddTaskForm
+                enableChecklist
+                initialRecurrence="daily"
+                draftKey="dailyRoutine_draft"
+                titlePlaceholder="Nome da rotina (ex.: Ler 20 páginas) *"
+                onCancel={() => setShowForm(false)}
+                onSubmit={async (task, opts) => {
+                  await onCreateRoutine(task);
+                  if (!opts?.keepOpen) setShowForm(false);
+                }}
+              />
             </div>
-            <span className={styles.progressLabel}>
-              {done} de {total} feita{total !== 1 ? "s" : ""} hoje
-            </span>
-          </div>
+          )}
+
+          {total === 0 ? (
+            <div style={{ padding: "16px", fontSize: 13, color: "var(--text-muted)", textAlign: "center" }}>
+              Nenhuma rotina ainda — crie a primeira em “Nova rotina”.
+            </div>
+          ) : (
+          <>
+          {/* Barra de progresso — no mobile ela vive no card "Seu progresso hoje". */}
+          {!isMobile && (
+            <div className={styles.progressWrap}>
+              <div className={styles.progressBar}>
+                <div className={`${styles.progressFill} ${allDone ? styles.progressFillDone : ""}`} style={{ width: `${pct}%` }} />
+              </div>
+              <span className={styles.progressLabel}>
+                {done} de {total} feita{total !== 1 ? "s" : ""} hoje
+              </span>
+            </div>
+          )}
 
           {allDone && (
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, padding: "8px 12px", fontSize: 13, color: "var(--success)" }}>
@@ -230,6 +361,8 @@ export default function DailyRoutinePanel({
               />
             ))}
           </div>
+          </>
+          )}
         </>
       )}
     </div>
@@ -255,6 +388,7 @@ function RoutineItem({
   task, history, busy, onComplete, onReopen, onToggleChecklist,
   dragging, onDragStart, onDragEnd, onDropItem, onOpenDetail,
 }: RoutineItemProps): JSX.Element {
+  const isMobile = useIsMobile();
   const [expanded, setExpanded] = useState<boolean>(false);
   const dotColor = PRIORITY_COLORS[task.priority] || "var(--text-muted)";
   const isDone = task.completed;
@@ -279,24 +413,28 @@ function RoutineItem({
       onDrop={onDropItem}
       style={{ opacity: dragging ? 0.5 : 1 }}
     >
-      <span className={styles.priorityBar} style={{ background: isDone ? "var(--success)" : dotColor }} aria-hidden />
+      {!isMobile && (
+        <span className={styles.priorityBar} style={{ background: isDone ? "var(--success)" : dotColor }} aria-hidden />
+      )}
       <div className={`${styles.taskItem} ${isDone ? styles.taskDone : ""}`}>
-        {/* Alça de arraste */}
-        <span
-          title="Arraste para reordenar"
-          style={{ display: "inline-flex", cursor: "grab", color: "var(--text-muted)", userSelect: "none" }}
-        >
-          <GripVertical size={14} />
-        </span>
+        {/* Alça de arraste — no mobile o toque é para abrir/concluir, não arrastar. */}
+        {!isMobile && (
+          <span
+            title="Arraste para reordenar"
+            style={{ display: "inline-flex", cursor: "grab", color: "var(--text-muted)", userSelect: "none" }}
+          >
+            <GripVertical size={14} />
+          </span>
+        )}
 
         {/* Concluir / reabrir */}
         <button
           className={styles.checkBtn}
           disabled={busy}
           style={{
-            borderColor: isDone ? "var(--success)" : "var(--border)",
+            borderColor: isDone ? "var(--progress)" : "var(--border)",
             color: "#fff",
-            background: isDone ? "var(--success)" : "transparent",
+            background: isDone ? "var(--progress)" : "transparent",
             opacity: busy ? 0.5 : 1,
           }}
           onClick={() => {
@@ -321,41 +459,51 @@ function RoutineItem({
           style={onOpenDetail ? { cursor: "pointer" } : undefined}
         >
           <span className={styles.taskTitle}>{task.title}</span>
-          <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            {streak > 0 && (
-              <span
-                title={`${streak} dia(s) seguido(s)`}
-                style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, fontWeight: 600, color: "#f0a540" }}
-              >
-                <Flame size={11} /> {streak}
-              </span>
-            )}
-            {task.recurrence === "weekdays" && (
-              <span className={styles.taskSub}>dias úteis</span>
-            )}
-            {hasSubtasks && (
-              <span className={styles.taskSub}>
-                {task.checklist_completed_count}/{task.checklist_count} subtarefas
-              </span>
-            )}
-            {/* Mini-heatmap dos últimos 7 dias */}
-            <span style={{ display: "inline-flex", gap: 2 }}>
-              {week.map((d, i) => (
+          {/* Mobile: a linha é só título + chama (o resto polui numa tela estreita). */}
+          {!isMobile && (
+            <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {streak > 0 && (
                 <span
-                  key={i}
-                  title={`${d.iso}${d.done ? " ✓" : ""}`}
-                  style={{
-                    width: 10, height: 10, borderRadius: 3,
-                    background: d.done ? "var(--success)" : "var(--border)",
-                    opacity: i === 6 && !d.done ? 0.9 : d.done ? 1 : 0.45,
-                    outline: i === 6 ? "1.5px solid var(--accent)" : "none",
-                    outlineOffset: i === 6 ? 1 : 0,
-                  }}
-                />
-              ))}
+                  title={`${streak} dia(s) seguido(s)`}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, fontWeight: 600, color: "var(--streak)" }}
+                >
+                  <Flame size={11} /> {streak}
+                </span>
+              )}
+              {task.recurrence === "weekdays" && (
+                <span className={styles.taskSub}>dias úteis</span>
+              )}
+              {hasSubtasks && (
+                <span className={styles.taskSub}>
+                  {task.checklist_completed_count}/{task.checklist_count} subtarefas
+                </span>
+              )}
+              {/* Mini-heatmap dos últimos 7 dias */}
+              <span style={{ display: "inline-flex", gap: 2 }}>
+                {week.map((d, i) => (
+                  <span
+                    key={i}
+                    title={`${d.iso}${d.done ? " ✓" : ""}`}
+                    style={{
+                      width: 10, height: 10, borderRadius: 3,
+                      background: d.done ? "var(--progress)" : "var(--border)",
+                      opacity: i === 6 && !d.done ? 0.9 : d.done ? 1 : 0.45,
+                      outline: i === 6 ? "1.5px solid var(--accent)" : "none",
+                      outlineOffset: i === 6 ? 1 : 0,
+                    }}
+                  />
+                ))}
+              </span>
             </span>
-          </span>
+          )}
         </div>
+
+        {/* Mobile: sequência da rotina à direita, em laranja. */}
+        {isMobile && streak > 0 && (
+          <span className={styles.streakPill} title={`${streak} dia(s) seguido(s)`}>
+            <Flame size={12} /> {streak} {streak === 1 ? "dia" : "dias"}
+          </span>
+        )}
 
         {/* Expandir subtarefas */}
         {hasSubtasks && onToggleChecklist && (

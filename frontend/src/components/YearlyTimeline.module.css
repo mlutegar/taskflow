@@ -1,0 +1,94 @@
+.timeline {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--card-bg, #fff);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e0e0e0);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary, #333);
+}
+
+.streak {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--critical, #ff5252);
+  font-weight: 500;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.itemCompleted {
+  background: var(--success-bg, #e8f5e9);
+  color: var(--success-text, #2e7d32);
+}
+
+.itemCurrent {
+  background: var(--warning-bg, #fff3e0);
+  color: var(--warning-text, #ef6c00);
+  font-weight: 500;
+}
+
+.itemPending {
+  background: var(--info-bg, #e3f2fd);
+  color: var(--info-text, #1565c0);
+}
+
+.itemSkipped {
+  background: var(--muted-bg, #f5f5f5);
+  color: var(--text-muted, #757575);
+  opacity: 0.7;
+}
+
+.icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.year {
+  font-weight: 600;
+  min-width: 3rem;
+}
+
+.detail {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+@media (max-width: 640px) {
+  .timeline {
+    padding: 0.75rem;
+  }
+
+  .list li {
+    gap: 0.5rem;
+    padding: 0.4rem;
+  }
+
+  .detail {
+    font-size: 0.8rem;
+  }
+}

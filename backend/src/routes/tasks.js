@@ -16,13 +16,15 @@ import {
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 const ALLOWED_SORTS = new Set(["due_date_asc", "due_date", "due_date_desc", "created", "priority", "estimated"]);
 
-const recurrenceValues = ["daily", "weekdays", "weekly", "biweekly", "monthly", "monthly_first", "custom"];
+const recurrenceValues = ["daily", "weekdays", "weekly", "biweekly", "monthly", "monthly_first", "yearly", "custom"];
 const recurrenceRuleSchema = z.object({
   type: z.enum(["interval", "weekdays"]).optional(),
   intervalDays: z.number().int().min(1).max(365).optional(),
   weekdays: z.array(z.number().int().min(0).max(6)).max(7).optional(),
   skipWeekends: z.boolean().optional(),
   skipHolidays: z.boolean().optional(),
+  reminderDaysBefore: z.number().int().min(0).max(365).optional(),
+  birthdayYear: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
 }).optional().nullable();
 
 const createTaskSchema = z.object({
@@ -39,6 +41,7 @@ const createTaskSchema = z.object({
   actual_minutes: z.number().int().min(0).max(10080).optional().nullable(),
   orbita_projects: z.array(z.string().max(500)).max(50).optional().nullable(),
   orbita_prompt: z.string().max(10000).optional().nullable(),
+  assigned_to: z.string().uuid().optional().nullable(),
 });
 
 const updateTaskSchema = z.object({
@@ -56,12 +59,63 @@ const updateTaskSchema = z.object({
   actual_minutes: z.number().int().min(0).max(10080).optional().nullable(),
   orbita_projects: z.array(z.string().max(500)).max(50).optional().nullable(),
   orbita_prompt: z.string().max(10000).optional().nullable(),
+  assigned_to: z.string().uuid().optional().nullable(),
   // Versão esperada pelo cliente. Se enviada e divergir da do servidor,
   // a edição é rejeitada com 409 (outra aba/dispositivo alterou antes).
   version:      z.number().int().min(0).optional(),
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Recorrências que contam como "rotina" no painel/heatmap da aba Tarefas. */
+const ROUTINE_RECURRENCES = ["daily", "weekdays"];
+/** Teto do período pedido no heatmap (~13 meses). */
+const MAX_CONSISTENCY_DAYS = 400;
+/** Teto do histórico varrido para calcular a melhor sequência (~3 anos). */
+const MAX_HISTORY_DAYS = 1100;
+
+/** Soma dias a uma data ISO (YYYY-MM-DD), sem sofrer com fuso/DST. */
+function shiftISO(isoDate, days) {
+  const base = new Date(`${isoDate}T00:00:00.000Z`);
+  base.setUTCDate(base.getUTCDate() + days);
+  return base.toISOString().slice(0, 10);
+}
+
+/** Diferença em dias entre duas datas ISO (to - from). */
+function diffISO(fromISO, toISO) {
+  const a = Date.parse(`${fromISO}T00:00:00.000Z`);
+  const b = Date.parse(`${toISO}T00:00:00.000Z`);
+  return Math.round((b - a) / 86_400_000);
+}
+
+/**
+ * Maior sequência de dias 100% concluídos. Dias sem rotina agendada são
+ * neutros: não contam e não quebram a sequência.
+ *
+ * `onlyIndex` restringe o cálculo a uma rotina específica (usado para o filtro
+ * "por rotina" do heatmap); sem ele, considera todas as rotinas do dia.
+ */
+function bestFullDayStreak(days, onlyIndex = null) {
+  let best = 0;
+  let run = 0;
+  for (const day of days) {
+    const expected = onlyIndex === null
+      ? day.expected.length
+      : (day.expected.includes(onlyIndex) ? 1 : 0);
+    if (expected === 0) continue;
+    const completed = onlyIndex === null
+      ? day.completed.length
+      : (day.completed.includes(onlyIndex) ? 1 : 0);
+    if (completed >= expected) {
+      run += 1;
+      if (run > best) best = run;
+    } else {
+      run = 0;
+    }
+  }
+  return best;
+}
+
 async function requestCalendar(req) {
   const headerZone = req.headers["x-timezone"];
   if (headerZone) {
@@ -102,7 +156,7 @@ async function validateProject(userId, projectId) {
 async function reactivateDueRecurringTasks(userId, today) {
   const due = await prisma.task.findMany({
     where: {
-      userId,
+      createdBy: userId,
       completed: true,
       recurrence: { not: null },
       dueDate: { lte: storedDate(today) },
@@ -114,7 +168,7 @@ async function reactivateDueRecurringTasks(userId, today) {
   const ids = due.map((task) => task.id);
   await prisma.$transaction([
     prisma.task.updateMany({
-      where: { id: { in: ids }, userId },
+      where: { id: { in: ids }, createdBy: userId },
       data: { completed: false, completedAt: null },
     }),
     prisma.checklistItem.updateMany({
@@ -130,7 +184,7 @@ async function reactivateDueRecurringTasks(userId, today) {
 async function normalizePreviouslyCompletedRecurrences(userId, today) {
   await prisma.task.updateMany({
     where: {
-      userId,
+      createdBy: userId,
       completed: false,
       completedAt: { not: null },
       recurrence: { not: null },
@@ -165,6 +219,8 @@ function shapeTask(task) {
   const checklist = (task.checklist ?? []).sort((a, b) => a.order - b.order || Number(a.id) - Number(b.id));
   return {
     ...task,
+    created_by: task.createdBy,
+    assigned_to: task.assignedTo ?? null,
     due_date: task.dueDate?.toISOString().slice(0, 10) ?? null,
     due_time: task.dueTime ?? null,
     project_id: task.projectId ?? null,
@@ -245,7 +301,7 @@ export default async function tasksRoutes(fastify) {
 
   // GET /tasks
   fastify.get("/", async (req) => {
-    const { status, sort: rawSort, project_id: projectId, time: rawTime } = req.query;
+    const { status, sort: rawSort, project_id: projectId, time: rawTime, assigned_to, priorities, due_filter } = req.query;
     const userId = req.userId;
 
     const { today } = await requestCalendar(req);
@@ -255,7 +311,7 @@ export default async function tasksRoutes(fastify) {
     // Whitelist de valores permitidos para sort
     const sort = ALLOWED_SORTS.has(rawSort) ? rawSort : "priority";
 
-    const where = { userId, deletedAt: null };
+    const where = { createdBy: userId, deletedAt: null };
     if (status === "active") where.completed = false;
     else if (status === "today") {
       where.OR = [
@@ -274,6 +330,7 @@ export default async function tasksRoutes(fastify) {
       where.dueDate = { gt: storedDate(today) };
     }
     else if (status === "completed") where.completed = true;
+    else if (status === "yearly") where.recurrence = "yearly";
 
     if (projectId === "none") {
       where.projectId = null;
@@ -281,6 +338,45 @@ export default async function tasksRoutes(fastify) {
       const ids = await projectAndDescendantIds(userId, projectId);
       if (!ids) return [];
       where.projectId = { in: ids };
+    }
+
+    // Filtro por responsável
+    if (assigned_to === "me") {
+      where.OR = [
+        { assignedTo: userId },
+        { assignedTo: null },
+      ];
+    } else if (assigned_to === "none") {
+      where.assignedTo = null;
+    } else if (assigned_to) {
+      // UUID específico (futuro: multi-user)
+      where.assignedTo = assigned_to;
+    }
+
+    // Filtro por prioridades (multisseleção: "1,2")
+    if (priorities) {
+      const prioList = priorities.split(",").map(Number).filter((p) => p >= 1 && p <= 4);
+      if (prioList.length > 0) {
+        where.priority = { in: prioList };
+      }
+    }
+
+    // Filtro por vencimento
+    if (due_filter === "overdue") {
+      where.dueDate = { lt: storedDate(today) };
+      where.completed = false;
+    } else if (due_filter === "today") {
+      where.dueDate = storedDate(today);
+    } else if (due_filter === "this_week") {
+      const todayDate = new Date(today);
+      const endOfWeek = new Date(todayDate);
+      endOfWeek.setDate(todayDate.getDate() + (7 - todayDate.getDay()));
+      where.dueDate = {
+        gte: storedDate(today),
+        lte: storedDate(endOfWeek.toISOString().slice(0, 10)),
+      };
+    } else if (due_filter === "no_date") {
+      where.dueDate = null;
     }
 
     // Filtro por tempo estimado (faixas) — limites vêm de taskEstimatedTime.js
@@ -316,14 +412,14 @@ export default async function tasksRoutes(fastify) {
   // Busca granular usada pelos eventos em tempo real, sem recarregar a lista toda.
   fastify.get("/:id", async (req, reply) => {
     const task = await prisma.task.findFirst({
-      where: { id: req.params.id, userId: req.userId, deletedAt: null }, include: { checklist: true },
+      where: { id: req.params.id, createdBy: req.userId, deletedAt: null }, include: { checklist: true },
     });
     if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });
     return shapeTask(task);
   });
 
   fastify.get("/:id/changes", async (req, reply) => {
-    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: req.userId }, select: { id: true } });
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, createdBy: req.userId }, select: { id: true } });
     const hasHistory = await prisma.taskChange.findFirst({ where: { taskId: req.params.id, userId: req.userId }, select: { id: true } });
     if (!task && !hasHistory) return reply.status(404).send({ error: "Tarefa não encontrada." });
     const rows = await prisma.taskChange.findMany({
@@ -377,7 +473,7 @@ export default async function tasksRoutes(fastify) {
         details: parsed.error.flatten().fieldErrors,
       });
     }
-    const { client_id, title, description, priority, due_date, due_time, recurrence, recurrence_rule, project_id, estimated_minutes, actual_minutes, orbita_projects, orbita_prompt } = parsed.data;
+    const { client_id, title, description, priority, due_date, due_time, recurrence, recurrence_rule, project_id, estimated_minutes, actual_minutes, orbita_projects, orbita_prompt, assigned_to } = parsed.data;
     if (!(await validateProject(req.userId, project_id))) {
       return reply.status(400).send({ error: "Projeto inválido ou arquivado." });
     }
@@ -386,7 +482,7 @@ export default async function tasksRoutes(fastify) {
     let estimatedMinutes = estimated_minutes ?? null;
     if (estimatedMinutes == null && project_id) {
       const project = await prisma.project.findFirst({
-        where: { id: project_id, userId: req.userId }, select: { defaultEstimatedMinutes: true },
+        where: { id: project_id, createdBy: req.userId }, select: { defaultEstimatedMinutes: true },
       });
       estimatedMinutes = project?.defaultEstimatedMinutes ?? null;
     }
@@ -394,7 +490,8 @@ export default async function tasksRoutes(fastify) {
     const task = await prisma.task.create({
       data: {
         ...(client_id ? { id: client_id } : {}),
-        userId: req.userId,
+        createdBy: req.userId,
+        assignedTo: assigned_to ?? req.userId,
         title,
         description,
         priority: priority ?? 4,
@@ -444,6 +541,7 @@ export default async function tasksRoutes(fastify) {
     if (body.actual_minutes !== undefined) data.actualMinutes = body.actual_minutes ?? null;
     if (body.orbita_projects !== undefined) data.orbitaProjects = body.orbita_projects?.length ? JSON.stringify(body.orbita_projects) : null;
     if (body.orbita_prompt !== undefined) data.orbitaPrompt = body.orbita_prompt ?? null;
+    if (body.assigned_to !== undefined) data.assignedTo = body.assigned_to || null;
     if (body.project_id !== undefined) {
       if (!(await validateProject(req.userId, body.project_id))) {
         return reply.status(400).send({ error: "Projeto inválido ou arquivado." });
@@ -451,7 +549,7 @@ export default async function tasksRoutes(fastify) {
       data.projectId = body.project_id || null;
     }
 
-    const existing = await prisma.task.findFirst({ where: { id, userId: req.userId } });
+    const existing = await prisma.task.findFirst({ where: { id, createdBy: req.userId } });
     if (!existing) return reply.status(404).send({ error: "Tarefa não encontrada." });
 
     // Versionamento otimista: se o cliente informou a versão que tinha em mãos
@@ -470,12 +568,12 @@ export default async function tasksRoutes(fastify) {
     data.version = { increment: 1 };
     if (body.version !== undefined) {
       const changed = await prisma.task.updateMany({
-        where: { id, userId: req.userId, version: body.version },
+        where: { id, createdBy: req.userId, version: body.version },
         data,
       });
       if (changed.count === 0) {
         syncMetric("conflicts");
-        const current = await prisma.task.findFirst({ where: { id, userId: req.userId }, include: { checklist: true } });
+        const current = await prisma.task.findFirst({ where: { id, createdBy: req.userId }, include: { checklist: true } });
         if (!current) return reply.status(404).send({ error: "Tarefa não encontrada." });
         return reply.status(409).send({
           error: "Esta tarefa foi alterada em outro lugar. Recarregamos a versão mais recente.",
@@ -485,7 +583,7 @@ export default async function tasksRoutes(fastify) {
     } else {
       await prisma.task.update({ where: { id }, data });
     }
-    const task = await prisma.task.findFirst({ where: { id, userId: req.userId }, include: { checklist: true } });
+    const task = await prisma.task.findFirst({ where: { id, createdBy: req.userId }, include: { checklist: true } });
     const before = shapeTask({ ...existing, checklist: [] });
     const after = shapeTask({ ...task, checklist: task.checklist });
     await recordTaskChange({ userId: req.userId, taskId: id, action: "update", before, after });
@@ -495,7 +593,7 @@ export default async function tasksRoutes(fastify) {
   // DELETE /tasks/:id
   fastify.delete("/:id", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id } = req.params;
-    const existing = await prisma.task.findFirst({ where: { id, userId: req.userId, deletedAt: null }, include: { checklist: true } });
+    const existing = await prisma.task.findFirst({ where: { id, createdBy: req.userId, deletedAt: null }, include: { checklist: true } });
     if (!existing) return reply.status(404).send({ error: "Tarefa não encontrada." });
     await prisma.task.update({ where: { id }, data: { deletedAt: new Date(), version: { increment: 1 } } });
     await recordTaskChange({ userId: req.userId, taskId: id, action: "delete", before: shapeTask(existing) });
@@ -503,7 +601,7 @@ export default async function tasksRoutes(fastify) {
   });
 
   fastify.post("/:id/restore", MUTATION_RATE_LIMIT, async (req, reply) => {
-    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: req.userId, deletedAt: { not: null } }, include: { checklist: true } });
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, createdBy: req.userId, deletedAt: { not: null } }, include: { checklist: true } });
     if (!task) return reply.status(404).send({ error: "Tarefa excluída não encontrada." });
     const restored = await prisma.task.update({
       where: { id: task.id }, data: { deletedAt: null, version: { increment: 1 } }, include: { checklist: true },
@@ -518,7 +616,7 @@ export default async function tasksRoutes(fastify) {
     const { id } = req.params;
     const { timeZone, today } = await requestCalendar(req);
     const result = await prisma.$transaction(async (tx) => {
-      const task = await tx.task.findFirst({ where: { id, userId: req.userId }, include: { checklist: true } });
+      const task = await tx.task.findFirst({ where: { id, createdBy: req.userId }, include: { checklist: true } });
       if (!task) return null;
 
       // Idempotência: toque duplo não avança a recorrência duas vezes.
@@ -595,7 +693,7 @@ export default async function tasksRoutes(fastify) {
 
   // GET /tasks/:id/history
   fastify.get("/:id/history", async (req, reply) => {
-    const task = await prisma.task.findFirst({ where: { id: req.params.id, userId: req.userId }, select: { id: true } });
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, createdBy: req.userId }, select: { id: true } });
     if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });
     const rows = await prisma.taskCompletion.findMany({
       where: { taskId: task.id, userId: req.userId }, orderBy: { completedAt: "desc" }, take: 90,
@@ -611,7 +709,7 @@ export default async function tasksRoutes(fastify) {
   // POST /tasks/:id/reopen
   fastify.post("/:id/reopen", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id } = req.params;
-    const existing = await prisma.task.findFirst({ where: { id, userId: req.userId } });
+    const existing = await prisma.task.findFirst({ where: { id, createdBy: req.userId } });
     if (!existing) return reply.status(404).send({ error: "Tarefa não encontrada." });
 
     const latest = await prisma.taskCompletion.findFirst({
@@ -638,7 +736,7 @@ export default async function tasksRoutes(fastify) {
 
     const tasks = await prisma.task.findMany({
       where: {
-        userId: req.userId,
+        createdBy: req.userId,
         completed: false,
         dueDate: storedDate(today),
       },
@@ -662,6 +760,113 @@ export default async function tasksRoutes(fastify) {
     return { count };
   });
 
+  /**
+   * GET /tasks/routines/consistency?from=YYYY-MM-DD&to=YYYY-MM-DD
+   *
+   * Heatmap de consistência das rotinas (aba Tarefas). "Rotina" = tarefa com
+   * recorrência `daily` ou `weekdays` — o mesmo critério do painel Rotina Diária.
+   *
+   * Faz DUAS queries agregadas (rotinas + conclusões) e devolve, por dia:
+   *   expected  = ÍNDICES (em `routines`) das rotinas que se aplicavam ao dia
+   *   completed = índices das que foram concluídas (undone não conta)
+   *
+   * Índices em vez de UUIDs porque o payload de 1 ano × N rotinas fica pequeno,
+   * e com eles o cliente monta o tooltip ("quais rotinas") e filtra por rotina
+   * sem refetch nenhum.
+   *
+   * `best_streak` considera TODO o histórico, não apenas o período pedido.
+   */
+  fastify.get("/routines/consistency", async (req) => {
+    const { timeZone, today } = await requestCalendar(req);
+    const ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+    const rawTo = req.query?.to;
+    const to = ISO.test(rawTo ?? "") && rawTo < today ? rawTo : today;
+    const rawFrom = req.query?.from;
+    let from = ISO.test(rawFrom ?? "") ? rawFrom : shiftISO(to, -179);
+    if (from > to) from = to;
+    if (diffISO(from, to) > MAX_CONSISTENCY_DAYS) from = shiftISO(to, -MAX_CONSISTENCY_DAYS);
+
+    const routines = await prisma.task.findMany({
+      where: {
+        createdBy: req.userId,
+        deletedAt: null,
+        recurrence: { in: ROUTINE_RECURRENCES },
+      },
+      select: { id: true, title: true, recurrence: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
+    });
+    if (routines.length === 0) {
+      // Sem rotinas ainda: devolve o período inteiro em branco para a grade
+      // renderizar cinza em vez de colapsar.
+      const blank = [];
+      for (let day = from; day <= to; day = shiftISO(day, 1)) {
+        blank.push({ date: day, expected: [], completed: [] });
+      }
+      return { from, to, routines: [], days: blank, best_streak: 0, best_streak_by_routine: [] };
+    }
+
+    const born = routines.map((r) => ({
+      recurrence: r.recurrence,
+      since: dateInTimeZone(r.createdAt, timeZone),
+    }));
+
+    // Janela completa = desde a rotina mais antiga (teto de MAX_HISTORY_DAYS).
+    const oldest = born.reduce((min, r) => (r.since < min ? r.since : min), today);
+    const historyFloor = shiftISO(to, -MAX_HISTORY_DAYS);
+    const history = oldest < historyFloor ? historyFloor : oldest;
+    // ...mas nunca depois de `from`: `days` precisa cobrir o período PEDIDO por
+    // inteiro. Sem isso, um usuário cuja rotina mais antiga nasceu hoje recebia
+    // um único dia e o heatmap desenhava uma célula só. Dias anteriores à
+    // criação saem com `expected: []` → célula neutra, que é o correto.
+    const start = from < history ? from : history;
+
+    const completions = await prisma.taskCompletion.findMany({
+      where: {
+        userId: req.userId,
+        undoneAt: null,
+        taskId: { in: routines.map((r) => r.id) },
+        scheduledFor: { gte: storedDate(start), lte: storedDate(to) },
+      },
+      select: { taskId: true, scheduledFor: true },
+    });
+
+    // Dedup: a mesma rotina concluída 2x no mesmo dia conta uma vez só.
+    const doneByDay = new Map();
+    for (const row of completions) {
+      if (!row.scheduledFor) continue;
+      const day = row.scheduledFor.toISOString().slice(0, 10);
+      if (!doneByDay.has(day)) doneByDay.set(day, new Set());
+      doneByDay.get(day).add(row.taskId);
+    }
+
+    const all = [];
+    for (let day = start; day <= to; day = shiftISO(day, 1)) {
+      const dow = new Date(`${day}T00:00:00.000Z`).getUTCDay(); // 0=dom … 6=sáb
+      const doneToday = doneByDay.get(day);
+      const expected = [];
+      const completed = [];
+      born.forEach((r, i) => {
+        if (r.since > day) return;
+        if (r.recurrence === "weekdays" && (dow === 0 || dow === 6)) return;
+        expected.push(i);
+        if (doneToday?.has(routines[i].id)) completed.push(i);
+      });
+      all.push({ date: day, expected, completed });
+    }
+
+    return {
+      from,
+      to,
+      routines: routines.map((r) => ({ id: r.id, title: r.title, recurrence: r.recurrence })),
+      days: all.filter((d) => d.date >= from),
+      best_streak: bestFullDayStreak(all),
+      // Melhor sequência de cada rotina isolada, para o filtro "por rotina"
+      // continuar mostrando o recorde de todo o histórico (e não só do período).
+      best_streak_by_routine: routines.map((_, i) => bestFullDayStreak(all, i)),
+    };
+  });
+
   // POST /tasks/:id/checklist
   fastify.post("/:id/checklist", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id: taskId } = req.params;
@@ -671,7 +876,7 @@ export default async function tasksRoutes(fastify) {
       return reply.status(400).send({ error: "Descrição do item é obrigatória." });
     }
 
-    const task = await prisma.task.findFirst({ where: { id: taskId, userId: req.userId } });
+    const task = await prisma.task.findFirst({ where: { id: taskId, createdBy: req.userId } });
     if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });
 
     const count = await prisma.checklistItem.count({
@@ -689,12 +894,56 @@ export default async function tasksRoutes(fastify) {
     return item;
   });
 
+  // POST /tasks/:id/checklist/batch — adicionar múltiplos itens de uma vez
+  fastify.post("/:id/checklist/batch", MUTATION_RATE_LIMIT, async (req, reply) => {
+    const { id: taskId } = req.params;
+    const { items } = req.body ?? {};
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return reply.status(400).send({ error: "Array de itens obrigatório." });
+    }
+
+    const task = await prisma.task.findFirst({ where: { id: taskId, createdBy: req.userId } });
+    if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });
+
+    const baseCount = await prisma.checklistItem.count({ where: { taskId } });
+
+    const created = await prisma.$transaction([
+      ...items
+        .filter(item => item.description?.trim())
+        .map((item, index) =>
+          prisma.checklistItem.create({
+            data: {
+              taskId,
+              description: item.description.trim(),
+              parentId: item.parent_id ? BigInt(item.parent_id) : null,
+              order: baseCount + index,
+            },
+          })
+        ),
+      prisma.task.update({ where: { id: taskId }, data: { version: { increment: 1 } } }),
+    ]);
+
+    // Remove o último item (que é a atualização da task)
+    const newItems = created.slice(0, -1);
+
+    await recordTaskChange({
+      userId: req.userId,
+      taskId,
+      action: "checklist-batch-add",
+      after: { count: newItems.length, items: newItems }
+    });
+
+    reply.status(201);
+    return newItems;
+  });
+
   // PATCH /tasks/:id/checklist/:itemId
   fastify.patch("/:id/checklist/:itemId", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id: taskId, itemId } = req.params;
     const { description, note } = req.body ?? {};
 
-    const task = await prisma.task.findFirst({ where: { id: taskId, userId: req.userId } });
+    const task = await prisma.task.findFirst({ where: { id: taskId, createdBy: req.userId } });
     if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });
     const existingItem = await prisma.checklistItem.findFirst({ where: { id: BigInt(itemId), taskId } });
     if (!existingItem) return reply.status(404).send({ error: "Item não encontrado." });
@@ -715,7 +964,7 @@ export default async function tasksRoutes(fastify) {
   fastify.patch("/:id/checklist/:itemId/toggle", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id: taskId, itemId } = req.params;
 
-    const task = await prisma.task.findFirst({ where: { id: taskId, userId: req.userId } });
+    const task = await prisma.task.findFirst({ where: { id: taskId, createdBy: req.userId } });
     if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });
 
     const current = await prisma.checklistItem.findFirst({ where: { id: BigInt(itemId), taskId } });
@@ -732,11 +981,38 @@ export default async function tasksRoutes(fastify) {
     return item;
   });
 
+  // PATCH /tasks/:id/checklist/:itemId/order — reordenar item
+  fastify.patch("/:id/checklist/:itemId/order", MUTATION_RATE_LIMIT, async (req, reply) => {
+    const { id: taskId, itemId } = req.params;
+    const { newOrder } = req.body ?? {};
+
+    if (typeof newOrder !== "number") {
+      return reply.status(400).send({ error: "newOrder deve ser um número." });
+    }
+
+    const task = await prisma.task.findFirst({ where: { id: taskId, createdBy: req.userId } });
+    if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });
+
+    const existingItem = await prisma.checklistItem.findFirst({ where: { id: BigInt(itemId), taskId } });
+    if (!existingItem) return reply.status(404).send({ error: "Item não encontrado." });
+
+    const [item] = await prisma.$transaction([
+      prisma.checklistItem.update({
+        where: { id: BigInt(itemId) },
+        data: { order: newOrder },
+      }),
+      prisma.task.update({ where: { id: taskId }, data: { version: { increment: 1 } } }),
+    ]);
+
+    await recordTaskChange({ userId: req.userId, taskId, action: "checklist-reorder", before: existingItem, after: item });
+    return item;
+  });
+
   // DELETE /tasks/:id/checklist/:itemId
   fastify.delete("/:id/checklist/:itemId", MUTATION_RATE_LIMIT, async (req, reply) => {
     const { id: taskId, itemId } = req.params;
 
-    const task = await prisma.task.findFirst({ where: { id: taskId, userId: req.userId } });
+    const task = await prisma.task.findFirst({ where: { id: taskId, createdBy: req.userId } });
     if (!task) return reply.status(404).send({ error: "Tarefa não encontrada." });
 
     const item = await prisma.checklistItem.findFirst({ where: { id: BigInt(itemId), taskId } });

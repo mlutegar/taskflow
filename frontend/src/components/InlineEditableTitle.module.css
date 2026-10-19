@@ -1,0 +1,37 @@
+.title {
+  margin: 0 0 20px 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: text;
+  padding: 8px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.title:hover {
+  background: var(--surface-hover);
+}
+
+.title:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-secondary);
+}
+
+.input {
+  width: 100%;
+  margin: 0 0 20px 0;
+  padding: 8px;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface);
+  border: 2px solid var(--primary);
+  border-radius: 8px;
+  outline: none;
+  font-family: inherit;
+}
+
+.input::placeholder {
+  color: var(--text-secondary);
+}

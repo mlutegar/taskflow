@@ -7,6 +7,8 @@ import RecurrenceFields, { RecurrenceRule } from "./RecurrenceFields";
 import { todayISO } from "../lib/dateUtils";
 import { Project } from "../api/projects";
 import ProjectSelect from "./ProjectSelect";
+import { useIsMobile } from "../hooks/useIsMobile";
+import { ChevronRight } from "lucide-react";
 
 /* Vibração tátil curta (ignorada se browser não suportar) */
 function haptic(ms: number = 10): void {
@@ -271,6 +273,7 @@ interface TodayTaskItemProps {
 }
 
 function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist, onUpdate, projects, onOpenDetail, index, isDragging, onDragStart, onDragEnd, onDropAt }: TodayTaskItemProps) {
+  const isMobile = useIsMobile();
   const [expanded, setExpanded] = useState<boolean>(false);
   const [editing, setEditing] = useState<boolean>(false);
   const dotColor = PRIORITY_COLORS[task.priority] || "var(--text-muted)";
@@ -370,6 +373,14 @@ function TodayTaskItem({ task, onComplete, onReopen, onRemove, onToggleChecklist
             </button>
           )}
 
+          {/* Mobile: chevron indicando que a linha abre o detalhe (os botões
+              de editar/remover ficam no próprio detalhe). */}
+          {isMobile && onOpenDetail && (
+            <span className={styles.chevron} aria-hidden>
+              <ChevronRight size={18} />
+            </span>
+          )}
+
           {/* Editar */}
           <button
             className={styles.editBtn}
@@ -430,6 +441,7 @@ interface TodayPanelProps {
 }
 
 export default function TodayPanel({ tasks, completedToday = 0, onComplete, onReopen, onToggleChecklist, onUpdate, projects = [], onOpenDetail, forceExpanded = false, onSelectionChange, reloadSignal = 0 }: TodayPanelProps) {
+  const isMobile = useIsMobile();
   // Inicia com o cache local para evitar flash, depois sincroniza com o BD
   const [todayIds, setTodayIds] = useState<string[]>(loadCachedIds);
   const [showPicker, setShowPicker] = useState<boolean>(false);
@@ -567,29 +579,33 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
 
   const completedCount = todayTasks.filter((t) => t.completed).length;
   const canAdd = count < DAILY_LIMIT;
+  // Sem botão de recolher no mobile, um "recolhido" herdado travaria o card.
+  const isCollapsed = isMobile ? false : collapsed;
   const pct = count > 0 ? Math.round((completedCount / count) * 100) : 0;
 
   return (
-    <div className={styles.panel}>
+    <div className={`${styles.panel} ${isMobile ? styles.panelMobile : ""}`}>
       {/* Cabeçalho */}
       <div className={styles.header}>
         <div className={styles.titleRow}>
           {/* Botão colapsar */}
-          <button
-            className={`${styles.collapseBtn} ${collapsed ? styles.collapseBtnClosed : ""}`}
-            onClick={() => {
-              const next = !collapsed;
-              setCollapsed(next);
-              try { localStorage.setItem("todayPanel_collapsed", String(next)); } catch {}
-            }}
-            aria-label={collapsed ? "Expandir painel" : "Recolher painel"}
-            title={collapsed ? "Expandir" : "Recolher"}
-          >
-            ‹
-          </button>
-          <span className={styles.title}>Tarefas de Hoje</span>
+          {!isMobile && (
+            <button
+              className={`${styles.collapseBtn} ${collapsed ? styles.collapseBtnClosed : ""}`}
+              onClick={() => {
+                const next = !collapsed;
+                setCollapsed(next);
+                try { localStorage.setItem("todayPanel_collapsed", String(next)); } catch {}
+              }}
+              aria-label={collapsed ? "Expandir painel" : "Recolher painel"}
+              title={collapsed ? "Expandir" : "Recolher"}
+            >
+              ‹
+            </button>
+          )}
+          <span className={styles.title}>{isMobile ? "Tarefas de hoje" : "Tarefas de Hoje"}</span>
           <span className={`${styles.slot} ${count >= DAILY_LIMIT ? styles.slotFull : ""}`}>
-            {count}/{DAILY_LIMIT}
+            {count} / {DAILY_LIMIT}
           </span>
           {completedToday > 0 && (
             <span
@@ -600,7 +616,7 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
             </span>
           )}
         </div>
-        {canAdd && !collapsed && (
+        {canAdd && !isCollapsed && (
           <button className={styles.addBtn} onClick={() => setShowPicker((v) => !v)}>
             {showPicker ? "✕ Fechar" : "+ Selecionar"}
           </button>
@@ -608,7 +624,7 @@ export default function TodayPanel({ tasks, completedToday = 0, onComplete, onRe
       </div>
 
       {/* Corpo colapsável */}
-      {!collapsed && (
+      {!isCollapsed && (
         <>
           {/* Barra de progresso */}
           {count > 0 && (

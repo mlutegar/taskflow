@@ -21,7 +21,7 @@ export const taskSchema = z.object({
     .optional()
     .or(z.literal("")),
   recurrence: z
-    .enum(["", "daily", "weekdays", "weekly", "biweekly", "monthly", "monthly_first", "custom"])
+    .enum(["", "daily", "weekdays", "weekly", "biweekly", "monthly", "monthly_first", "yearly", "custom"])
     .optional(),
   recurrence_rule: z.object({
     type: z.enum(["interval", "weekdays"]).optional(),
@@ -29,6 +29,8 @@ export const taskSchema = z.object({
     weekdays: z.array(z.number().min(0).max(6)).optional(),
     skipWeekends: z.boolean().optional(),
     skipHolidays: z.boolean().optional(),
+    reminderDaysBefore: z.number().min(0).max(365).optional(),
+    birthdayYear: z.number().min(1900).max(new Date().getFullYear()).optional(),
   }).nullable().optional(),
   project_id: z.string().uuid().nullable().optional(),
   estimated_minutes: z.number().int().min(0).max(1440).nullable().optional(),

@@ -89,7 +89,7 @@ export default function BottomNav({
                 </span>
               )}
             </span>
-            <span className={styles.bottomNavLabel}>{item.label}</span>
+            <span className={styles.bottomNavLabel}>{item.shortLabel ?? item.label}</span>
           </button>
         );
       })}

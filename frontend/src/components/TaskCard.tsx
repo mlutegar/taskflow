@@ -10,6 +10,8 @@ import { formatMinutes, bucketOf, recordEstimationSample } from "../lib/estimate
 import DescriptionEditor from "./DescriptionEditor";
 import ReactMarkdown from "react-markdown";
 import type { TaskUpdateInput } from "../types/tasks";
+import { daysBetweenISO } from "../lib/dailyRoutine";
+import { todayISO } from "../lib/dateUtils";
 
 interface ChecklistNodeItem {
   id: string;
@@ -225,8 +227,14 @@ const RECURRENCE_LABELS: Record<string, string> = {
   monthly: "Todo mês",
   weekdays: "Dias úteis",
   monthly_first: "Primeiro dia do mês",
+  yearly: "Todo ano",
   custom: "Personalizada",
 };
+
+function formatDayMonth(date: string | Date): string {
+  const d = typeof date === "string" ? new Date(date + "T00:00:00") : date;
+  return d.toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+}
 
 const PRIORITY_MAP: Record<number, { label: string; cls: string }> = {
   1: { label: "Crítica", cls: "critical" },
@@ -603,9 +611,38 @@ function TaskCard({ task, onComplete, onReopen, onDelete, onUpdate, onAddCheckli
                 ✅ {completionLabel(task.completed_at)} · volta {task.due_date ? formatDate(task.due_date) : "na próxima data"}
               </span>
             ) : task.recurrence && (
-              <span className={styles.recurrenceBadge}>
-                🔄 {RECURRENCE_LABELS[task.recurrence]}
-              </span>
+              <>
+                <span className={styles.recurrenceBadge}>
+                  {task.recurrence === "yearly" && task.due_date
+                    ? (() => {
+                        const birthdayYear = task.recurrence_rule?.birthdayYear;
+                        if (birthdayYear) {
+                          const age = new Date().getFullYear() - birthdayYear;
+                          return `🎂 ${age} anos em ${formatDayMonth(task.due_date)}`;
+                        }
+                        const base = `🔄 Todo ano em ${formatDayMonth(task.due_date)}`;
+                        if (task.created_at) {
+                          const yearsSince = new Date().getFullYear() - new Date(task.created_at).getFullYear();
+                          if (yearsSince > 0) {
+                            return `${base} (${yearsSince + 1}º ano)`;
+                          }
+                        }
+                        return base;
+                      })()
+                    : `🔄 ${RECURRENCE_LABELS[task.recurrence]}`}
+                </span>
+                {task.recurrence === "yearly" && task.due_date && !task.completed && (() => {
+                  const daysUntil = daysBetweenISO(todayISO(), task.due_date);
+                  if (daysUntil > 0 && daysUntil <= 30) {
+                    return (
+                      <span className={styles.countdownBadge}>
+                        ⏳ em {daysUntil} {daysUntil === 1 ? "dia" : "dias"}
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+              </>
             )}
             {task.checklist_count !== undefined && task.checklist_count > 0 && (
               <span className={styles.metaItem}>

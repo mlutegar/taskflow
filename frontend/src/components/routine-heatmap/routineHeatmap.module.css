@@ -1,0 +1,358 @@
+/* Card "Consistência das Rotinas" — segue os tokens dos demais cards da aba Tarefas. */
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+  overflow: hidden;
+
+  /* A escala --hm-0..4 vive no tema (index.css) para acompanhar claro/escuro. */
+  --hm-none: transparent;
+  --hm-cell: 13px;
+  --hm-gap: 3px;
+}
+
+/* ── Cabeçalho ──────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.subtitle {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.rangeSelect {
+  max-width: 190px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.rangeSelect:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Pill único do mobile — abre o bottom sheet de opções. */
+.rangePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 55%;
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rangePill:active { transform: scale(0.97); }
+
+/* ── Grade ──────────────────────────────────────────────────────────────── */
+.body {
+  padding: 14px 16px 10px;
+}
+
+.gridWrap {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;      /* rola DENTRO do card, não a página */
+  overscroll-behavior-x: contain;
+  padding-bottom: 4px;
+}
+
+.dayLabels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hm-gap);
+  /* alinha com a primeira linha de células, abaixo dos rótulos de mês */
+  padding-top: 16px;
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 1;
+  padding-right: 2px;
+}
+
+.dayLabel {
+  height: var(--hm-cell);
+  line-height: var(--hm-cell);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.gridInner {
+  width: fit-content;
+}
+
+.monthRow {
+  display: flex;
+  gap: var(--hm-gap);
+  margin-bottom: 4px;
+  height: 12px;
+}
+
+.monthCell {
+  width: var(--hm-cell);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.grid {
+  display: flex;
+  gap: var(--hm-gap);
+}
+
+.week {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hm-gap);
+}
+
+.cell {
+  width: var(--hm-cell);
+  height: var(--hm-cell);
+  border-radius: 2px;
+  background: var(--hm-0);
+  border: 0;
+  padding: 0;
+}
+
+.cellEmpty { background: var(--hm-none); }
+.cellNone  { background: var(--hm-none); box-shadow: inset 0 0 0 1px var(--border); }
+.cell0 { background: var(--hm-0); }
+.cell1 { background: var(--hm-1); }
+.cell2 { background: var(--hm-2); }
+.cell3 { background: var(--hm-3); }
+.cell4 { background: var(--hm-4); }
+
+.cellInteractive { cursor: pointer; }
+.cellInteractive:hover { opacity: 0.75; }
+
+.cellToday { outline: 1.5px solid var(--accent); outline-offset: 1px; }
+
+.cellActive { outline: 1.5px solid var(--text); outline-offset: 1px; }
+
+/* ── Detalhe do dia (hover/toque) ───────────────────────────────────────── */
+.detail {
+  margin-top: 8px;
+  /* Reserva altura para a grade não "pular" quando o detalhe aparece. */
+  min-height: 58px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.detailHead {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.detailList {
+  list-style: none;
+  margin: 5px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 14px;
+}
+
+.detailItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailDone { color: var(--text); }
+
+.detailMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.detailMarkDone {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.detailMore { font-style: italic; }
+
+/* ── Rodapé / estatísticas ──────────────────────────────────────────────── */
+.stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  border-top: 1px solid var(--border);
+  padding: 10px 16px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.stat strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 14px;
+  background: var(--border);
+}
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.legendCell {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* ── Loading / vazio ────────────────────────────────────────────────────── */
+.skeletonCell {
+  background: var(--surface-2);
+  animation: hmPulse 1.3s ease-in-out infinite;
+}
+
+@keyframes hmPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.empty {
+  padding: 10px 0 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Mobile (redesign) ──────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .panel {
+    border-radius: var(--radius-lg);
+    margin-bottom: 16px;
+  }
+
+  /* Cabeçalho deixa de ser uma faixa e vira topo do card. */
+  .header {
+    background: transparent;
+    border-bottom: none;
+    padding: var(--card-pad) var(--card-pad) 10px;
+    align-items: center;
+  }
+
+  .title { font-size: 15px; }
+  .subtitle { font-size: 12px; margin-top: 3px; }
+
+  .body { padding: 4px var(--card-pad) 8px; }
+
+  /* 6 meses cabem inteiros: o JS calcula --hm-cell pela largura. */
+  .gridWrapCompact { overflow-x: auto; }
+
+  .dayLabels { padding-top: 14px; padding-right: 4px; }
+  .dayLabel { font-size: 9px; }
+  .monthCell { font-size: 9px; }
+
+  .cell { border-radius: 2px; }
+
+  .detail { min-height: 44px; margin-top: 6px; }
+
+  .stats {
+    padding: 12px var(--card-pad) var(--card-pad);
+    font-size: 12px;
+    flex-wrap: nowrap;
+  }
+
+  /* Rodapé em UMA linha: tendência à esquerda, % à direita. */
+  .statsCompact {
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .statsCompact:active { opacity: 0.7; }
+
+  .statDone { color: var(--progress); font-weight: 600; }
+  .statDone strong { color: var(--progress); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonCell { animation: none; }
+}
