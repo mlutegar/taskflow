@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 
+import { enableWalMode } from "./prisma.js";
 import authRoutes from "./routes/auth.js";
 import tasksRoutes from "./routes/tasks.js";
 import routinesRoutes from "./routes/routines.js";
@@ -128,8 +129,10 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 try {
+  // Antes de aceitar tráfego: WAL é pré-requisito do Litestream (backup).
+  const journalMode = await enableWalMode();
   await fastify.listen({ port: Number(PORT), host: "0.0.0.0" });
-  console.log(`TaskFlow API rodando em http://localhost:${PORT}`);
+  console.log(`TaskFlow API rodando em http://localhost:${PORT} (sqlite journal_mode=${journalMode})`);
 } catch (err) {
   if (err && err.code === "EADDRINUSE") {
     console.error(

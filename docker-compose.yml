@@ -29,6 +29,12 @@ services:
     image: litestream/litestream:latest
     container_name: taskflow-litestream
     restart: unless-stopped
+    # A imagem roda como `nonroot` por padrão, mas o banco é criado pelo
+    # taskflow-api como root (0644) no volume compartilhado. Sem isto o
+    # litestream lê mas não escreve — ele precisa criar o diretório
+    # `.taskflow.db-litestream` ao lado do banco — e a replicação morre com
+    # "attempt to write a readonly database (8)", silenciosamente.
+    user: "0:0"
     volumes:
       - taskflow_data:/data
       - ./litestream.yml:/etc/litestream.yml
