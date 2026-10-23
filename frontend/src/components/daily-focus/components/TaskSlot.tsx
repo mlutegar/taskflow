@@ -88,7 +88,7 @@ function TaskSlot({ slot, index, level, onChange, onMoveUp, onMoveDown, canMoveU
   // Carrega detalhes da tarefa quando supabaseId muda
   useEffect(() => {
     if (slot.supabaseId) {
-      tasksApi.getTask(slot.supabaseId as string).then(setTaskDetails).catch(() => setTaskDetails(null));
+      tasksApi.get(slot.supabaseId as string).then(setTaskDetails).catch(() => setTaskDetails(null));
     } else {
       setTaskDetails(null);
     }

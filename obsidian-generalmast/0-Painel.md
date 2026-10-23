@@ -63,19 +63,19 @@ Vault de documentação do projeto **generalmast** (app de foco com "modos").
 - [[59-Botao-Nova-Rotina-e-Fix-UserId]] — botão **"+ Nova rotina"** no card Rotina Diária (form inline com recorrência já pré-selecionada; painel deixa de sumir quando não há rotina) + **fix crítico** `createdBy`→`userId` em `TaskCompletion`/`TaskChange`/`UserPreferences`, que derrubava criar/concluir tarefa com 500 + **fix de cache**: `today-panel-all` e `routine-consistency` ficam fora de `taskKeys.lists()`, então a rotina criada só aparecia após reload — agora têm chave própria em `taskKeys` e invalidação explícita, com testes-guard (`tasks.js`, `AddTaskForm.tsx`, `DailyRoutinePanel.tsx`, `taskKeys.ts`, `taskOwnerField.test.js`, `taskSync.test.ts`)
 - [[60-Redesign-Mobile-Tela-Tarefas]] — **novo layout mobile (PWA) da aba Tarefas**: cabeçalho "Meu dia" + data, card "Seu progresso hoje", heatmap com célula responsiva (6 meses sem scroll) e pill único abrindo bottom sheet, rodapé em uma linha, Rotina diária com badge e menu "⋯", FAB removido, "Foco" na nav. Inclui o **fix do heatmap que colapsava para uma célula** (era dado, não CSS). Desktop intacto via `useIsMobile()` + `@media (max-width: 640px)` (`useIsMobile.ts`, `tasks-mobile/*`, `HeatmapOptionsSheet.tsx`, `tasks.js`)
 - [[61-Deploy-VPS-KVM8-via-Git]] — **segundo ambiente** do taskflow no VPS KVM 8 (`ssh kvm8`), agora com **deploy por Git** (`deploy-git.ps1`: push → pull → rebuild) em vez de tar/scp. Inclui o conserto do repositório (17 gitlinks de worktree commitados que quebravam `git status` e quebrariam o `clone` no servidor) e o **fix do backup**: o Litestream nunca replicou — rodava como `nonroot` sem permissão de escrita e o banco estava em `journal_mode=delete` (ele exige WAL)
+- [[62-Fix-Erro-getTask-Daily-Focus]] — **fix crítico**: erro "As.getTask is not a function" no Daily Focus ao selecionar tarefa existente nos slots de preparação. Causa: `TaskSlot.tsx` chamava `tasksApi.getTask()` (método inexistente); o correto é `tasksApi.get()`. Correção de uma linha, solução imediata.
 
 ## Feature recente
+**Fix crítico no Daily Focus**: o erro "As.getTask is not a function" que derrubava a
+tela ao selecionar tarefas nos slots de preparação foi corrigido — era um método chamado
+com nome errado (`getTask` vs `get`). Mudança de uma linha, app voltou ao normal.
+Ver [[62-Fix-Erro-getTask-Daily-Focus]].
+
 **Deploy no KVM 8 + backup que não existia**: o taskflow ganhou um segundo ambiente
 (`taskflow.mrender.com.br`, portas 3026/3033) com deploy por Git. No caminho, dois
 achados sérios: o repositório tinha 17 worktrees de agente commitados como submódulos
 (quebravam `git status` e impediriam o `clone` no servidor) e o **Litestream nunca
 replicou o banco** — subia "Up" e falhava em silêncio. Ver [[61-Deploy-VPS-KVM8-via-Git]].
-
-**Redesign mobile da tela de Tarefas**: no celular a tela virou "Meu dia" — cabeçalho com
-a data, card de progresso das rotinas, heatmap que finalmente mostra os 6 meses inteiros
-(o bug da célula única era de dados, não de CSS), um seletor só abrindo bottom sheet, e o
-FAB saiu de cima do conteúdo. O desktop continua exatamente como estava.
-Ver [[60-Redesign-Mobile-Tela-Tarefas]].
 
 **Botão "Nova rotina" + fix que destravou o app**: dava para ver rotinas na aba Tarefas,
 mas não **criar** uma — agora tem o botão no card "Rotina Diária", com o formulário já
