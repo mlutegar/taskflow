@@ -69,6 +69,25 @@ Renomeado método de `getTask` para `get` para corresponder à assinatura corret
   - Contador de checklist é exibido (ex: "3/5 items")
   - Sem erros no console
 
+### ✅ Deploy Realizado
+
+**Data:** 2026-10-23 01:35 UTC  
+**Commit:** `7a4173a`  
+**Servidor:** VPS KVM 8 (taskflow.mrender.com.br)  
+**Status:** ✅ Todos os containers healthy  
+**Versão no ar:** `0.1.0+7a4173a`
+
+```bash
+# Status dos containers
+taskflow              Up (healthy)    127.0.0.1:3026->80/tcp
+taskflow-api          Up (healthy)    127.0.0.1:3033->3001/tcp
+taskflow-litestream   Up              (backup ativo)
+
+# Health checks
+GET /health → {"ok":true}
+GET /taskflow/ → HTTP 200
+```
+
 ---
 
 ## Notas Técnicas
