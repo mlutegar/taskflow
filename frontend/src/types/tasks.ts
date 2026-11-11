@@ -27,6 +27,7 @@ export interface TaskRecord {
   completed: boolean;
   due_date?: string | null;
   due_time?: string | null; // "HH:MM" (opcional)
+  completed_at?: string | null; // ISO; enviado pelo backend (serializer de tasks)
   recurrence?: string | null;
   recurrence_rule?: RecurrenceRule | null;
   project_id?: string | null;

@@ -23,7 +23,7 @@ interface CustomModeSessionProps {
   tasks: Task[];
   onCompleteTask: (id: string) => Promise<void>;
   onToggleChecklist: (taskId: string, itemId: string) => void;
-  onAddChecklist: (taskId: string, text: string) => void;
+  onAddChecklist: (taskId: string, text: string) => Promise<void>;
   onClose: () => void;
   onComplete?: (() => void) | null;
 }

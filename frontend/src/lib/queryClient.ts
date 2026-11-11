@@ -8,18 +8,19 @@
 
 import { QueryClient, MutationCache } from "@tanstack/react-query";
 import { ApiError } from "./apiClient";
+import type { ToastType } from "../components/shared/Toast";
 
 // Status HTTP "definitivos" (erro de negócio/permissão): repetir não ajuda.
 const NON_RETRYABLE_STATUS = new Set([400, 401, 403, 404, 409, 422]);
 
 /** Função de notificação de erros, registrada via setMutationErrorHandler(). */
-let _errorHandler: ((message: string, type: string) => void) | null = null;
+let _errorHandler: ((message: string, type: ToastType) => void) | null = null;
 
 /**
  * Registra o handler de erro para mutações falhas.
  * Chamado uma vez dentro do componente QueryErrorHandler.
  */
-export function setMutationErrorHandler(fn: ((message: string, type: string) => void) | null): void {
+export function setMutationErrorHandler(fn: ((message: string, type: ToastType) => void) | null): void {
   _errorHandler = fn;
 }
 

@@ -40,13 +40,13 @@ const TEMPLATES = {
 
 export function ChecklistInFocus({ taskId, onAllCompleted, compact = false }: ChecklistInFocusProps) {
   const {
-    data: tasks,
+    tasks,
     addChecklistMutation,
     addChecklistBatchMutation,
     toggleChecklistMutation,
     updateChecklistMutation,
     deleteChecklistMutation,
-  } = useTasks();
+  } = useTasks(undefined, undefined);
   const { showToast } = useToast();
 
   const [newItemText, setNewItemText] = useState(() => {
@@ -152,7 +152,7 @@ export function ChecklistInFocus({ taskId, onAllCompleted, compact = false }: Ch
         }
       } catch (error) {
         console.error('Erro ao marcar item:', error);
-        showToast("Erro ao marcar item. Tente novamente.", { duration: 3000 });
+        showToast("Erro ao marcar item. Tente novamente.", { type: "error", duration: 3000 });
       }
     },
     [taskId, checklist, completedCount, totalCount, toggleChecklistMutation, onAllCompleted, showToast]
@@ -175,7 +175,7 @@ export function ChecklistInFocus({ taskId, onAllCompleted, compact = false }: Ch
         setTimeout(() => inputRef.current?.focus(), 10);
       } catch (error) {
         console.error('Erro ao adicionar item:', error);
-        showToast("Erro ao adicionar item. Tente novamente.", { duration: 3000 });
+        showToast("Erro ao adicionar item. Tente novamente.", { type: "error", duration: 3000 });
       }
     },
     [taskId, addChecklistMutation, showToast]
@@ -197,7 +197,7 @@ export function ChecklistInFocus({ taskId, onAllCompleted, compact = false }: Ch
         showToast(`✓ ${items.length} itens adicionados`, { duration: 2000 });
       } catch (error) {
         console.error('Erro ao adicionar itens:', error);
-        showToast("Erro ao adicionar itens. Tente novamente.", { duration: 3000 });
+        showToast("Erro ao adicionar itens. Tente novamente.", { type: "error", duration: 3000 });
       }
     },
     [taskId, addChecklistBatchMutation, showToast]
@@ -248,7 +248,7 @@ export function ChecklistInFocus({ taskId, onAllCompleted, compact = false }: Ch
           });
         } catch (error) {
           console.error('Erro ao editar item:', error);
-          showToast("Erro ao editar item. Tente novamente.", { duration: 3000 });
+          showToast("Erro ao editar item. Tente novamente.", { type: "error", duration: 3000 });
         }
       }
       setEditingId(null);
@@ -281,7 +281,7 @@ export function ChecklistInFocus({ taskId, onAllCompleted, compact = false }: Ch
           }
         } catch (error) {
           console.error('Erro ao remover item:', error);
-          showToast("Erro ao remover item. Tente novamente.", { duration: 3000 });
+          showToast("Erro ao remover item. Tente novamente.", { type: "error", duration: 3000 });
         }
       }
     },

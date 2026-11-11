@@ -203,7 +203,6 @@ export function TaskDetailPage({ taskId, onClose }: TaskDetailPageProps) {
                   projects={projectsHook.projects}
                   value={task.project_id || ""}
                   onChange={(value) => handleFieldChange("project_id", value || null)}
-                  allowNone
                 />
               </PropertyRow>
 

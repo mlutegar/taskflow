@@ -14,7 +14,7 @@
 import { api } from "./apiClient";
 import { SYNC_QUEUE_MAX } from "../config/constants";
 
-type MutableMethod = "POST" | "PUT" | "PATCH" | "DELETE";
+export type MutableMethod = "POST" | "PUT" | "PATCH" | "DELETE";
 
 interface QueueItem {
   method: MutableMethod;

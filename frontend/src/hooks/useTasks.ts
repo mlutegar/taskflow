@@ -744,7 +744,7 @@ export function useTasks(
     handleAddTaskChecklistBatch: (taskId: string, items: Array<{ description: string; parent_id?: string | number | null; order?: number }>) =>
       remember(() => addChecklistBatchMutation.mutateAsync({ taskId, items })),
     handleToggleTaskChecklist: (taskId: string, itemId: string)      => remember(() => toggleChecklistMutation.mutateAsync({ taskId, itemId })),
-    handleUpdateTaskChecklist: (taskId: string, itemId: string, fields: unknown) => remember(() => updateChecklistMutation.mutateAsync({ taskId, itemId, fields })),
+    handleUpdateTaskChecklist: (taskId: string, itemId: string, fields: string | Record<string, unknown>) => remember(() => updateChecklistMutation.mutateAsync({ taskId, itemId, fields })),
     handleReorderTaskChecklist: (taskId: string, itemId: string, newOrder: number) => remember(() => reorderChecklistMutation.mutateAsync({ taskId, itemId, newOrder })),
     handleDeleteTaskChecklist: (taskId: string, itemId: string)      => remember(() => deleteChecklistMutation.mutateAsync({ taskId, itemId })),
     // Mutations para acesso direto (ChecklistInFocus)

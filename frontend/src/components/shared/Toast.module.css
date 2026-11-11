@@ -25,6 +25,7 @@
 
 .success { background: #1e4d2b; border-left: 3px solid #4ecca3; color: #e8f5e9; }
 .error   { background: #4d1e1e; border-left: 3px solid #e05252; color: #fde8e8; }
+.warning { background: #4d3a1e; border-left: 3px solid #e0a252; color: #fdf1e0; }
 .info    { background: #1e2d4d; border-left: 3px solid #4ea8cc; color: #e8f0fd; }
 
 .icon { font-size: 1rem; flex-shrink: 0; }

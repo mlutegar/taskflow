@@ -25,7 +25,7 @@ interface LazyFalconSessionProps {
   tasks: Task[];
   onCompleteTask: (id: string) => Promise<void>;
   onToggleChecklist: (...args: unknown[]) => unknown;
-  onAddChecklist: (...args: unknown[]) => unknown;
+  onAddChecklist: (taskId: string, text: string) => Promise<void>;
   onClose: () => void;
   onComplete?: () => void;
 }

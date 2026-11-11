@@ -21,7 +21,7 @@ interface WorkingTaskProps {
   completeLabel?: string;
   onComplete?: () => void;
   onToggleChecklist?: (taskId: string | number, itemId: string | number) => void;
-  onAddChecklist?: (taskId: string | number, desc: string) => void;
+  onAddChecklist?: (taskId: string, desc: string) => Promise<void>;
   onSwap?: () => void;
   swapLabel?: string;
   children?: ReactNode;

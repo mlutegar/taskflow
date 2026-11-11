@@ -35,13 +35,13 @@ interface MultiCardSessionProps {
   intention?: string;
   tasks: any[];
   routines?: any[];
-  onCompleteTask: (id: string) => Promise<void>;
-  onCompleteRoutine?: (id: string) => Promise<void>;
-  onAddTask: (task: { title: string; priority: number }) => Promise<void>;
-  onAddChecklist?: (parentId: string, description: string) => Promise<void>;
-  onToggleChecklist?: (parentId: string, itemId: string) => Promise<void>;
-  onAddRoutineChecklist?: (parentId: string, description: string) => Promise<void>;
-  onToggleRoutineChecklist?: (parentId: string, itemId: string) => Promise<void>;
+  onCompleteTask: (id: string) => Promise<unknown>;
+  onCompleteRoutine?: (id: string) => Promise<unknown>;
+  onAddTask: (task: { title: string; priority: number }) => Promise<unknown>;
+  onAddChecklist?: (parentId: string, description: string) => Promise<unknown>;
+  onToggleChecklist?: (parentId: string, itemId: string) => Promise<unknown>;
+  onAddRoutineChecklist?: (parentId: string, description: string) => Promise<unknown>;
+  onToggleRoutineChecklist?: (parentId: string, itemId: string) => Promise<unknown>;
   onMinimize?: () => void;
   /** true quando a sessão está minimizada (oculta) — desativa atalhos globais. */
   minimized?: boolean;

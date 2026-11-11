@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 import styles from "./Toast.module.css";
 
-type ToastType = "info" | "success" | "error";
+export type ToastType = "info" | "success" | "error" | "warning";
 
 interface ToastAction {
   label: string;
@@ -20,10 +20,15 @@ interface ToastOptions {
   action?: ToastAction;
   /** Duração em ms antes de sumir sozinho (default 3000; use maior p/ ações). */
   durationMs?: number;
+  /** Alias de `durationMs` (se ambos forem passados, `durationMs` vence). */
+  duration?: number;
+  /** Tipo do toast quando as opções são passadas como 2º argumento: `showToast(msg, { type, duration })`. */
+  type?: ToastType;
 }
 
 interface ToastContextValue {
-  showToast: (message: string, type?: ToastType, options?: ToastOptions) => void;
+  /** `showToast(msg)`, `showToast(msg, "error")`, `showToast(msg, "error", { durationMs })` ou `showToast(msg, { type, duration })`. */
+  showToast: (message: string, typeOrOptions?: ToastType | ToastOptions, options?: ToastOptions) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -31,7 +36,9 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 export function ToastProvider({ children }: { children: ReactNode }): JSX.Element {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = "info", options?: ToastOptions): void => {
+  const showToast = useCallback((message: string, typeOrOptions?: ToastType | ToastOptions, maybeOptions?: ToastOptions): void => {
+    const options: ToastOptions | undefined = typeof typeOrOptions === "object" && typeOrOptions !== null ? typeOrOptions : maybeOptions;
+    const type: ToastType = (typeof typeOrOptions === "string" ? typeOrOptions : options?.type) ?? "info";
     const id = Math.random().toString(36).slice(2);
     setToasts(prev => {
       const next = [...prev, { id, message, type, action: options?.action }];
@@ -39,7 +46,7 @@ export function ToastProvider({ children }: { children: ReactNode }): JSX.Elemen
     });
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, options?.durationMs ?? 3000);
+    }, options?.durationMs ?? options?.duration ?? 3000);
   }, []);
 
   const dismiss = (id: string): void => setToasts(prev => prev.filter(t => t.id !== id));
@@ -51,7 +58,7 @@ export function ToastProvider({ children }: { children: ReactNode }): JSX.Elemen
         {toasts.map(t => (
           <div key={t.id} className={`${styles.toast} ${styles[t.type]}`}>
             <span className={styles.icon}>
-              {t.type === "success" ? "✅" : t.type === "error" ? "⚠️" : "ℹ️"}
+              {t.type === "success" ? "✅" : t.type === "error" || t.type === "warning" ? "⚠️" : "ℹ️"}
             </span>
             <span className={styles.message}>{t.message}</span>
             {t.action && (

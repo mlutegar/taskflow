@@ -28,6 +28,7 @@ interface TaskData {
   description?: string | null;
   priority: number;
   due_date?: string | null;
+  due_time?: string | null; // "HH:MM" (opcional)
   recurrence?: string | null;
   recurrence_rule?: RecurrenceRule | null;
   project_id?: string | null;

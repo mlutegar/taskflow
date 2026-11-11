@@ -19,7 +19,7 @@ interface CafeRitualSessionProps {
   tasks: TaskItem[];
   onCompleteTask: (id: string) => Promise<void>;
   onToggleChecklist?: (taskId: string, itemId: string) => Promise<void>;
-  onAddChecklist?: (taskId: string, text: string) => void;
+  onAddChecklist?: (taskId: string, text: string) => Promise<void>;
   onClose: () => void;
   onComplete?: () => void;
   /** `preset.variant`: "ritual" (padrão) ou "leite". */

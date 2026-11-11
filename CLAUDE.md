@@ -21,7 +21,7 @@ Monorepo sem workspaces (raiz = só orquestração dev; pacote raiz chama-se `ge
 Scripts:
 - Raiz: `npm run dev` (API :3001 + Web :5175, libera portas antes), `npm run setup` (`prisma migrate`/db:push)
 - Frontend: `npm run dev|build|lint|typecheck|typecheck:baseline|test|test:coverage` (CI roda lint → typecheck(informativo) → **typecheck:baseline (bloqueante)** → `test -- --run` → build)
-- **Tipos (ratchet):** `tsc` ainda tem erros herdados (136 em 47 arquivos, ver `frontend/tsc-baseline.json`). `npm run typecheck:baseline` falha se o total **ou** o nº de erros de qualquer arquivo aumentar. Ao reduzir erros, rode `npm run typecheck:baseline -- --update` e commite o JSON (o baseline só pode diminuir). Código novo não pode entrar com erro de tipo. Lint está em 0 erros (só warnings) — mantenha; `rules-of-hooks` é o gate contra o React #310.
+- **Tipos (ratchet):** `tsc` ainda tem erros herdados (92 em 42 arquivos, ver `frontend/tsc-baseline.json`; a maioria é duplicação de tipos `Task`/`ChecklistItem`/`Mode` — etapa 04 do `PROMPTS.md`). `npm run typecheck:baseline` falha se o total **ou** o nº de erros de qualquer arquivo aumentar. Ao reduzir erros, rode `npm run typecheck:baseline -- --update` e commite o JSON (o baseline só pode diminuir). Código novo não pode entrar com erro de tipo. Lint está em 0 erros (só warnings) — mantenha; `rules-of-hooks` é o gate contra o React #310.
 - Backend: `npm run dev` (migrate deploy + `node --watch`), `start`, `test`, `db:migrate`, `db:deploy`, `db:drift-check`, `db:studio`
 - Dev: Vite proxia `/api/*` → `http://localhost:3001` (remove o prefixo `/api`). `base` do Vite = `/taskflow/`.
 - Env: `.env` na raiz (JWT_SECRET, etc.), `frontend/.env.local`. Nunca commitar.
@@ -112,6 +112,14 @@ Obs.: vários ids de (A) aparecem em `HELPER_GROUPS` sem ter componente em `HELP
 
 ### 7.2 `base: "/taskflow/"` × domínio `kflow.mlutegar.com` — **ponto a verificar**
 O que o repo mostra: `vite.config` usa `base: "/taskflow/"`; `frontend/nginx.conf` serve o build em `/taskflow/` (SPA fallback para `/taskflow/index.html`), redireciona `/` → `/taskflow/` (301) e faz proxy de `/api/` → `taskflow-api:3001`; compose expõe nginx em `127.0.0.1:3026` e a API em `127.0.0.1:3033`. Os hostnames públicos entram por **Cloudflare Tunnel**, configurado **fora do repo**: `deploy-vps.sh` cita `mlutegar.com` (túnel "emme") e `deploy-git.ps1`/nota 61 citam `taskflow.mrender.com.br` (túnel "iazan"). **`kflow.mlutegar.com` não aparece em nenhum arquivo do repo** (nem `CORS_ORIGIN` de exemplo, nem deploy). Logo, o mapeamento do domínio (hostname → porta 3026, e se mostra `/taskflow/` ou reescreve) está só na config do túnel/Cloudflare — confirmar lá. Também verificar se `CORS_ORIGIN` no `.env` do servidor inclui esse domínio.
+
+### 7.3 Bugs conhecidos aguardando decisão (achados pelo `tsc`, prompt 01c)
+- **Exportar tarefas anuais (.ics) está quebrado:** `lib/exportIcal.ts` usa `api.baseURL` (não existe → `undefined/ical/yearly`; o nginx devolve o `index.html` via SPA fallback e o app baixa um "`tarefas-anuais.ics`" com HTML). O correto seria `apiConnection()` de `lib/apiClient.ts` (`{baseUrl, token}`; o token também é lido da chave errada `"token"`). Botão em `TasksPage.tsx`.
+- **"Métricas de Checklist" do celebrate nunca aparece:** em `DailyFocusPage.tsx` o bloco procura `tasks.find(t => t.id === t.supabaseId)`, mas `tasks` são os slots locais (sem `id`), então `checklist_count` é sempre 0 e o bloco retorna `null`. Para funcionar, precisa buscar `checklist_count`/`checklist_completed_count` das tarefas reais (backend já envia). O `checklistMetrics` no histórico foi removido (nunca era lido).
+
+### 7.4 Convenções que evitam erro de tipo
+- `showToast(msg)`, `showToast(msg, "error")`, `showToast(msg, "error", { durationMs })` ou `showToast(msg, { type, duration })`; tipos `info|success|error|warning`, default 3000 ms.
+- `useTasks(filter, sort, …)` exige os 2 primeiros args (`useTasks(undefined, undefined)`) e devolve `{ tasks, … }` (não existe `data`).
 
 ## 8. Backlog (funcionalidades que provavelmente ainda NÃO existem)
 Verificado por busca no código em 2026-11-11 (nenhuma ocorrência de "adaptativ*"/"adaptive"):

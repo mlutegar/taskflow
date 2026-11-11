@@ -1206,32 +1206,6 @@ export default function DailyFocusPage() {
     setNewRecord(isNewRecord || isNewCycleRecord);
     if (isNewRecord || isNewCycleRecord) playNewRecord();
 
-    // Calcular métricas de checklist
-    const checklistMetrics = (() => {
-      const tasksWithChecklist = completedTasks.filter(t => {
-        if (!t.supabaseId) return false;
-        const fullTask = tasks?.find(task => task.id === t.supabaseId);
-        return fullTask && (fullTask.checklist_count || 0) > 0;
-      });
-
-      const totalItems = tasksWithChecklist.reduce((sum, t) => {
-        const fullTask = tasks?.find(task => task.id === t.supabaseId);
-        return sum + (fullTask?.checklist_count || 0);
-      }, 0);
-
-      const completedItems = tasksWithChecklist.reduce((sum, t) => {
-        const fullTask = tasks?.find(task => task.id === t.supabaseId);
-        return sum + (fullTask?.checklist_completed_count || 0);
-      }, 0);
-
-      return {
-        tasksWithChecklist: tasksWithChecklist.length,
-        totalItems,
-        completedItems,
-        completionRate: totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0
-      };
-    })();
-
     // Save history
     addSession({
       date: todayStr(),
@@ -1244,7 +1218,6 @@ export default function DailyFocusPage() {
       tabMode,
       cycleCount: tabMode ? tabCycleCount : undefined,
       tabsOpened: tabMode ? completedTasks.length : undefined,
-      checklistMetrics: checklistMetrics.totalItems > 0 ? checklistMetrics : undefined,
     });
 
     // Check achievements

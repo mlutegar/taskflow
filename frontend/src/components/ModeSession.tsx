@@ -93,13 +93,14 @@ interface ModeSessionProps {
   tasks: any[];
   routines?: any[];
   intention?: string;
-  onCompleteTask: (id: string) => Promise<void>;
-  onCompleteRoutine?: (id: string) => Promise<void>;
-  onAddTask: (task: { title: string; priority: number }) => Promise<void>;
-  onAddChecklist?: (parentId: string, description: string) => Promise<void>;
-  onToggleChecklist?: (parentId: string, itemId: string) => Promise<void>;
-  onAddRoutineChecklist?: (parentId: string, description: string) => Promise<void>;
-  onToggleRoutineChecklist?: (parentId: string, itemId: string) => Promise<void>;
+  // Promise<unknown>: os handlers de useTasks/useRoutines resolvem com o registro criado/alterado; o resultado é ignorado aqui.
+  onCompleteTask: (id: string) => Promise<unknown>;
+  onCompleteRoutine?: (id: string) => Promise<unknown>;
+  onAddTask: (task: { title: string; priority: number }) => Promise<unknown>;
+  onAddChecklist?: (parentId: string, description: string) => Promise<unknown>;
+  onToggleChecklist?: (parentId: string, itemId: string) => Promise<unknown>;
+  onAddRoutineChecklist?: (parentId: string, description: string) => Promise<unknown>;
+  onToggleRoutineChecklist?: (parentId: string, itemId: string) => Promise<unknown>;
   onTaskComplete?: (modeId: string) => void;
   onMinimize?: () => void;
   onClose: () => void;
