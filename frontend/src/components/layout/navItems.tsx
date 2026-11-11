@@ -7,6 +7,7 @@ import {
   BarChart3,
   User,
   HeartPulse,
+  Wallet,
 } from "lucide-react";
 
 export interface NavItem {
@@ -28,6 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
   { Icon: Target,      label: "Daily Focus", shortLabel: "Foco", hash: "#/daily-focus" },
   { Icon: Gamepad2,    label: "Modos",       hash: "#/modes" },
   { Icon: HeartPulse,  label: "Saúde",       hash: "#/saude" },
+  { Icon: Wallet,      label: "Finanças",    hash: "#/financas" },
   { Icon: BarChart3,   label: "Análises",    hash: "#/dashboard" },
   { Icon: User,        label: "Perfil",      hash: "#/profile" },
 ];

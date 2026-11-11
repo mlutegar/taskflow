@@ -36,8 +36,8 @@ Scripts:
 ## 3. Arquitetura
 
 ### Backend (`backend/src`)
-`index.js` registra rotas com prefixo: `/auth /tasks /projects /routines /daily-tasks /mode-stats /daily-focus /preferences /session-usage-logs /mode-combo-log /ai /uploads /orbita /ical /saude/medications /saude/skincare /saude/shopping-list /saude/nutrition /saude/workouts` + `GET /health`. Arquivos em `routes/*.js`; helpers de domínio em `src/` (`taskRecurrence.js`, `taskVersion.js`, `taskSyncInfrastructure.js`, `taskEstimatedTime.js`, `auth.js`, `prisma.js`).
-Models (Prisma/SQLite): User, Task (+ChecklistItem, TaskCompletion, TaskChange, TaskMutationReceipt), Project, Routine (+RoutineChecklistItem), DailyTask, DailyFocus{Session,Checkin,Emotion,DayState,Achievement,ActiveSession}, UserPreferences, SessionUsageLog, UserModeActivation, ModeStat, ModeLog (legado), ModeComboLog; **Saúde:** Medication (+MedicationSchedule, MedicationIntake), SkincareProduct/SkincareStep/SkincareCheck, Meal, WaterLog, Workout, WorkoutPlan.
+`index.js` registra rotas com prefixo: `/auth /tasks /projects /routines /daily-tasks /mode-stats /daily-focus /preferences /session-usage-logs /mode-combo-log /ai /uploads /orbita /ical /saude/medications /saude/skincare /saude/shopping-list /saude/nutrition /saude/workouts /financas/categories /financas/entries /financas/series /financas/summary` + `GET /health`. Arquivos em `routes/*.js`; helpers de domínio em `src/` (`taskRecurrence.js`, `taskVersion.js`, `taskSyncInfrastructure.js`, `taskEstimatedTime.js`, `auth.js`, `prisma.js`).
+Models (Prisma/SQLite): User, Task (+ChecklistItem, TaskCompletion, TaskChange, TaskMutationReceipt), Project, Routine (+RoutineChecklistItem), DailyTask, DailyFocus{Session,Checkin,Emotion,DayState,Achievement,ActiveSession}, UserPreferences, SessionUsageLog, UserModeActivation, ModeStat, ModeLog (legado), ModeComboLog; **Saúde:** Medication (+MedicationSchedule, MedicationIntake), SkincareProduct/SkincareStep/SkincareCheck, Meal, WaterLog, Workout, WorkoutPlan; **Finanças:** FinanceCategory, FinanceEntry, FinanceSeries, FinanceSeriesException.
 **Atenção:** dono dos models é `userId` (não `createdBy`) — há teste-guard `taskOwnerField.test.js`. Tarefas usam versão otimista (409 em conflito).
 
 ### Frontend (`frontend/src`)
@@ -149,8 +149,24 @@ Regras e convenções:
 - Dados de Saúde ainda não entram em Análises/backup exportável nem no `useRemoteSync`.
 - Opcional não feito: hábito "Tomar remédios" que marca sozinho quando todas as doses do dia foram tomadas.
 
+### 7.6 Finanças (prompt 03 — **Fase A concluída**, nota 72; Fase B pendente)
+Página `#/financas` (`pages/FinancePage.tsx`, `components/finance/*`), mobile-first, ícone `Wallet` no "Mais" (abaixo de Saúde). Abas: **Mês** (entradas/saídas/saldo, rosca por categoria, comparação com mês anterior) · **Lançamentos** (por dia; tocar = ações) · **Categorias**; botão **+** flutuante = adição rápida (valor, tipo, categoria em chips; "mais opções": data, forma, recorrência).
+
+- **Dinheiro = centavos (Int)**, nunca float; exibição `formatBRL` / entrada `parseBRL` em `lib/money.ts`. Datas `YYYY-MM-DD`, meses `YYYY-MM`.
+- **Recorrência = regra guardada + ocorrências calculadas na leitura** (`backend/src/finance/recurrence.js`); não se geram lançamentos futuros. `FinanceEntry` = lançamento único real; `FinanceSeries` = fixo mensal (`monthly`) ou parcelado (`installment`, `amountCents` = TOTAL, resto de centavos na 1ª parcela). Dia 31 vira último dia do mês.
+- **Passado nunca é reescrito:** `POST /series/:id/revise {effectiveMonth,…}` encerra a série no mês anterior (`endDate`) e cria outra (`supersedesId`) a partir do mês; `POST /:id/end {fromMonth}` só define `endDate`; `PATCH` só descrição/forma de pagamento; `PUT /:id/exceptions/:month` pula o mês ou ajusta valor (`FinanceSeriesException`). **Parcelas só podem ser encerradas** (sem revisão de valor).
+- Categorias: padrão criadas na 1ª leitura; "excluir" = arquivar (`active=false`); `categoryId` sem FK (histórico preservado). Categoria deve ser do usuário e do mesmo tipo do lançamento.
+- Rotas (JWT + zod + `userId`): `/financas/categories`, `/entries?month=` (reais + virtuais mescladas, `origin: single|series`), `/series`, `/summary?month=`. Lógica pura testada em `backend/src/finance/` (`installments|recurrence|monthSummary|validation|service`); testes de rota em `routes/financas/finance.routes.test.js`.
+- Frontend: `api/financas.ts`, `hooks/useFinance.ts`, `lib/{money,financeKeys,financeFormat}.ts`; chaves `["financas", …]`.
+- Migration aditiva: `20261115000000_financas_lancamentos`.
+- **Fase B (pendente):** `IncomeSource`, `ExpectedIncome` (confirmada/provável/incerta, "Recebi" gera `FinanceEntry`), `FinanceSettings` (saldo inicial) e `GET /financas/projection?months=3..6` (cenários "só confirmadas" e "confirmadas + prováveis", reusando `recurrence.js`).
+- **Backlog Finanças:** cartão de crédito é **só forma de pagamento** (parcela cai na data da compra); **fatura/fechamento/vencimento do cartão ficam como backlog**. Também: orçamento/meta por categoria, anexos/comprovantes, importação de extrato, Finanças fora de Análises/backup.
+
 ## 8. Backlog (funcionalidades que provavelmente ainda NÃO existem)
 Verificado por busca no código em 2026-11-11 (nenhuma ocorrência de "adaptativ*"/"adaptive"):
 - **Pomodoro adaptativo**: hoje só existe `sessions/PomodoroSession.tsx` + `PomodoroHelper` (ciclos fixos). Não há ajuste automático de duração por desempenho/energia/histórico.
 - **Priorização semanal/mensal**: só existe a diária (5 "Tarefas de Hoje", `DailyTask`, `PrepareDayScreen`). Há apenas `WeeklyReview` (resumo semanal automático), `weeklyGoal` em preferências e `getWeeklyStats`/`WeekHeatmap` (métricas), sem planejamento/priorização de semana ou mês.
-- Próximos prompts planejados (ver `PROMPTS.md`): 01 Novos modos · 02 Página de Saúde · 03 Página de Finanças.
+- Próximos prompts planejados (ver `PROMPTS.md`): 03 Finanças (Fase B: rendas + projeção) · 04 unificação de tipos.
+
+## 9. Regras de trabalho com o usuário
+- **Nos próximos prompts não mostrar plano antes:** implementar direto e só parar para perguntar se houver decisão de **modelagem de banco difícil de desfazer**.

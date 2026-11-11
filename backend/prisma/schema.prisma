@@ -578,3 +578,72 @@ model WorkoutPlan {
   @@index([userId, weekday])
   @@map("workout_plans")
 }
+
+// ─── Finanças (prompt 03, Fase A) ────────────────────────────────────────────
+// Valores sempre em centavos (Int). Datas "YYYY-MM-DD". `categoryId` é referência leve (sem FK):
+// arquivar categoria nunca mexe no histórico. Recorrência = regra guardada (FinanceSeries) e
+// ocorrências calculadas na leitura; editar uma série cria outra a partir de um mês (supersedesId),
+// então meses passados nunca são reescritos.
+
+model FinanceCategory {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  kind      String // "expense" | "income"
+  emoji     String?
+  color     String?
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("finance_categories")
+}
+
+model FinanceEntry {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  type          String // "expense" | "income"
+  amountCents   Int      @map("amount_cents")
+  date          String // "YYYY-MM-DD"
+  categoryId    String?  @map("category_id")
+  description   String?
+  paymentMethod String?  @map("payment_method")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([userId, date])
+  @@map("finance_entries")
+}
+
+model FinanceSeries {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  type          String // "expense" | "income"
+  kind          String // "monthly" | "installment"
+  amountCents   Int      @map("amount_cents") // monthly: valor mensal; installment: total
+  installments  Int? // só parcelado
+  startDate     String   @map("start_date")
+  endDate       String?  @map("end_date") // último dia válido (inclusive)
+  dayOfMonth    Int      @map("day_of_month")
+  categoryId    String?  @map("category_id")
+  description   String?
+  paymentMethod String?  @map("payment_method")
+  supersedesId  String?  @map("supersedes_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([userId, startDate])
+  @@map("finance_series")
+}
+
+model FinanceSeriesException {
+  id          String  @id @default(uuid())
+  userId      String  @map("user_id")
+  seriesId    String  @map("series_id")
+  month       String // "YYYY-MM"
+  skipped     Boolean @default(false)
+  amountCents Int?    @map("amount_cents")
+
+  @@unique([seriesId, month])
+  @@index([userId])
+  @@map("finance_series_exceptions")
+}

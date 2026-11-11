@@ -23,6 +23,10 @@ import saudeSkincareRoutes from "./routes/saude/skincare.js";
 import saudeShoppingRoutes from "./routes/saude/shopping.js";
 import saudeNutritionRoutes from "./routes/saude/nutrition.js";
 import saudeWorkoutsRoutes from "./routes/saude/workouts.js";
+import financeCategoriesRoutes from "./routes/financas/categories.js";
+import financeEntriesRoutes from "./routes/financas/entries.js";
+import financeSeriesRoutes from "./routes/financas/series.js";
+import financeSummaryRoutes from "./routes/financas/summary.js";
 
 const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5175";
@@ -98,6 +102,10 @@ fastify.register(saudeSkincareRoutes, { prefix: "/saude/skincare" });
 fastify.register(saudeShoppingRoutes, { prefix: "/saude/shopping-list" });
 fastify.register(saudeNutritionRoutes, { prefix: "/saude/nutrition" });
 fastify.register(saudeWorkoutsRoutes, { prefix: "/saude/workouts" });
+fastify.register(financeCategoriesRoutes, { prefix: "/financas/categories" });
+fastify.register(financeEntriesRoutes, { prefix: "/financas/entries" });
+fastify.register(financeSeriesRoutes, { prefix: "/financas/series" });
+fastify.register(financeSummaryRoutes, { prefix: "/financas/summary" });
 
 // Erro global
 fastify.setErrorHandler((error, request, reply) => {

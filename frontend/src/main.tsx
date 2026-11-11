@@ -54,6 +54,7 @@ const DailyFocusApp = lazy(() => import("./DailyFocusApp.jsx"));
 const AnalyticsPage = lazy(() => import("./components/analytics/AnalyticsPage.jsx"));
 const ProfilePage   = lazy(() => import("./components/auth/ProfilePage.jsx"));
 const HealthPage    = lazy(() => import("./pages/HealthPage"));
+const FinancePage   = lazy(() => import("./pages/FinancePage"));
 
 // ── 404 page ─────────────────────────────────────────────────────────────────
 function NotFoundPage(): JSX.Element {
@@ -131,6 +132,7 @@ const KNOWN_ROUTES = new Set<string>([
   "#/history",
   "#/profile",
   "#/saude",
+  "#/financas",
 ]);
 // Rota de destino quando a atual é desconhecida. DEVE pertencer a KNOWN_ROUTES.
 const DEFAULT_ROUTE = "#/tasks";
@@ -192,6 +194,7 @@ function Root(): JSX.Element {
   else if (hash === "#/history")      Page = <AnalyticsPage />;
   else if (hash === "#/profile")      Page = <ProfilePage onSignOut={signOut} />;
   else if (hash === "#/saude")        Page = <HealthPage />;
+  else if (hash === "#/financas")     Page = <FinancePage />;
   else Page = <NotFoundPage />;
 
   return (
