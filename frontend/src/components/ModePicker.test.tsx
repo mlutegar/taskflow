@@ -7,10 +7,11 @@ import { todayISO } from "../lib/dateUtils";
 const MUSIC_ID = "music_hundred";
 const MUSIC_NAME = "100 Músicas";
 
-const logsMock = vi.fn<[], { modeId: string; date: string; hour: number }[]>(() => []);
+const logsMock = vi.fn<() => { modeId: string; date: string; hour: number }[]>(() => []);
 
 vi.mock("../lib/sessionUsageLog", () => ({
   getUsageLogs: () => logsMock(),
+  usageStatsLive: () => [],
   getModeSuccessRate: () => null,
   getBestHourForMode: () => null,
 }));

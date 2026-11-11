@@ -67,6 +67,7 @@ Vault de documentação do projeto **generalmast** (app de foco com "modos").
 - [[63-Exploracao-e-CLAUDE-md]] — mapeamento do repositório (stack, arquitetura, catálogo de 94 modos e onde rodam) consolidado no `CLAUDE.md` da raiz; criação do `PROMPTS.md`
 - [[64-Anexos-Daily-Focus]] — docs antigos de checklist/cronômetro/sync movidos da raiz do repo para o vault; lacunas fundidas nas notas 54 e 55
 - [[65-Novos-Modos-Cafe-com-Leite-Curtidas-DJ]] — 3 modos novos (`cafe_com_leite`, `music_liked`, `music_dj`) com sessão própria no `SESSION_MAP` (reuso de `CafeRitualSession`/`MusicSession` via preset), helpers no Daily Focus e botão "Abrir Spotify"
+- [[66-Estabilizacao-Testes-Lint-Tsc]] — prompt 01b: 7 testes do `ModePicker` corrigidos (mock sem `usageStatsLive`), lint 8→0 erros (hooks após `return` em `ChecklistInFocus`, bug real), `tsc` 234→136 e ratchet `typecheck:baseline` no CI
 
 ## Feature recente
 **Fix crítico no Daily Focus**: o erro "As.getTask is not a function" que derrubava a

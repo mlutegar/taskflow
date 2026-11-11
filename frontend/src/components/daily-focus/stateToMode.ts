@@ -17,6 +17,7 @@ export interface Estado {
   motivoAlt: string | null;
   modeIds: string[];
   comboMotivo: string | null;
+  custom?: boolean;
 }
 
 export const ESTADOS_DEFAULT: Estado[] = [

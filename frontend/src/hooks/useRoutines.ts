@@ -23,7 +23,7 @@ export function useRoutines(routineFilter: string | undefined) {
   // ── Helpers de cache (para delete otimista + undo em App.jsx) ─────────────
 
   const removeRoutine = useCallback(
-    (id: unknown) => queryClient.setQueryData(queryKey, (old: any[] = []) => old.filter((r) => r.id !== id)),
+    (id: string | number) => queryClient.setQueryData(queryKey, (old: any[] = []) => old.filter((r) => r.id !== id)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [queryClient, JSON.stringify(queryKey)]
   );
@@ -54,40 +54,40 @@ export function useRoutines(routineFilter: string | undefined) {
   });
 
   const completeMutation = useMutation({
-    mutationFn: (id: unknown) => routinesApi.complete(id),
+    mutationFn: (id: string | number) => routinesApi.complete(id),
     onSuccess: updateCache,
   });
 
   const uncompleteMutation = useMutation({
-    mutationFn: (id: unknown) => routinesApi.uncomplete(id),
+    mutationFn: (id: string | number) => routinesApi.uncomplete(id),
     onSuccess: updateCache,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: unknown) => routinesApi.delete(id),
-    onSuccess: (_: any, id: unknown) =>
+    mutationFn: (id: string | number) => routinesApi.delete(id),
+    onSuccess: (_: any, id: string | number) =>
       queryClient.setQueryData(queryKey, (old: any[] = []) => old.filter((r) => r.id !== id)),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: unknown; data: any }) => routinesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string | number; data: any }) => routinesApi.update(id, data),
     onSuccess: updateCache,
   });
 
   const completeForDateMutation = useMutation({
-    mutationFn: ({ id, dateStr }: { id: unknown; dateStr: string }) => routinesApi.completeForDate(id, dateStr),
+    mutationFn: ({ id, dateStr }: { id: string | number; dateStr: string }) => routinesApi.completeForDate(id, dateStr),
     onSuccess: updateCache,
   });
 
   const addProgressMutation = useMutation({
-    mutationFn: ({ id, amount }: { id: unknown; amount: number }) => routinesApi.addProgress(id, amount),
+    mutationFn: ({ id, amount }: { id: string | number; amount: number }) => routinesApi.addProgress(id, amount),
     onSuccess: updateCache,
   });
 
   const addChecklistMutation = useMutation({
-    mutationFn: ({ routineId, description }: { routineId: unknown; description: string }) =>
+    mutationFn: ({ routineId, description }: { routineId: string | number; description: string }) =>
       routinesApi.addChecklistItem(routineId, description),
-    onSuccess: (item: any, { routineId }: { routineId: unknown; description: string }) =>
+    onSuccess: (item: any, { routineId }: { routineId: string | number; description: string }) =>
       queryClient.setQueryData(queryKey, (old: any[] = []) =>
         old.map((r) =>
           r.id === routineId
@@ -98,9 +98,9 @@ export function useRoutines(routineFilter: string | undefined) {
   });
 
   const toggleChecklistMutation = useMutation({
-    mutationFn: ({ routineId, itemId }: { routineId: unknown; itemId: unknown }) =>
+    mutationFn: ({ routineId, itemId }: { routineId: string | number; itemId: string | number }) =>
       routinesApi.toggleChecklistItem(routineId, itemId),
-    onSuccess: (item: any, { routineId, itemId }: { routineId: unknown; itemId: unknown }) => {
+    onSuccess: (item: any, { routineId, itemId }: { routineId: string | number; itemId: string | number }) => {
       queryClient.setQueryData(queryKey, (old: any[] = []) =>
         old.map((r) => {
           if (r.id !== routineId) return r;
@@ -118,9 +118,9 @@ export function useRoutines(routineFilter: string | undefined) {
   });
 
   const deleteChecklistMutation = useMutation({
-    mutationFn: ({ routineId, itemId }: { routineId: unknown; itemId: unknown }) =>
+    mutationFn: ({ routineId, itemId }: { routineId: string | number; itemId: string | number }) =>
       routinesApi.deleteChecklistItem(routineId, itemId),
-    onSuccess: (_: any, { routineId, itemId }: { routineId: unknown; itemId: unknown }) =>
+    onSuccess: (_: any, { routineId, itemId }: { routineId: string | number; itemId: string | number }) =>
       queryClient.setQueryData(queryKey, (old: any[] = []) =>
         old.map((r) => {
           if (r.id !== routineId) return r;
@@ -141,17 +141,17 @@ export function useRoutines(routineFilter: string | undefined) {
     restoreRoutine,
     // Handlers
     handleCreateRoutine:           (data: any)                          => createMutation.mutateAsync(data),
-    handleCompleteRoutine:         (id: unknown)                        => completeMutation.mutateAsync(id),
-    handleUncompleteRoutine:       (id: unknown)                        => uncompleteMutation.mutateAsync(id),
-    handleDeleteRoutine:           (id: unknown)                        => deleteMutation.mutateAsync(id),
-    handleUpdateRoutine:           (id: unknown, data: any)             => updateMutation.mutateAsync({ id, data }),
-    handleCompleteRoutineForDate:  (id: unknown, dateStr: string)       => completeForDateMutation.mutateAsync({ id, dateStr }),
-    handleAddProgress:             (id: unknown, amount: number)        => addProgressMutation.mutateAsync({ id, amount }),
-    handleAddRoutineChecklist:     (routineId: unknown, description: string) =>
+    handleCompleteRoutine:         (id: string | number)                        => completeMutation.mutateAsync(id),
+    handleUncompleteRoutine:       (id: string | number)                        => uncompleteMutation.mutateAsync(id),
+    handleDeleteRoutine:           (id: string | number)                        => deleteMutation.mutateAsync(id),
+    handleUpdateRoutine:           (id: string | number, data: any)             => updateMutation.mutateAsync({ id, data }),
+    handleCompleteRoutineForDate:  (id: string | number, dateStr: string)       => completeForDateMutation.mutateAsync({ id, dateStr }),
+    handleAddProgress:             (id: string | number, amount: number)        => addProgressMutation.mutateAsync({ id, amount }),
+    handleAddRoutineChecklist:     (routineId: string | number, description: string) =>
       addChecklistMutation.mutateAsync({ routineId, description }),
-    handleToggleRoutineChecklist:  (routineId: unknown, itemId: unknown) =>
+    handleToggleRoutineChecklist:  (routineId: string | number, itemId: string | number) =>
       toggleChecklistMutation.mutateAsync({ routineId, itemId }),
-    handleDeleteRoutineChecklist:  (routineId: unknown, itemId: unknown) =>
+    handleDeleteRoutineChecklist:  (routineId: string | number, itemId: string | number) =>
       deleteChecklistMutation.mutateAsync({ routineId, itemId }),
   };
 }

@@ -515,7 +515,7 @@ export function useTasks(
   const updateChecklistMutation = useMutation<
     ChecklistItemFull,
     Error,
-    { taskId: string; itemId: string; fields: unknown },
+    { taskId: string; itemId: string; fields: string | Record<string, unknown> },
     { previous?: TaskItem[] }
   >({
     mutationKey: taskKeys.mutation("checklist-update"),

@@ -42,7 +42,7 @@ export default function CountdownTimer({ seconds, title, onComplete, onCancel }:
             icon: "/taskflow/icon.svg",
             tag: "taskflow-timer",
             renotify: true,
-          });
+          } as NotificationOptions);
         } catch {}
       }
     }

@@ -20,7 +20,8 @@ Monorepo sem workspaces (raiz = só orquestração dev; pacote raiz chama-se `ge
 
 Scripts:
 - Raiz: `npm run dev` (API :3001 + Web :5175, libera portas antes), `npm run setup` (`prisma migrate`/db:push)
-- Frontend: `npm run dev|build|lint|typecheck|test|test:coverage` (CI roda lint → typecheck(não bloqueante) → `test -- --run` → build)
+- Frontend: `npm run dev|build|lint|typecheck|typecheck:baseline|test|test:coverage` (CI roda lint → typecheck(informativo) → **typecheck:baseline (bloqueante)** → `test -- --run` → build)
+- **Tipos (ratchet):** `tsc` ainda tem erros herdados (136 em 47 arquivos, ver `frontend/tsc-baseline.json`). `npm run typecheck:baseline` falha se o total **ou** o nº de erros de qualquer arquivo aumentar. Ao reduzir erros, rode `npm run typecheck:baseline -- --update` e commite o JSON (o baseline só pode diminuir). Código novo não pode entrar com erro de tipo. Lint está em 0 erros (só warnings) — mantenha; `rules-of-hooks` é o gate contra o React #310.
 - Backend: `npm run dev` (migrate deploy + `node --watch`), `start`, `test`, `db:migrate`, `db:deploy`, `db:drift-check`, `db:studio`
 - Dev: Vite proxia `/api/*` → `http://localhost:3001` (remove o prefixo `/api`). `base` do Vite = `/taskflow/`.
 - Env: `.env` na raiz (JWT_SECRET, etc.), `frontend/.env.local`. Nunca commitar.

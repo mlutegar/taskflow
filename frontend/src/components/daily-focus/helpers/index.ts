@@ -23,7 +23,7 @@ import { MUSIC_VARIANTS } from "../../../data/musicVariants";
 
 export interface HelperEntry {
   Component: React.ComponentType<any>;
-  defaultState: Record<string, unknown>;
+  defaultState: object;
 }
 
 /**

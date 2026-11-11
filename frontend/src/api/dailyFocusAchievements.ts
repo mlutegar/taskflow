@@ -1,6 +1,6 @@
 import { api } from "../lib/apiClient";
 
-export async function fetchAchievements(): Promise<unknown[]> {
+export async function fetchAchievements(): Promise<string[]> {
   try {
     return await api.get("/daily-focus/achievements") ?? [];
   } catch {

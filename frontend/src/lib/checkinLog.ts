@@ -40,11 +40,28 @@ export function updateLastFeedbackEstadoAfter(estadoAfter: string): void {
   storageSet(FEEDBACK_KEY, feedbacks);
 }
 
-export function getSessionFeedback(): unknown[] {
+export interface CheckinEntry {
+  estadoId: string;
+  modeId: string;
+  date: string;
+  hour: number;
+  [key: string]: unknown;
+}
+
+export interface FeedbackEntry {
+  estadoId: string;
+  modeId: string;
+  rating: number;
+  date: string;
+  estadoAfter?: string;
+  [key: string]: unknown;
+}
+
+export function getSessionFeedback(): FeedbackEntry[] {
   return storageGet(FEEDBACK_KEY, []);
 }
 
-export function getCheckinLog(): unknown[] {
+export function getCheckinLog(): CheckinEntry[] {
   return storageGet(LS_KEY, []);
 }
 

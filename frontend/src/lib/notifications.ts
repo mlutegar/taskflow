@@ -27,12 +27,15 @@ export function loadPreference(): { enabled?: boolean; updatedAt?: number } {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; }
 }
 
-export function showNotification(title: string, options: NotificationOptions = {}): void {
+/** `renotify` existe na spec/Chrome, mas não está em lib.dom do TypeScript. */
+export type AppNotificationOptions = NotificationOptions & { renotify?: boolean };
+
+export function showNotification(title: string, options: AppNotificationOptions = {}): void {
   if (getPermission() !== "granted") return;
   const pref = loadPreference();
   if (pref.enabled === false) return;
 
-  const defaults: NotificationOptions = {
+  const defaults: AppNotificationOptions = {
     icon: "/taskflow/icons/icon-192x192.png",
     badge: "/taskflow/icons/icon-192x192.png",
     tag: "taskflow",

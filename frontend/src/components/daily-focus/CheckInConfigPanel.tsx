@@ -1,20 +1,8 @@
 import { useState } from "react";
-import { getEstados, saveEstados, resetEstados, ESTADOS_DEFAULT } from "./stateToMode";
+import { getEstados, saveEstados, resetEstados, ESTADOS_DEFAULT, type Estado } from "./stateToMode";
 import styles from "./CheckInConfigPanel.module.css";
 import ModalOverlay from "../shared/ModalOverlay";
 import type { Mode } from "../../types/index";
-
-interface Estado {
-  id: string;
-  emoji: string;
-  label: string;
-  modeId: string | null;
-  motivo: string;
-  modeIdAlt: string;
-  motivoAlt: string;
-  custom?: boolean;
-  [key: string]: unknown;
-}
 
 interface CheckInConfigPanelProps {
   allModes?: Mode[];
@@ -50,7 +38,7 @@ export default function CheckInConfigPanel({ allModes = [], onClose }: CheckInCo
       modeIdAlt: allModes[0]?.id ?? "",
       motivoAlt: "",
       custom: true,
-    }]);
+    } as Estado]); // modeIds/comboMotivo ficam ausentes de propósito (estado custom simples)
   }
 
   return (

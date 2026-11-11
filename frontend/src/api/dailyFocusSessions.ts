@@ -1,4 +1,5 @@
 import { api, ApiError } from "../lib/apiClient";
+import type { HistoryEntry } from "../lib/dailyFocusHistory";
 
 export interface SaveResult {
   ok: boolean;
@@ -25,7 +26,7 @@ export async function saveSession(session: Record<string, unknown>): Promise<Sav
 }
 
 interface SessionsPage {
-  data?: unknown[];
+  data?: HistoryEntry[];
   pagination?: { page: number; totalPages: number; total: number };
 }
 
@@ -33,17 +34,17 @@ interface SessionsPage {
  * Busca TODO o histórico de sessões do backend, paginando até esgotar.
  * Antes carregava apenas a 1ª página (máx. 50), perdendo histórico antigo.
  */
-export async function fetchSessions(): Promise<unknown[]> {
+export async function fetchSessions(): Promise<HistoryEntry[]> {
   const LIMIT = 200; // teto aceito pelo backend
   const MAX_PAGES = 100; // trava de segurança contra loop
-  const all: unknown[] = [];
+  const all: HistoryEntry[] = [];
   try {
     let page = 1;
     let totalPages = 1;
     do {
       const resp = (await api.get(`/daily-focus/sessions?page=${page}&limit=${LIMIT}`)) as
         | SessionsPage
-        | unknown[]
+        | HistoryEntry[]
         | null;
 
       if (Array.isArray(resp)) {

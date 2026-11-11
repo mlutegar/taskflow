@@ -8,7 +8,7 @@ import { api } from "../lib/apiClient";
  * Busca todas as preferências do usuário do backend.
  * @returns {{ customModes, weeklyGoal, activities, estadosCustom, paperReminders }}
  */
-export function fetchPreferences(): Promise<unknown> {
+export function fetchPreferences(): Promise<any> {
   return api.get("/preferences");
 }
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, FormEvent, KeyboardEvent, ClipboardEvent } from "react";
+import { useState, useCallback, useMemo, FormEvent, KeyboardEvent, ClipboardEvent } from "react";
 import { useTasks } from "../../../hooks/useTasks";
 import { TaskChecklistItem } from "../../../types/tasks";
 import styles from "./ChecklistInFocus.module.css";
@@ -20,9 +20,8 @@ export function ChecklistInFocus({ taskId, onAllCompleted, compact = false }: Ch
 
   const task = tasks?.find((t) => t.id === taskId);
 
-  if (!task) return null;
-
-  const checklist = task.checklist || [];
+  // Hooks SEMPRE antes de qualquer return antecipado (regra dos hooks).
+  const checklist = useMemo(() => task?.checklist || [], [task]);
   const completed = checklist.filter((item) => item.completed);
   const active = checklist.filter((item) => !item.completed);
   const totalCount = checklist.length;
@@ -132,6 +131,8 @@ export function ChecklistInFocus({ taskId, onAllCompleted, compact = false }: Ch
     },
     [taskId, deleteChecklistMutation]
   );
+
+  if (!task) return null;
 
   if (!hasChecklist && !showAddField) {
     return (

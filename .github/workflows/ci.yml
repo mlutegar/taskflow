@@ -26,11 +26,16 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Type-check informativo (não bloqueia: há erros de tipagem herdados).
+      # Type-check informativo (completo; há erros de tipagem herdados).
       # O gate contra bugs de Hooks (React #310) é a regra rules-of-hooks no lint.
       - name: Type-check (non-blocking)
         run: npm run typecheck
         continue-on-error: true
+
+      # Ratchet: BLOQUEIA se o nº de erros de tipo aumentar (total ou por arquivo)
+      # em relação a frontend/tsc-baseline.json. Ver scripts/tsc-baseline.mjs.
+      - name: Type-check baseline (ratchet)
+        run: npm run typecheck:baseline
 
       - name: Test
         run: npm test -- --run

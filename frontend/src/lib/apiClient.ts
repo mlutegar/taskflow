@@ -209,7 +209,7 @@ function toError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
 }
 
-async function request(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<unknown> {
+async function request(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<any> {
   const isRefreshCall = path === "/auth/refresh";
 
   let res: Response;
@@ -250,10 +250,10 @@ async function request(method: string, path: string, body?: unknown, options: Re
 }
 
 export const api = {
-  get:    (path: string): Promise<unknown>               => request("GET",    path),
-  post:   (path: string, body?: unknown, timeoutOrOptions?: number | RequestOptions): Promise<unknown> =>
+  get:    <T = any>(path: string): Promise<T>                    => request("GET",    path),
+  post:   <T = any>(path: string, body?: unknown, timeoutOrOptions?: number | RequestOptions): Promise<T> =>
     request("POST", path, body, typeof timeoutOrOptions === "number" ? { timeoutMs: timeoutOrOptions } : timeoutOrOptions),
-  patch:  (path: string, body?: unknown, options?: RequestOptions): Promise<unknown> => request("PATCH", path, body, options),
-  put:    (path: string, body?: unknown, options?: RequestOptions): Promise<unknown> => request("PUT", path, body, options),
-  delete: (path: string, options?: RequestOptions): Promise<unknown> => request("DELETE", path, undefined, options),
+  patch:  <T = any>(path: string, body?: unknown, options?: RequestOptions): Promise<T> => request("PATCH", path, body, options),
+  put:    <T = any>(path: string, body?: unknown, options?: RequestOptions): Promise<T> => request("PUT", path, body, options),
+  delete: <T = any>(path: string, options?: RequestOptions): Promise<T> => request("DELETE", path, undefined, options),
 };
