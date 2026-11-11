@@ -400,3 +400,66 @@ model ModeComboLog {
   @@unique([userId, modeIdA, modeIdB, date, hour])
   @@map("mode_combo_logs")
 }
+
+// ─── Saúde: Remédios (prompt 02, Fase A) ─────────────────────────────────────
+// Datas = string "YYYY-MM-DD" (dia civil local, evita o bug UTC vs fuso);
+// horários = string "HH:MM". Dono = userId (sem FK, como Routine).
+
+model Medication {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  name              String
+  dose              String?
+  frequency         String   @default("daily") // daily | weekdays | custom_days | every_n_days
+  daysOfWeek        String   @default("[]") @map("days_of_week") // JSON number[] (0=dom … 6=sáb)
+  intervalDays      Int?     @map("interval_days") // every_n_days (âncora = startDate)
+  startDate         String   @map("start_date")
+  endDate           String?  @map("end_date")
+  stockQty          Float    @default(0) @map("stock_qty")
+  lowStockThreshold Float    @default(5) @map("low_stock_threshold")
+  active            Boolean  @default(true) // false = arquivado (preserva histórico)
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  schedules MedicationSchedule[]
+  intakes   MedicationIntake[]
+
+  @@index([userId])
+  @@map("medications")
+}
+
+model MedicationSchedule {
+  id           String   @id @default(uuid())
+  medicationId String   @map("medication_id")
+  time         String // "HH:MM"
+  doseQty      Float    @default(1) @map("dose_qty") // unidades por dose neste horário
+  active       Boolean  @default(true) // soft delete: nunca apagar (histórico)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  medication Medication         @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  intakes    MedicationIntake[]
+
+  @@index([medicationId])
+  @@map("medication_schedules")
+}
+
+model MedicationIntake {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  medicationId  String    @map("medication_id")
+  scheduleId    String?   @map("schedule_id") // SetNull: o histórico sobrevive a um horário removido
+  date          String // "YYYY-MM-DD"
+  scheduledTime String    @map("scheduled_time") // snapshot "HH:MM" do horário na hora do check
+  status        String // taken | skipped
+  doseQty       Float     @default(1) @map("dose_qty") // snapshot copiado do schedule; é o que o estoque devolve
+  takenAt       DateTime? @map("taken_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  medication Medication          @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  schedule   MedicationSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+
+  @@unique([scheduleId, date])
+  @@index([userId, date])
+  @@index([medicationId, date])
+  @@map("medication_intakes")
+}

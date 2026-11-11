@@ -18,6 +18,7 @@ import projectsRoutes from "./routes/projects.js";
 import uploadsRoutes from "./routes/uploads.js";
 import orbitaRoutes from "./routes/orbita.js";
 import icalRoutes from "./routes/ical.js";
+import saudeMedicationsRoutes from "./routes/saude/medications.js";
 
 const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5175";
@@ -87,6 +88,8 @@ fastify.register(aiRoutes, { prefix: "/ai" });
 fastify.register(uploadsRoutes, { prefix: "/uploads" });
 fastify.register(orbitaRoutes, { prefix: "/orbita" });
 fastify.register(icalRoutes, { prefix: "/ical" });
+// Saúde (dados pessoais — todas as rotas exigem JWT)
+fastify.register(saudeMedicationsRoutes, { prefix: "/saude/medications" });
 
 // Erro global
 fastify.setErrorHandler((error, request, reply) => {

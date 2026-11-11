@@ -11,7 +11,7 @@ interface MobileDrawerProps {
   onClose: () => void;
 }
 
-/** Drawer lateral (mobile) com a lista completa de navegação. */
+/** Sheet "Mais" (mobile): bottom sheet com a grade completa de páginas (nada some da navegação). */
 export default function MobileDrawer({
   currentHash,
   streak,
@@ -35,11 +35,11 @@ export default function MobileDrawer({
         className={`${styles.drawer} ${open ? styles.drawerOpen : ""}`}
         aria-hidden={!open}
         role="dialog"
-        aria-label="Menu de navegação"
+        aria-label="Mais páginas"
       >
         <div className={styles.drawerHeader}>
           <Zap className={styles.drawerLogo} strokeWidth={2.2} aria-hidden="true" />
-          <span className={styles.drawerTitle}>TaskFlow</span>
+          <span className={styles.drawerTitle}>Mais</span>
           <button className={styles.drawerClose} onClick={onClose} aria-label="Fechar menu">
             <X size={18} strokeWidth={2.2} aria-hidden="true" />
           </button>

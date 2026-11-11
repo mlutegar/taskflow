@@ -36,7 +36,7 @@ Scripts:
 ## 3. Arquitetura
 
 ### Backend (`backend/src`)
-`index.js` registra rotas com prefixo: `/auth /tasks /projects /routines /daily-tasks /mode-stats /daily-focus /preferences /session-usage-logs /mode-combo-log /ai /uploads /orbita /ical` + `GET /health`. Arquivos em `routes/*.js`; helpers de domínio em `src/` (`taskRecurrence.js`, `taskVersion.js`, `taskSyncInfrastructure.js`, `taskEstimatedTime.js`, `auth.js`, `prisma.js`).
+`index.js` registra rotas com prefixo: `/auth /tasks /projects /routines /daily-tasks /mode-stats /daily-focus /preferences /session-usage-logs /mode-combo-log /ai /uploads /orbita /ical /saude/medications` + `GET /health`. Arquivos em `routes/*.js`; helpers de domínio em `src/` (`taskRecurrence.js`, `taskVersion.js`, `taskSyncInfrastructure.js`, `taskEstimatedTime.js`, `auth.js`, `prisma.js`).
 Models (Prisma/SQLite): User, Task (+ChecklistItem, TaskCompletion, TaskChange, TaskMutationReceipt), Project, Routine (+RoutineChecklistItem), DailyTask, DailyFocus{Session,Checkin,Emotion,DayState,Achievement,ActiveSession}, UserPreferences, SessionUsageLog, UserModeActivation, ModeStat, ModeLog (legado), ModeComboLog.
 **Atenção:** dono dos models é `userId` (não `createdBy`) — há teste-guard `taskOwnerField.test.js`. Tarefas usam versão otimista (409 em conflito).
 
@@ -120,6 +120,13 @@ O que o repo mostra: `vite.config` usa `base: "/taskflow/"`; `frontend/nginx.con
 ### 7.4 Convenções que evitam erro de tipo
 - `showToast(msg)`, `showToast(msg, "error")`, `showToast(msg, "error", { durationMs })` ou `showToast(msg, { type, duration })`; tipos `info|success|error|warning`, default 3000 ms.
 - `useTasks(filter, sort, …)` exige os 2 primeiros args (`useTasks(undefined, undefined)`) e devolve `{ tasks, … }` (não existe `data`).
+
+### 7.5 Saúde (prompt 02) — em andamento
+- Fase A pronta: `#/saude` + Remédios (ver nota 68). Faltam B (Skincare + compras, incluindo seção "Remédios" com estoque ≤ `lowStockThreshold`), C (Alimentação) e D (Exercícios).
+- Navegação: bottom nav = Tarefas · Hábitos · Foco · **Mais** (bottom sheet com todos os `NAV_ITEMS`; Finanças entra com 1 linha em `navItems.tsx`).
+- API `/saude/*`: JWT obrigatório, camelCase, datas `YYYY-MM-DD`, horas `HH:MM`, zod em tudo. Nunca apagar horários/passos: usar `active=false`; intakes guardam snapshot de hora e dose. Lógica pura em `backend/src/health/` (reusa `recurrenceDays.js`, de onde `routines.js` importa `appliesToday`).
+- **Pendência — Web Push:** os lembretes de remédio são só locais/best-effort (timers + Notification API, só com o app aberto, opt-in). Lembrete confiável com o app fechado exige VAPID + handler `push` no `sw.ts` + agendador no backend.
+- Badge de pendências no item "Mais": adiado.
 
 ## 8. Backlog (funcionalidades que provavelmente ainda NÃO existem)
 Verificado por busca no código em 2026-11-11 (nenhuma ocorrência de "adaptativ*"/"adaptive"):

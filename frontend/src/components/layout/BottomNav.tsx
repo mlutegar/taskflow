@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { MoreHorizontal, X } from "lucide-react";
 import styles from "./Sidebar.module.css";
 import { NAV_ITEMS, MOBILE_PINNED, navigate, tapHaptic } from "./navItems";
 
@@ -12,7 +12,7 @@ interface BottomNavProps {
 
 /**
  * Barra de navegação inferior (mobile).
- * - 3 atalhos fixos + botão Menu (abre drawer).
+ * - 3 atalhos fixos + botão "Mais" (abre o sheet com TODAS as páginas).
  * - Pill deslizante indica o item ativo.
  * - Botão Menu acende quando a rota atual está "dentro" do drawer.
  * - Auto-oculta ao rolar para baixo, revela ao rolar para cima.
@@ -101,7 +101,7 @@ export default function BottomNav({
           tapHaptic();
           onToggleDrawer();
         }}
-        aria-label={drawerOpen ? "Fechar menu" : "Abrir menu"}
+        aria-label={drawerOpen ? "Fechar menu Mais" : "Abrir menu Mais"}
         aria-expanded={drawerOpen}
         aria-current={menuActive && !drawerOpen ? "page" : undefined}
       >
@@ -109,10 +109,10 @@ export default function BottomNav({
           {drawerOpen ? (
             <X className={styles.navSvg} strokeWidth={2.2} aria-hidden="true" />
           ) : (
-            <Menu className={styles.navSvg} strokeWidth={2.2} aria-hidden="true" />
+            <MoreHorizontal className={styles.navSvg} strokeWidth={2.2} aria-hidden="true" />
           )}
         </span>
-        <span className={styles.bottomNavLabel}>Menu</span>
+        <span className={styles.bottomNavLabel}>Mais</span>
       </button>
     </nav>
   );

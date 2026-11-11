@@ -1,28 +1,11 @@
 import prisma from "../prisma.js";
 import { authenticate } from "../auth.js";
+import { appliesToday } from "../recurrenceDays.js";
 
 const TODAY = () => new Date().toISOString().split("T")[0];
 
 function parseJson(val, fallback) {
   try { return JSON.parse(val); } catch { return fallback; }
-}
-
-// Recorrências agendáveis (espelha frontend/src/lib/dailyRoutine.ts).
-const DAILY_RECURRENCES = new Set(["daily", "weekdays"]);
-
-/**
- * true se a rotina/hábito "vale para hoje" segundo sua recorrência.
- * - sem recorrência (null/"none"): sempre vale (comportamento legado).
- * - "daily": todo dia. "weekdays": seg–sex (getDay 1..5, horário local).
- */
-function appliesToday(recurrence, ref = new Date()) {
-  if (!recurrence || recurrence === "none") return true;
-  if (!DAILY_RECURRENCES.has(recurrence)) return true;
-  if (recurrence === "weekdays") {
-    const dow = ref.getDay(); // 0=dom … 6=sáb
-    return dow >= 1 && dow <= 5;
-  }
-  return true;
 }
 
 function shapeRoutine(routine) {

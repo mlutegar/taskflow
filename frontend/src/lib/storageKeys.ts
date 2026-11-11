@@ -24,6 +24,9 @@ export const SK = {
   MINIMIZE_HINT_SEEN:          "minimizeHintSeen",    // dica "dá pra minimizar" já vista
   MODE_FOCUS_TIMER:            "modeFocusTimer",      // acumulador de tempo de foco do modo (sync c/ Daily Focus)
 
+  // Saúde
+  MED_REMINDERS_ENABLED: "medRemindersEnabled", // lembretes locais de remédio (best-effort)
+
   // Modes Panel
   MODES_SORT_BY:        "modesSortBy",
   MODES_CATEGORY:       "modesCategory",

@@ -6,6 +6,7 @@ import {
   Gamepad2,
   BarChart3,
   User,
+  HeartPulse,
 } from "lucide-react";
 
 export interface NavItem {
@@ -19,12 +20,14 @@ export interface NavItem {
   hash: string;
 }
 
-// Todos os itens da navegação (ordem = sidebar desktop + drawer mobile)
+// Todos os itens da navegação (ordem = sidebar desktop + sheet "Mais" do mobile).
+// Nova página (ex.: Finanças) = 1 linha aqui: aparece na sidebar e no sheet "Mais".
 export const NAV_ITEMS: NavItem[] = [
   { Icon: CheckSquare, label: "Tarefas",     hash: "#/tasks" },
   { Icon: Repeat,      label: "Hábitos",     hash: "#/routines" },
   { Icon: Target,      label: "Daily Focus", shortLabel: "Foco", hash: "#/daily-focus" },
   { Icon: Gamepad2,    label: "Modos",       hash: "#/modes" },
+  { Icon: HeartPulse,  label: "Saúde",       hash: "#/saude" },
   { Icon: BarChart3,   label: "Análises",    hash: "#/dashboard" },
   { Icon: User,        label: "Perfil",      hash: "#/profile" },
 ];

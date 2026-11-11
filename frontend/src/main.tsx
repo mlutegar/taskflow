@@ -35,6 +35,7 @@ import LoginPage from "./components/auth/LoginPage.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 import { useRemoteSync } from "./hooks/useRemoteSync.js";
 import { useStreakReminder } from "./hooks/useStreakReminder.js";
+import { useMedicationReminders } from "./hooks/useMedicationReminders";
 import { migrateLegacyKeys } from "./lib/migrateLegacyKeys";
 import { APP_VERSION, formatBuildDate } from "./version.js";
 
@@ -52,6 +53,7 @@ const ModesPage     = lazy(() => import("./pages/ModesPage.jsx"));
 const DailyFocusApp = lazy(() => import("./DailyFocusApp.jsx"));
 const AnalyticsPage = lazy(() => import("./components/analytics/AnalyticsPage.jsx"));
 const ProfilePage   = lazy(() => import("./components/auth/ProfilePage.jsx"));
+const HealthPage    = lazy(() => import("./pages/HealthPage"));
 
 // ── 404 page ─────────────────────────────────────────────────────────────────
 function NotFoundPage(): JSX.Element {
@@ -128,6 +130,7 @@ const KNOWN_ROUTES = new Set<string>([
   "#/dashboard",
   "#/history",
   "#/profile",
+  "#/saude",
 ]);
 // Rota de destino quando a atual é desconhecida. DEVE pertencer a KNOWN_ROUTES.
 const DEFAULT_ROUTE = "#/tasks";
@@ -159,6 +162,8 @@ function Root(): JSX.Element {
   }, [remoteSync.errors, showToast]);
 
   useStreakReminder();
+  // Lembretes locais de remédio (best-effort; só com opt-in + permissão de notificação).
+  useMedicationReminders(!!user);
 
   if (!user) return <LoginPage signIn={signIn} signUp={signUp} />;
 
@@ -186,6 +191,7 @@ function Root(): JSX.Element {
   else if (hash === "#/dashboard")    Page = <AnalyticsPage />;
   else if (hash === "#/history")      Page = <AnalyticsPage />;
   else if (hash === "#/profile")      Page = <ProfilePage onSignOut={signOut} />;
+  else if (hash === "#/saude")        Page = <HealthPage />;
   else Page = <NotFoundPage />;
 
   return (
