@@ -1,6 +1,6 @@
 # CLAUDE.md — TaskFlow
 
-PWA de organização de tarefas (uso principal: celular), em produção em `kflow.mlutegar.com`.
+PWA de organização de tarefas (uso principal: celular), em produção em `taskflow.mlutegar.com/taskflow/` (VPS kvm8; ver §2 e §7.2).
 Abas: **Tarefas / Hábitos (Rotinas) / Modos**; nav inferior mobile: Tarefas · Hábitos · Foco (Daily Focus) · **Mais** (bottom sheet com todas as páginas: Modos, Saúde, Análises, Perfil…).
 Priorização diária (5 tarefas "de Hoje"), pomodoro/foco, Daily Focus, modos de atividade.
 
@@ -32,6 +32,15 @@ Scripts:
 - Frontend builda **dentro** do Docker (multi-stage, Debian — não Alpine, bug do vite-plugin-pwa); `APP_COMMIT` injetado → versão `pkg+hash` visível no app (`src/version.ts`).
 - Backend roda `prisma migrate deploy` no start. CI extra: `.github/workflows/backend-migrations.yml` falha se `schema.prisma` divergir das migrations (`db:drift-check`) → **toda mudança de schema precisa de migration** em `backend/prisma/migrations/<timestamp>_nome/`.
 - `.github/workflows/deploy.yml` (GitHub Pages) é legado.
+- **Produção = VPS `kvm8`** (alias SSH → `2.25.204.56`, host `srv1753241`, `/root/taskflow`, volume `taskflow_data`, deploy via `deploy-git.ps1`). Domínio: `https://taskflow.mlutegar.com/taskflow/` (ver 7.2). **Não é o kvm2** (`179.198.98.180`): a cópia antiga de lá foi removida (7.2b). Sempre confirmar o host (`ssh kvm8 hostname` → `srv1753241`) antes de mexer.
+- **Deploy COM migration (procedimento fixo).** O `docker compose up` recria a API e o `litestream` (que segue rodando de antes) mantém o SQLite aberto → o `prisma migrate deploy` do start falha com `database is locked` e a API entra em loop de restart (aconteceu no P05; a API só ficou pronta após as 15 tentativas porque o litestream foi parado). Passos:
+  1. Backup: copiar `/var/lib/docker/volumes/taskflow_data/_data/taskflow.db` **+ `-wal` + `-shm`** (host não tem `sqlite3`; o banco é WAL) e/ou conferir a réplica (`docker exec taskflow-litestream litestream restore -o /tmp/x.db /data/taskflow.db`).
+  2. `git push` → no VPS: `git pull --ff-only`, `APP_COMMIT` no `.env`, `docker compose build --no-cache`.
+  3. `docker compose stop taskflow-api litestream` → `fuser -v <volume>/taskflow.db*` deve vir vazio.
+  4. `docker compose up -d --no-deps taskflow-api` → acompanhar `docker logs` até "All migrations have been successfully applied" e health `healthy`.
+  5. `docker compose up -d --no-deps taskflow` (nginx) e `docker compose up -d --no-deps litestream` (conferir no log "replicating to" sem erro).
+  6. Smoke: `/health`, rotas novas sem token = 401, bundle novo em `taskflow.mlutegar.com` (versão `pkg+hash`).
+  **Correção definitiva (proposta, NÃO implementada):** (a) no `deploy-git.ps1`, quando houver migration nova, executar os passos 3–5 automaticamente (stop litestream+api → migrate → up); ou (b) separar a migração num serviço one-shot (`docker compose run --rm taskflow-api npx prisma migrate deploy`) executado com o litestream parado, antes do `up -d`; ou (c) `busy_timeout`/`connection_limit=1` + retry no `migrate deploy` do entrypoint (reduz, mas não elimina, o lock com litestream).
 
 ## 3. Arquitetura
 
@@ -110,12 +119,22 @@ Hoje `ModeSession.tsx` resolve `mode.session || mode.id`; sem entrada → **fall
 
 Obs.: vários ids de (A) aparecem em `HELPER_GROUPS` sem ter componente em `HELPER_REGISTRY`, ou seja, são oferecidos como "apoio" no Daily Focus mas `getHelper()` retorna `null`. O teste `modes.coverage.test.ts` não cobre esse caso. Nenhum desses modos tem teste próprio.
 
-### 7.2 `base: "/taskflow/"` × domínio `kflow.mlutegar.com` — **ponto a verificar**
-O que o repo mostra: `vite.config` usa `base: "/taskflow/"`; `frontend/nginx.conf` serve o build em `/taskflow/` (SPA fallback para `/taskflow/index.html`), redireciona `/` → `/taskflow/` (301) e faz proxy de `/api/` → `taskflow-api:3001`; compose expõe nginx em `127.0.0.1:3026` e a API em `127.0.0.1:3033`. Os hostnames públicos entram por **Cloudflare Tunnel**, configurado **fora do repo**: `deploy-vps.sh` cita `mlutegar.com` (túnel "emme") e `deploy-git.ps1`/nota 61 citam `taskflow.mrender.com.br` (túnel "iazan"). **`kflow.mlutegar.com` não aparece em nenhum arquivo do repo** (nem `CORS_ORIGIN` de exemplo, nem deploy). Logo, o mapeamento do domínio (hostname → porta 3026, e se mostra `/taskflow/` ou reescreve) está só na config do túnel/Cloudflare — confirmar lá. Também verificar se `CORS_ORIGIN` no `.env` do servidor inclui esse domínio.
+### 7.2 Domínio de produção e `base: "/taskflow/"` (verificado em 2026-11-11, P05)
+`vite.config` usa `base: "/taskflow/"`; `frontend/nginx.conf` serve o build em `/taskflow/`, redireciona `/` → `/taskflow/` (301) e faz proxy de `/api/` → `taskflow-api:3001` (mesma origem → o browser não depende de CORS). Compose expõe nginx em `127.0.0.1:3026` e a API em `127.0.0.1:3033`; os hostnames entram por **Cloudflare Tunnel com token** (remote-managed, não há ingress em arquivo no servidor → só visível no dashboard da Cloudflare).
+- **Domínio real: `https://taskflow.mlutegar.com/taskflow/`** (DNS Cloudflare; serve o build do kvm8, API em `/api/*`; `/` → 301 `/taskflow/`).
+- **`kflow.mlutegar.com` e `taskflow.mrender.com.br` NÃO existem no DNS** (curl exit 6). Os textos antigos que os citam estão desatualizados.
+- `mlutegar.com/taskflow/` responde 200, mas com um **build antigo e estático (last-modified 2026-08-11)** que não vem do kvm8 nem do kvm2 (nada escuta 3026/3033 no kvm2). Origem não identificada → conferir no dashboard (túnel "emme") e decidir se remove/redireciona; não é a produção.
+- `CORS_ORIGIN` no `.env` do kvm8 = `https://taskflow.mrender.com.br` (host inexistente). Não quebra o app (mesma origem), mas se algum cliente cross-origin for usado a mudança seria `CORS_ORIGIN=https://taskflow.mlutegar.com`. **Não alterado** (pendente de decisão).
+
+### 7.2b Instância antiga do kvm2 — removida (2026-11-11, P05)
+Havia uma cópia antiga do TaskFlow em `179.198.98.180` (kvm2, `srv1858777`, `/root/taskflow` + volume `taskflow_data`, sem containers rodando, schema antigo: 28 migrations, última tarefa 2026-10-11). Comparado com o kvm8: mesmo único usuário, **0 registros só no kvm2** em todas as tabelas, kvm8 mais recente (tarefas 71×55, última 2026-11-09). Removidos **apenas** `/root/taskflow` e o volume `taskflow_data` (`docker ps` idêntico antes/depois, cloudflared intocado). Backup (inclui o `.env` — **sensível**, fora do repo): `C:\Users\mlute\PycharmProjects\backups\taskflow-kvm2-20261111\taskflow_kvm2_20261111.tar.gz` (16.506.800 bytes, sha256 `13b04268…2ba`). Sobraram no kvm2 os `/root/taskflow_*.tar.gz` antigos (não tocados). **Pendente manual:** remover no dashboard Cloudflare (túnel "emme", account `c8cd8731…`, tunnel `bbf16cfd-8ec6-4cda-9723-5781aa3e6057`) qualquer Public Hostname que aponte para `localhost:3026`/`3033` — não é possível listar pelo servidor (túnel por token).
 
 ### 7.3 Bugs conhecidos aguardando decisão (achados pelo `tsc`, prompt 01c)
 - **Exportar tarefas anuais (.ics) está quebrado:** `lib/exportIcal.ts` usa `api.baseURL` (não existe → `undefined/ical/yearly`; o nginx devolve o `index.html` via SPA fallback e o app baixa um "`tarefas-anuais.ics`" com HTML). O correto seria `apiConnection()` de `lib/apiClient.ts` (`{baseUrl, token}`; o token também é lido da chave errada `"token"`). Botão em `TasksPage.tsx`.
 - **"Métricas de Checklist" do celebrate nunca aparece:** em `DailyFocusPage.tsx` o bloco procura `tasks.find(t => t.id === t.supabaseId)`, mas `tasks` são os slots locais (sem `id`), então `checklist_count` é sempre 0 e o bloco retorna `null`. Para funcionar, precisa buscar `checklist_count`/`checklist_completed_count` das tarefas reais (backend já envia). O `checklistMetrics` no histórico foi removido (nunca era lido).
+
+### 7.3b `deploy-git.ps1` quebra no Windows PowerShell 5.1 — pendência (P05, não corrigido)
+Com `$ErrorActionPreference = "Stop"`, o PS 5.1 trata a saída normal do `git push` (que vai para o **stderr**, "To https://github.com/…") como erro e aborta na linha do `git push origin main` — **depois** do push, **antes** de chegar ao VPS. Em PS 7 não ocorre. Contornos: rodar em `pwsh` 7, ou executar a parte remota (`ssh kvm8 …`) à mão. Correção sugerida: envolver o `git push` com `$ErrorActionPreference='Continue'` e checar `$LASTEXITCODE`. O script também é interativo se a árvore estiver suja (commitar antes). Além disso, o `npm test` do frontend sem `-- --run` fica em modo watch e não termina (usar `npm test -- --run`), e builds concorrentes na mesma `frontend/dist` geram `ENOENT … dist\sw.mjs` (rodar uma por vez).
 
 ### 7.4 Convenções que evitam erro de tipo
 - `showToast(msg)`, `showToast(msg, "error")`, `showToast(msg, "error", { durationMs })` ou `showToast(msg, { type, duration })`; tipos `info|success|error|warning`, default 3000 ms.
