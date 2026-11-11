@@ -464,7 +464,7 @@ dailyFocus_askOnChecklistComplete: "true" | "false" (padrão: "true")
 
 ## Melhorias Futuras
 
-Ver `MELHORIAS_CHECKLIST_DAILY_FOCUS.md` para lista completa:
+Ver [[MELHORIAS_CHECKLIST_DAILY_FOCUS]] (anexo, 17 melhorias com código) para a lista completa:
 
 ### **Implementadas Nesta Versão:**
 1. ✅ Toast de Feedback
@@ -504,8 +504,8 @@ Ver `MELHORIAS_CHECKLIST_DAILY_FOCUS.md` para lista completa:
 - `frontend/src/components/daily-focus/components/TaskSlot.tsx` (+12 linhas: progresso)
 
 ### **Documentação:**
-- `CHECKLIST_IMPLEMENTATION.md` (resumo inicial)
-- `MELHORIAS_CHECKLIST_DAILY_FOCUS.md` (17 melhorias sugeridas)
+- ~~`CHECKLIST_IMPLEMENTATION.md`~~ e ~~`IMPLEMENTACAO_COMPLETA_CHECKLIST.md`~~ — conteúdo absorvido nesta nota; removidos da raiz (histórico no git)
+- [[MELHORIAS_CHECKLIST_DAILY_FOCUS]] (17 melhorias sugeridas) — ver [[64-Anexos-Daily-Focus]]
 - `obsidian-generalmast/54-Checklist-no-Daily-Focus.md` (esta nota)
 
 ---

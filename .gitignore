@@ -25,3 +25,6 @@ Thumbs.db
 # Sem isto, worktrees abandonados com .git apontando para caminhos antigos
 # quebram o `git status` com "not a git repository".
 .claude/worktrees/
+
+# Pacotes de deploy gerados (tar/scp)
+*.tar.gz

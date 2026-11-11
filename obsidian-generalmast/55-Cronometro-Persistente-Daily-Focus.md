@@ -78,7 +78,7 @@ Banco de dados: Nenhuma migração necessária
 
 ## Melhorias Sugeridas (Fase 2)
 
-Documento completo: `MELHORIAS_CRONOMETRO_PERSISTENTE.md`
+Documento completo: [[MELHORIAS_CRONOMETRO_PERSISTENTE]] (anexo em [[64-Anexos-Daily-Focus]])
 
 ### Alta Prioridade
 1. **Detecção de relógio alterado** — protege contra mudanças no relógio do sistema
@@ -99,3 +99,33 @@ Documento completo: `MELHORIAS_CRONOMETRO_PERSISTENTE.md`
 12. **Estatísticas de precisão** — página de debug/transparência
 
 ROI: Alta prioridade = alto impacto + baixo esforço ✅
+
+---
+
+## Complementos (migrados de `IMPLEMENTACAO_CRONOMETRO_PERSISTENTE.md` e `TESTE_CRONOMETRO_PERSISTENTE.md`)
+
+Conteúdo que só existia nos documentos da raiz (removidos na limpeza — ver [[64-Anexos-Daily-Focus]]).
+
+### Arquivos
+| Arquivo | Mudança |
+|---|---|
+| `components/daily-focus/components/DailyTimer.tsx` | refatoração completa (~40 linhas) |
+| `components/daily-focus/DailyFocusPage.tsx` | verificação ao retornar (~50 linhas) |
+| `components/daily-focus/components/DailyTimer.test.tsx` | **novo** — 6 cenários unitários (Vitest) |
+| Guia de testes manuais | [[TESTE_CRONOMETRO_PERSISTENTE]] (10 cenários detalhados) |
+
+### Fluxos
+Timer ativo (tick a partir do timestamp âncora) · Pausa (congela e re-ancora) · Retorno de aba inativa (`visibilitychange` recalcula) · Finalização automática (tempo acabou com app fora → conclui ao voltar).
+
+### Compatibilidade
+Chrome/Edge, Firefox, Safari (desktop e iOS), Opera, Brave. `Date.now()` universal; `visibilitychange` moderno (fallback: verificação na montagem); localStorage universal (fallback: sync backend); Service Worker não é requerido.
+
+### Limitações conhecidas
+1. **Sem notificação push** quando o tempo acaba com o app fechado (futuro: Web Push via Service Worker).
+2. **Precisão depende do relógio do dispositivo**: troca manual de fuso/NTP pode causar saltos; o sync com o backend detecta discrepâncias e pausar/retomar recalibra (ver melhoria "detecção de relógio alterado").
+3. Navegadores sem `visibilitychange`: conclusão só verificada ao recarregar (impacto < 1%).
+
+### Debug (console)
+- Ver snapshot: `JSON.parse(localStorage.getItem('taskflow.dailyFocus.live'))` (sessão persistida em `taskflow_sess_daily_focus`).
+- Tempo restante: `liveRemaining(snap)` de `lib/dailyFocusLive`; forçar sync: `flushActiveSessionPush()`.
+- Simular retorno após 5 min: ajustar `snap.anchorTs = Date.now() - 300000`, regravar e `location.reload()`.
