@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Modal from "../shared/Modal";
 import { useToast } from "../shared/Toast";
 import { storageGet, storageSet } from "../../lib/storage";
@@ -19,22 +19,24 @@ interface Props {
   defaultDate: string;
   /** Lançamento real em edição (séries não passam por aqui). */
   editing?: FinanceItem | null;
+  /** Tipo com que o sheet abre (ignorado ao editar). */
+  initialType?: FinanceType;
 }
 
 /**
- * Adição rápida: valor em foco (teclado numérico, estilo caixa), tipo, categoria em chips.
- * "Mais opções" abre data, descrição, forma de pagamento e recorrência.
+ * Adição rápida: tipo (Gasto/Ganho) no topo, valor em foco (teclado numérico), categoria em chips,
+ * data (hoje) e forma de pagamento lembrada. "Mais opções" abre só descrição e recorrência.
  */
-export default function QuickAddSheet({ onClose, defaultDate, editing }: Props): JSX.Element {
+export default function QuickAddSheet({ onClose, defaultDate, editing, initialType = "expense" }: Props): JSX.Element {
   const { showToast } = useToast();
   const { data: categories = [] } = useFinanceCategories();
   const saveEntry = useSaveEntry();
   const createSeries = useCreateSeries();
 
-  const [type, setType] = useState<FinanceType>(editing?.type ?? "expense");
+  const [type, setType] = useState<FinanceType>(editing?.type ?? initialType);
   const [digits, setDigits] = useState(editing ? String(editing.amountCents) : "");
   const [categoryId, setCategoryId] = useState<string | null>(
-    editing ? editing.categoryId : (storageGet<string | null>(`${LAST_CAT_KEY}.expense`, null) ?? null),
+    editing ? editing.categoryId : (storageGet<string | null>(`${LAST_CAT_KEY}.${initialType}`, null) ?? null),
   );
   const [date, setDate] = useState(editing?.date ?? defaultDate);
   const [description, setDescription] = useState(editing?.description ?? "");
@@ -45,6 +47,13 @@ export default function QuickAddSheet({ onClose, defaultDate, editing }: Props):
   const [installments, setInstallments] = useState("3");
   const [more, setMore] = useState(!!editing);
   const [error, setError] = useState("");
+  const amountRef = useRef<HTMLInputElement>(null);
+
+  // O focus trap do Modal foca o 1º botão (o seletor de tipo); devolve o foco ao valor.
+  useEffect(() => {
+    const t = setTimeout(() => amountRef.current?.focus(), 0);
+    return () => clearTimeout(t);
+  }, []);
 
   const cents = centsFromDigits(digits);
   const n = Math.max(2, Math.min(120, Number(installments) || 2));
@@ -81,7 +90,7 @@ export default function QuickAddSheet({ onClose, defaultDate, editing }: Props):
       }
       storageSet(`${LAST_CAT_KEY}.${type}`, categoryId);
       if (payment) storageSet(LAST_PAYMENT_KEY, payment);
-      showToast(type === "expense" ? "Gasto lançado" : "Renda lançada", "success");
+      showToast(type === "expense" ? "Gasto lançado" : "Ganho lançado", "success");
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível salvar.");
@@ -96,7 +105,7 @@ export default function QuickAddSheet({ onClose, defaultDate, editing }: Props):
             Gasto
           </button>
           <button type="button" className={`${styles.segBtn} ${type === "income" ? styles.onIncome : ""}`} onClick={() => changeType("income")}>
-            Renda
+            Ganho
           </button>
         </div>
 
@@ -105,7 +114,7 @@ export default function QuickAddSheet({ onClose, defaultDate, editing }: Props):
           <input
             className={`${styles.input} ${styles.amountInput}`}
             inputMode="numeric"
-            autoFocus
+            ref={amountRef}
             aria-label="Valor"
             value={formatBRL(cents)}
             onChange={(e) => setDigits(e.target.value.replace(/\D/g, ""))}
@@ -128,33 +137,33 @@ export default function QuickAddSheet({ onClose, defaultDate, editing }: Props):
           </div>
         </div>
 
+      <div className={styles.row}>
+        <label className={styles.field}>
+          Data
+          <input className={styles.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        <label className={styles.field}>
+          Forma de pagamento
+          <select
+            className={styles.input}
+            value={payment ?? ""}
+            onChange={(e) => setPayment((e.target.value || null) as PaymentMethod | null)}
+          >
+            <option value="">—</option>
+            {PAYMENT_METHODS.map((p) => (
+              <option key={p} value={p}>{PAYMENT_LABELS[p]}</option>
+            ))}
+          </select>
+        </label>
+      </div>
         {!more && !editing && (
           <button type="button" className={styles.btn} onClick={() => setMore(true)}>
-            Mais opções (data, forma, recorrência)
+            Mais opções (descrição, recorrência)
           </button>
         )}
 
         {more && (
           <>
-            <div className={styles.row}>
-              <label className={styles.field}>
-                Data
-                <input className={styles.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </label>
-              <label className={styles.field}>
-                Forma de pagamento
-                <select
-                  className={styles.input}
-                  value={payment ?? ""}
-                  onChange={(e) => setPayment((e.target.value || null) as PaymentMethod | null)}
-                >
-                  <option value="">—</option>
-                  {PAYMENT_METHODS.map((p) => (
-                    <option key={p} value={p}>{PAYMENT_LABELS[p]}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
             <label className={styles.field}>
               Descrição
               <input className={styles.input} value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" />

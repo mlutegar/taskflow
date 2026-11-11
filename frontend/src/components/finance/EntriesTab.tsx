@@ -37,7 +37,7 @@ export default function EntriesTab({ month }: { month: string }): JSX.Element {
                 <button key={it.id} className={`${styles.item} ${it.skipped ? styles.itemSkipped : ""}`} onClick={() => setSelected(it)}>
                   <span className={styles.emoji}>{cat?.emoji ?? (it.type === "income" ? "💰" : "•")}</span>
                   <span className={styles.grow}>
-                    {it.description || cat?.name || (it.type === "income" ? "Renda" : "Gasto")}
+                    {it.description || cat?.name || (it.type === "income" ? "Ganho" : "Gasto")}
                     {it.kind === "monthly" && <span className={styles.badge}>🔁 mensal</span>}
                     {it.kind === "installment" && <span className={styles.badge}>{it.installmentIndex}/{it.installmentTotal}</span>}
                     {it.skipped && <span className={styles.badge}>pulado</span>}

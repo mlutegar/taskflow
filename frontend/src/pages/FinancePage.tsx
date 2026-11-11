@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, ChevronLeft, ChevronRight, List, Plus, Tags, TrendingUp, Wallet, HandCoins } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, List, Minus, Plus, Tags, TrendingUp, Wallet, HandCoins } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import ErrorBoundary from "../components/ErrorBoundary";
 import MonthTab from "../components/finance/MonthTab";
@@ -8,7 +8,9 @@ import CategoriesTab from "../components/finance/CategoriesTab";
 import IncomesTab from "../components/finance/IncomesTab";
 import ProjectionTab from "../components/finance/ProjectionTab";
 import QuickAddSheet from "../components/finance/QuickAddSheet";
-import { currentMonth, defaultDateFor, monthTitle, shiftMonth } from "../lib/financeFormat";
+import type { FinanceType } from "../api/financas";
+import { currentMonth, monthTitle, shiftMonth } from "../lib/financeFormat";
+import { todayISO } from "../lib/dateUtils";
 import styles from "../components/finance/Finance.module.css";
 
 type SectionId = "month" | "entries" | "incomes" | "projection" | "categories";
@@ -24,7 +26,7 @@ const SECTIONS: { id: SectionId; label: string; Icon: LucideIcon }[] = [
 export default function FinancePage(): JSX.Element {
   const [section, setSection] = useState<SectionId>("month");
   const [month, setMonth] = useState(currentMonth());
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<FinanceType | null>(null);
 
   return (
     <main className={styles.page}>
@@ -56,17 +58,22 @@ export default function FinancePage(): JSX.Element {
       )}
 
       <ErrorBoundary>
-        {section === "month" && <MonthTab month={month} />}
+        {section === "month" && <MonthTab month={month} onAdd={setAdding} />}
         {section === "entries" && <EntriesTab month={month} />}
         {section === "incomes" && <IncomesTab />}
         {section === "projection" && <ProjectionTab />}
         {section === "categories" && <CategoriesTab />}
       </ErrorBoundary>
 
-      <button className={styles.fab} onClick={() => setAdding(true)} aria-label="Novo lançamento">
-        <Plus size={26} aria-hidden="true" />
-      </button>
-      {adding && <QuickAddSheet defaultDate={defaultDateFor(month)} onClose={() => setAdding(false)} />}
+      <div className={styles.addBar}>
+        <button type="button" className={`${styles.addBtn} ${styles.addExpense}`} onClick={() => setAdding("expense")}>
+          <Minus size={20} aria-hidden="true" /> Gasto
+        </button>
+        <button type="button" className={`${styles.addBtn} ${styles.addIncome}`} onClick={() => setAdding("income")}>
+          <Plus size={20} aria-hidden="true" /> Ganho
+        </button>
+      </div>
+      {adding && <QuickAddSheet defaultDate={todayISO()} initialType={adding} onClose={() => setAdding(null)} />}
     </main>
   );
 }

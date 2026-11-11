@@ -76,6 +76,7 @@ Vault de documentação do projeto **generalmast** (app de foco com "modos").
 - [[72-Financas-Fase-A-Lancamentos]] — prompt 03, fase A: página **Finanças** (`#/financas`): lançamentos com adição rápida, recorrência calculada na leitura (fixo mensal/parcelado, passado preservado), categorias editáveis e visão do mês com comparação
 - [[73-Financas-Fase-B-Rendas-e-Projecao]] — prompt 03, fase B (fecha Finanças): fontes de renda, rendas previstas com "Recebi", saldo inicial e projeção 3–6 meses em dois cenários
 - [[74-Deploy-Producao-P05]] — prompt 05: deploy no kvm8 (6 migrations), incidente `database is locked` × litestream, domínio real `taskflow.mlutegar.com`, remoção da cópia antiga do kvm2
+- [[75-Financas-Botoes-Gasto-e-Ganho]] — prompt 06: botões fixos − Gasto / + Ganho em Finanças, sheet já no tipo certo, cards do Mês abrem o sheet
 
 ## Feature recente
 **Fix crítico no Daily Focus**: o erro "As.getTask is not a function" que derrubava a

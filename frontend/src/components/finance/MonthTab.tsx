@@ -2,6 +2,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { formatBRL } from "../../lib/money";
 import { monthTitle } from "../../lib/financeFormat";
 import { useFinanceCategories, useFinanceSummary } from "../../hooks/useFinance";
+import type { FinanceType } from "../../api/financas";
 import styles from "./Finance.module.css";
 
 const PALETTE = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#06b6d4", "#a855f7", "#ec4899", "#84cc16", "#f97316", "#14b8a6"];
@@ -19,7 +20,7 @@ function Delta({ cents, pct, goodWhenDown }: { cents: number; pct: number | null
 }
 
 /** Visão do mês: entradas, saídas, saldo, gastos por categoria (rosca) e comparação com o mês anterior. */
-export default function MonthTab({ month }: { month: string }): JSX.Element {
+export default function MonthTab({ month, onAdd }: { month: string; onAdd?: (type: FinanceType) => void }): JSX.Element {
   const { data, isLoading, isError } = useFinanceSummary(month);
   const { data: categories = [] } = useFinanceCategories(true);
 
@@ -40,16 +41,16 @@ export default function MonthTab({ month }: { month: string }): JSX.Element {
   return (
     <>
       <div className={styles.kpis}>
-        <div className={styles.kpi}>
+        <button type="button" className={`${styles.kpi} ${styles.kpiBtn}`} onClick={() => onAdd?.("income")} aria-label="Adicionar ganho">
           <span className={styles.kpiLabel}>Entradas</span>
           <span className={`${styles.kpiValue} ${styles.pos}`}>{formatBRL(data.incomeCents)}</span>
           <Delta cents={data.delta.incomeCents} pct={data.delta.incomePct} />
-        </div>
-        <div className={styles.kpi}>
+        </button>
+        <button type="button" className={`${styles.kpi} ${styles.kpiBtn}`} onClick={() => onAdd?.("expense")} aria-label="Adicionar gasto">
           <span className={styles.kpiLabel}>Saídas</span>
           <span className={`${styles.kpiValue} ${styles.neg}`}>{formatBRL(data.expenseCents)}</span>
           <Delta cents={data.delta.expenseCents} pct={data.delta.expensePct} goodWhenDown />
-        </div>
+        </button>
         <div className={`${styles.kpi} ${styles.kpiBalance}`}>
           <span className={styles.kpiLabel}>Saldo do mês</span>
           <span className={`${styles.kpiValue} ${data.balanceCents < 0 ? styles.neg : styles.pos}`}>{formatBRL(data.balanceCents)}</span>

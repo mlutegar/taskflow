@@ -206,7 +206,7 @@ function ReceiveSheet({ item, sourceName, onClose }: { item: ExpectedIncome; sou
     if (cents <= 0) return showToast("Informe um valor maior que zero.", "error");
     try {
       await receive.mutateAsync({ id: item.id, data: { amountCents: cents, date, categoryId, description: item.description ?? sourceName ?? null } });
-      showToast("Renda lançada", "success");
+      showToast("Ganho lançado", "success");
       onClose();
     } catch (e) {
       showToast(msg(e), "error");

@@ -40,8 +40,12 @@
 
 .empty { text-align: center; color: var(--text-muted); font-size: 14px; padding: 24px 8px; }
 
-.fab { position: fixed; right: 18px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); cursor: pointer; z-index: 40; }
-@media (min-width: 900px) { .fab { bottom: 28px; } }
+.addBar { position: fixed; left: 0; right: 0; bottom: calc(var(--bottomnav-h, 84px) + env(safe-area-inset-bottom, 0px) - 12px); display: flex; gap: 10px; justify-content: center; padding: 0 14px; z-index: 40; pointer-events: none; }
+.addBtn { pointer-events: auto; flex: 1; max-width: 220px; min-height: 52px; border: none; border-radius: 999px; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+.addExpense { background: var(--danger); color: #fff; }
+.addIncome { background: var(--success); color: #0b1f18; }
+@media (min-width: 900px) { .addBar { bottom: 24px; } }
+.kpiBtn { font: inherit; color: inherit; text-align: left; cursor: pointer; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; }
 .btn:disabled { opacity: 0.5; cursor: default; }
