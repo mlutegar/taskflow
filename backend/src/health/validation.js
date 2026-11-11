@@ -86,3 +86,66 @@ export function zodMessage(err) {
   const i = err.issues?.[0];
   return i ? `${i.path.join(".") || "corpo"}: ${i.message}` : "Dados inválidos";
 }
+
+// ── Skincare ────────────────────────────────────────────────────────────────
+import { PRODUCT_CATEGORIES, PRODUCT_STATUSES } from "./shoppingList.js";
+
+export const productCreate = z.object({
+  name: z.string().trim().min(1).max(120),
+  category: z.enum(PRODUCT_CATEGORIES).default("outro"),
+  status: z.enum(PRODUCT_STATUSES).default("have"),
+  notes: z.string().trim().max(500).nullable().optional(),
+});
+
+export const productUpdate = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  category: z.enum(PRODUCT_CATEGORIES).optional(),
+  status: z.enum(PRODUCT_STATUSES).optional(),
+  notes: z.string().trim().max(500).nullable().optional(),
+});
+
+export const PERIODS = ["morning", "night"];
+
+export const stepCreate = z
+  .object({
+    period: z.enum(PERIODS),
+    productId: z.string().min(1).nullable().optional(),
+    label: z.string().trim().max(120).default(""),
+    frequency: z.enum(FREQUENCIES).default("daily"),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).default([]),
+    intervalDays: z.number().int().min(1).max(365).nullable().optional(),
+    startDate: dateStr.optional(), // âncora do every_n_days (padrão: hoje)
+  })
+  .superRefine((v, ctx) => {
+    if (!v.label && !v.productId) issue(ctx, "label", "Informe um nome ou escolha um produto");
+    if (v.frequency === "custom_days" && v.daysOfWeek.length === 0) issue(ctx, "daysOfWeek", "Escolha ao menos um dia da semana");
+    if (v.frequency === "every_n_days" && !v.intervalDays) issue(ctx, "intervalDays", "Informe o intervalo em dias");
+  });
+
+/** PATCH: tudo opcional; `active=false` = remover (soft delete). */
+export const stepUpdate = z
+  .object({
+    productId: z.string().min(1).nullable().optional(),
+    label: z.string().trim().min(1).max(120).optional(),
+    frequency: z.enum(FREQUENCIES).optional(),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
+    intervalDays: z.number().int().min(1).max(365).nullable().optional(),
+    startDate: dateStr.optional(),
+    active: z.boolean().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.frequency === "custom_days" && v.daysOfWeek && v.daysOfWeek.length === 0) {
+      issue(ctx, "daysOfWeek", "Escolha ao menos um dia da semana");
+    }
+  });
+
+export const stepReorder = z.object({
+  period: z.enum(PERIODS),
+  ids: z.array(z.string().min(1)).max(50),
+});
+
+export const checkInput = z.object({
+  stepId: z.string().min(1),
+  date: dateStr,
+  done: z.boolean(),
+});

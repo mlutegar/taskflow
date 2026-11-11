@@ -105,3 +105,102 @@ export const medicationsApi = {
   history: (from: string, to: string) =>
     api.get<HistoryEntry[]>(`/saude/medications/history?from=${from}&to=${to}`),
 };
+
+// ── Skincare (prefixo /saude/skincare) e lista de compras ─────────────────────
+export type Period = "morning" | "night";
+export type ProductStatus = "have" | "low" | "need_to_buy";
+export type ProductCategory = "protetor" | "hidratante" | "esfoliante" | "limpeza" | "serum" | "outro";
+
+export interface SkincareProduct {
+  id: string;
+  name: string;
+  category: ProductCategory;
+  status: ProductStatus;
+  notes: string | null;
+}
+
+export interface ProductInput {
+  name: string;
+  category: ProductCategory;
+  status: ProductStatus;
+  notes?: string | null;
+}
+
+export interface SkincareStep {
+  id: string;
+  period: Period;
+  order: number;
+  productId: string | null;
+  productName: string | null;
+  productCategory: ProductCategory | null;
+  productStatus: ProductStatus | null;
+  label: string;
+  frequency: MedFrequency;
+  daysOfWeek: number[];
+  intervalDays: number | null;
+  startDate: string;
+  active: boolean;
+}
+
+export interface StepInput {
+  period: Period;
+  productId?: string | null;
+  label: string;
+  frequency: MedFrequency;
+  daysOfWeek: number[];
+  intervalDays?: number | null;
+  startDate?: string;
+}
+
+export interface SkincareTodayItem {
+  stepId: string;
+  label: string;
+  productId: string | null;
+  productName: string | null;
+  productStatus: ProductStatus | null;
+  done: boolean;
+  doneAt: string | null;
+}
+
+export interface SkincareToday {
+  date: string;
+  morning: SkincareTodayItem[];
+  night: SkincareTodayItem[];
+}
+
+export interface ShoppingList {
+  skincare: { id: string; name: string; category: ProductCategory; status: "low" | "need_to_buy" }[];
+  medications: {
+    id: string;
+    name: string;
+    dose: string | null;
+    stockQty: number;
+    lowStockThreshold: number;
+    empty: boolean;
+  }[];
+  total: number;
+}
+
+export const skincareApi = {
+  products: () => api.get<SkincareProduct[]>("/saude/skincare/products"),
+  createProduct: (data: ProductInput) => api.post<SkincareProduct>("/saude/skincare/products", data),
+  updateProduct: (id: string, data: Partial<ProductInput>) =>
+    api.patch<SkincareProduct>(`/saude/skincare/products/${id}`, data),
+  deleteProduct: (id: string) => api.delete<void>(`/saude/skincare/products/${id}`),
+  purchased: (id: string) => api.post<SkincareProduct>(`/saude/skincare/products/${id}/purchased`),
+
+  steps: () => api.get<SkincareStep[]>("/saude/skincare/steps"),
+  createStep: (data: StepInput) => api.post<SkincareStep>("/saude/skincare/steps", data),
+  updateStep: (id: string, data: Partial<Omit<StepInput, "period">> & { active?: boolean }) =>
+    api.patch<SkincareStep>(`/saude/skincare/steps/${id}`, data),
+  reorderSteps: (period: Period, ids: string[]) =>
+    api.put<SkincareStep[]>("/saude/skincare/steps/reorder", { period, ids }),
+
+  today: (date: string) => api.get<SkincareToday>(`/saude/skincare/today?date=${date}`),
+  setCheck: (stepId: string, date: string, done: boolean) =>
+    api.put<{ stepId: string; date: string; done: boolean }>("/saude/skincare/checks", { stepId, date, done }),
+};
+
+export const shoppingApi = {
+  list: () => api.get<ShoppingList>("/saude/shopping-list"),
+};

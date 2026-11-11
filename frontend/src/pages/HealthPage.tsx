@@ -3,6 +3,7 @@ import { Pill, Sparkles, Utensils, Dumbbell, HeartPulse } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import ErrorBoundary from "../components/ErrorBoundary";
 import MedicationsSection from "../components/health/MedicationsSection";
+import SkincareSection from "../components/health/SkincareSection";
 import styles from "../components/health/Health.module.css";
 
 type SectionId = "meds" | "skin" | "food" | "workout";
@@ -17,7 +18,7 @@ interface Section {
 
 const SECTIONS: Section[] = [
   { id: "meds", label: "Remédios", Icon: Pill },
-  { id: "skin", label: "Pele", Icon: Sparkles, phase: "B" },
+  { id: "skin", label: "Pele", Icon: Sparkles },
   { id: "food", label: "Comida", Icon: Utensils, phase: "C" },
   { id: "workout", label: "Treino", Icon: Dumbbell, phase: "D" },
 ];
@@ -53,6 +54,8 @@ export default function HealthPage(): JSX.Element {
       <ErrorBoundary>
         {section === "meds" ? (
           <MedicationsSection />
+        ) : section === "skin" ? (
+          <SkincareSection onGoMedications={() => setSection("meds")} />
         ) : (
           <div className={styles.placeholder}>
             {current.label} chega na fase {current.phase}.

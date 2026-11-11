@@ -40,6 +40,7 @@ function useInvalidateMedications() {
       qc.invalidateQueries({ queryKey: healthKeys.medicationsAll() }),
       qc.invalidateQueries({ queryKey: healthKeys.todayAll() }),
       qc.invalidateQueries({ queryKey: healthKeys.historyAll() }),
+      qc.invalidateQueries({ queryKey: healthKeys.shopping() }),
     ]);
 }
 

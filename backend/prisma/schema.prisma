@@ -463,3 +463,58 @@ model MedicationIntake {
   @@index([medicationId, date])
   @@map("medication_intakes")
 }
+
+// ─── Saúde: Skincare (prompt 02, Fase B) ─────────────────────────────────────
+// Passos nunca são apagados (active=false) para não perder os checks antigos.
+
+model SkincareProduct {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  category  String   @default("outro") // protetor | hidratante | esfoliante | limpeza | serum | outro
+  status    String   @default("have") // have | low | need_to_buy
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  steps SkincareStep[]
+
+  @@index([userId])
+  @@map("skincare_products")
+}
+
+model SkincareStep {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  period       String // morning | night
+  order        Int      @default(0)
+  productId    String?  @map("product_id")
+  label        String
+  frequency    String   @default("daily") // daily | weekdays | custom_days | every_n_days
+  daysOfWeek   String   @default("[]") @map("days_of_week") // JSON number[] (0=dom … 6=sáb)
+  intervalDays Int?     @map("interval_days")
+  startDate    String   @map("start_date") // âncora do every_n_days ("YYYY-MM-DD")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  product SkincareProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  checks  SkincareCheck[]
+
+  @@index([userId, period])
+  @@index([productId])
+  @@map("skincare_steps")
+}
+
+model SkincareCheck {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  stepId    String   @map("step_id")
+  date      String // "YYYY-MM-DD"
+  stepLabel String   @map("step_label") // snapshot p/ o histórico
+  doneAt    DateTime @default(now()) @map("done_at")
+
+  step SkincareStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@unique([stepId, date])
+  @@index([userId, date])
+  @@map("skincare_checks")
+}

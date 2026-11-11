@@ -70,6 +70,7 @@ Vault de documentação do projeto **generalmast** (app de foco com "modos").
 - [[66-Estabilizacao-Testes-Lint-Tsc]] — prompt 01b: 7 testes do `ModePicker` corrigidos (mock sem `usageStatsLive`), lint 8→0 erros (hooks após `return` em `ChecklistInFocus`, bug real), `tsc` 234→136 e ratchet `typecheck:baseline` no CI
 - [[67-Estabilizacao-Tipos-e-Bugs-Achados]] — prompt 01c: checklist do Daily Focus que nunca aparecia (`data` vs `tasks`), Toast com `{type, duration}`/`warning`, campos conferidos no backend, assinaturas `Promise<void>`, `tsc` 136→92; pendentes: export .ics e métricas de checklist do celebrate
 - [[68-Saude-Fase-A-Remedios]] — prompt 02, fase A: página **Saúde** (`#/saude`), bottom sheet "Mais" na nav, Remédios (horários com dose por horário, check tomei/não tomei, estoque com aviso, histórico preservado por soft delete, lembretes locais) e migration aditiva
+- [[69-Saude-Fase-B-Skincare-e-Compras]] — prompt 02, fase B: aba Pele (rotinas Manhã/Noite com passos de frequência própria, soft delete, produtos com status) e lista de compras automática (skincare + seção Remédios com estoque baixo)
 
 ## Feature recente
 **Fix crítico no Daily Focus**: o erro "As.getTask is not a function" que derrubava a
