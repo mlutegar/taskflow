@@ -88,3 +88,40 @@ export const categoryUpdate = z
     active: z.boolean().optional(),
   })
   .refine((o) => Object.keys(o).length > 0, "Nada para atualizar");
+
+// ── Fase B ──
+export const SOURCE_KINDS = ["job", "freelance", "sales", "other"];
+export const EXPECTED_STATUSES = ["confirmed", "probable", "uncertain"];
+
+export const sourceCreate = z.object({ name: z.string().trim().min(1).max(60), kind: z.enum(SOURCE_KINDS) });
+export const sourceUpdate = z
+  .object({ name: z.string().trim().min(1).max(60).optional(), kind: z.enum(SOURCE_KINDS).optional(), active: z.boolean().optional() })
+  .refine((o) => Object.keys(o).length > 0, "Nada para atualizar");
+
+export const expectedCreate = z.object({
+  sourceId: z.string().min(1).nullable().optional(),
+  amountCents: cents,
+  expectedDate: dateStr,
+  status: z.enum(EXPECTED_STATUSES),
+  description: optText(200),
+});
+export const expectedUpdate = expectedCreate.partial().refine((o) => Object.keys(o).length > 0, "Nada para atualizar");
+
+/** "Recebi": tudo opcional (pré-preenchido pela previsão); valor e data editáveis. */
+export const receiveBody = z.object({
+  amountCents: cents.optional(),
+  date: dateStr.optional(),
+  categoryId: category,
+  description: optText(200),
+  paymentMethod: payment,
+});
+
+export const settingsBody = z.object({
+  openingBalanceCents: z.number().int("Valor deve estar em centavos (inteiro)").min(-10_000_000_000).max(10_000_000_000),
+  openingDate: dateStr.nullable().optional(),
+});
+
+export const projectionQuery = z.object({
+  months: z.coerce.number().int().min(3).max(6).default(3),
+  from: monthStr,
+});

@@ -27,6 +27,7 @@ import financeCategoriesRoutes from "./routes/financas/categories.js";
 import financeEntriesRoutes from "./routes/financas/entries.js";
 import financeSeriesRoutes from "./routes/financas/series.js";
 import financeSummaryRoutes from "./routes/financas/summary.js";
+import financeIncomesRoutes from "./routes/financas/incomes.js";
 
 const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5175";
@@ -106,6 +107,7 @@ fastify.register(financeCategoriesRoutes, { prefix: "/financas/categories" });
 fastify.register(financeEntriesRoutes, { prefix: "/financas/entries" });
 fastify.register(financeSeriesRoutes, { prefix: "/financas/series" });
 fastify.register(financeSummaryRoutes, { prefix: "/financas/summary" });
+fastify.register(financeIncomesRoutes, { prefix: "/financas" });
 
 // Erro global
 fastify.setErrorHandler((error, request, reply) => {

@@ -32,6 +32,7 @@ function useInvalidateMoney() {
   return () => {
     qc.invalidateQueries({ queryKey: financeKeys.entriesAll() });
     qc.invalidateQueries({ queryKey: financeKeys.summaryAll() });
+    qc.invalidateQueries({ queryKey: financeKeys.projectionAll() });
   };
 }
 

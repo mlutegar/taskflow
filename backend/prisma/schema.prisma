@@ -647,3 +647,43 @@ model FinanceSeriesException {
   @@index([userId])
   @@map("finance_series_exceptions")
 }
+
+// ─── Finanças (prompt 03, Fase B) ────────────────────────────────────────────
+// Fontes de renda (arquivar, nunca apagar), rendas previstas (confirmada/provável/incerta;
+// "Recebi" cria um FinanceEntry de renda e guarda o vínculo em receivedEntryId, sem FK) e saldo inicial.
+
+model IncomeSource {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  kind      String // "job" | "freelance" | "sales" | "other"
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("income_sources")
+}
+
+model ExpectedIncome {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  sourceId        String?  @map("source_id")
+  amountCents     Int      @map("amount_cents")
+  expectedDate    String   @map("expected_date") // "YYYY-MM-DD"
+  status          String // "confirmed" | "probable" | "uncertain"
+  description     String?
+  receivedEntryId String?  @map("received_entry_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([userId, expectedDate])
+  @@map("expected_incomes")
+}
+
+model FinanceSettings {
+  userId              String   @id @map("user_id")
+  openingBalanceCents Int      @default(0) @map("opening_balance_cents")
+  openingDate         String?  @map("opening_date") // "YYYY-MM-DD"
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("finance_settings")
+}

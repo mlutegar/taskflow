@@ -108,3 +108,77 @@ export const financeApi = {
 
   summary: (month: string) => api.get<MonthSummary>(`/financas/summary?month=${month}`),
 };
+
+// ── Fase B: fontes, rendas previstas, saldo inicial e projeção ──
+export type SourceKind = "job" | "freelance" | "sales" | "other";
+export type ExpectedStatus = "confirmed" | "probable" | "uncertain";
+
+export interface IncomeSource {
+  id: string;
+  name: string;
+  kind: SourceKind;
+  active: boolean;
+}
+export interface ExpectedIncome {
+  id: string;
+  sourceId: string | null;
+  amountCents: number;
+  expectedDate: string;
+  status: ExpectedStatus;
+  description: string | null;
+  receivedEntryId: string | null;
+}
+export interface ExpectedInput {
+  sourceId?: string | null;
+  amountCents: number;
+  expectedDate: string;
+  status: ExpectedStatus;
+  description?: string | null;
+}
+export interface ReceiveInput {
+  amountCents?: number;
+  date?: string;
+  categoryId?: string | null;
+  description?: string | null;
+  paymentMethod?: PaymentMethod | null;
+}
+export interface FinanceSettings {
+  openingBalanceCents: number;
+  openingDate: string | null;
+}
+export interface ProjectionMonth {
+  month: string;
+  incomeCents: number;
+  expenseCents: number;
+  expectedConfirmedCents: number;
+  expectedProbableCents: number;
+  confirmedBalanceCents: number;
+  withProbableBalanceCents: number;
+}
+export interface Projection {
+  from: string;
+  monthsCount: number;
+  openingBalanceCents: number;
+  openingDate: string | null;
+  startingBalanceCents: number;
+  months: ProjectionMonth[];
+  negativeMonths: { confirmed: string[]; withProbable: string[] };
+}
+
+export const incomeApi = {
+  sources: (all = false) => api.get<IncomeSource[]>(`/financas/income-sources${all ? "?all=1" : ""}`),
+  createSource: (d: { name: string; kind: SourceKind }) => api.post<IncomeSource>("/financas/income-sources", d),
+  updateSource: (id: string, d: Partial<Pick<IncomeSource, "name" | "kind" | "active">>) =>
+    api.patch<IncomeSource>(`/financas/income-sources/${id}`, d),
+  archiveSource: (id: string) => api.delete<void>(`/financas/income-sources/${id}`),
+
+  expected: () => api.get<ExpectedIncome[]>("/financas/expected-incomes"),
+  createExpected: (d: ExpectedInput) => api.post<ExpectedIncome>("/financas/expected-incomes", d),
+  updateExpected: (id: string, d: Partial<ExpectedInput>) => api.patch<ExpectedIncome>(`/financas/expected-incomes/${id}`, d),
+  deleteExpected: (id: string) => api.delete<void>(`/financas/expected-incomes/${id}`),
+  receive: (id: string, d: ReceiveInput) => api.post<FinanceItem>(`/financas/expected-incomes/${id}/receive`, d),
+
+  settings: () => api.get<FinanceSettings>("/financas/settings"),
+  saveSettings: (d: FinanceSettings) => api.put<FinanceSettings>("/financas/settings", d),
+  projection: (from: string, months: number) => api.get<Projection>(`/financas/projection?from=${from}&months=${months}`),
+};

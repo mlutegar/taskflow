@@ -42,7 +42,11 @@ export default async function entriesRoutes(fastify) {
   fastify.delete("/:id", async (req, reply) => {
     const own = await prisma.financeEntry.findFirst({ where: { id: req.params.id, userId: req.userId } });
     if (!own) return reply.status(404).send({ error: "Lançamento não encontrado." });
-    await prisma.financeEntry.delete({ where: { id: own.id } });
+    // Se veio de um "Recebi", a previsão volta a ficar pendente.
+    await prisma.$transaction([
+      prisma.expectedIncome.updateMany({ where: { userId: req.userId, receivedEntryId: own.id }, data: { receivedEntryId: null } }),
+      prisma.financeEntry.delete({ where: { id: own.id } }),
+    ]);
     return reply.status(204).send();
   });
 }

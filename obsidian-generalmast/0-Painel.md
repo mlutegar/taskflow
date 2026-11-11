@@ -74,6 +74,7 @@ Vault de documentação do projeto **generalmast** (app de foco com "modos").
 - [[70-Saude-Fase-C-Alimentacao-e-Reposicao]] — prompt 02, fase C: aba Comida (refeições por tipo/horário/descrição e água com +1 copo/desfazer, sem calorias) e reposição rápida de remédio (`POST /saude/medications/:id/restock` + botão "Repor" na lista de compras)
 - [[71-Saude-Fase-D-Exercicios]] — prompt 02, fase D (fecha a página Saúde): aba Treino (treinos, plano semanal, histórico por semana e botão "Fiz" que registra o treino planejado já preenchido)
 - [[72-Financas-Fase-A-Lancamentos]] — prompt 03, fase A: página **Finanças** (`#/financas`): lançamentos com adição rápida, recorrência calculada na leitura (fixo mensal/parcelado, passado preservado), categorias editáveis e visão do mês com comparação
+- [[73-Financas-Fase-B-Rendas-e-Projecao]] — prompt 03, fase B (fecha Finanças): fontes de renda, rendas previstas com "Recebi", saldo inicial e projeção 3–6 meses em dois cenários
 
 ## Feature recente
 **Fix crítico no Daily Focus**: o erro "As.getTask is not a function" que derrubava a

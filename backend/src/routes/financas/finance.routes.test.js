@@ -30,6 +30,7 @@ before(async () => {
   app.register((await import("./entries.js")).default, { prefix: "/financas/entries" });
   app.register((await import("./series.js")).default, { prefix: "/financas/series" });
   app.register((await import("./summary.js")).default, { prefix: "/financas/summary" });
+  app.register((await import("./incomes.js")).default, { prefix: "/financas" });
   await app.ready();
 });
 
@@ -135,4 +136,73 @@ test("summary compara com o mês anterior", async () => {
   assert.equal(s.previous.expenseCents, 10000);
   assert.equal(s.delta.expensePct, 100);
   assert.equal((await inject("GET", `${F}/summary?month=2028-13`, tk)).statusCode, 400);
+});
+
+// ── Fase B ──
+test("fase B: rotas exigem autenticação", async () => {
+  for (const [m, u] of [
+    ["GET", `${F}/income-sources`], ["POST", `${F}/income-sources`], ["PATCH", `${F}/income-sources/x`], ["DELETE", `${F}/income-sources/x`],
+    ["GET", `${F}/expected-incomes`], ["POST", `${F}/expected-incomes`], ["PATCH", `${F}/expected-incomes/x`],
+    ["DELETE", `${F}/expected-incomes/x`], ["POST", `${F}/expected-incomes/x/receive`],
+    ["GET", `${F}/settings`], ["PUT", `${F}/settings`], ["GET", `${F}/projection?from=2026-11`],
+  ]) {
+    assert.equal((await inject(m, u, null, {})).statusCode, 401, `${m} ${u}`);
+  }
+});
+
+test("fase B: fonte arquivada some da lista padrão e continua em all=1", async () => {
+  const tk = tokenA();
+  const s = (await inject("POST", `${F}/income-sources`, tk, { name: "Empresa X", kind: "job" })).json();
+  assert.equal((await inject("DELETE", `${F}/income-sources/${s.id}`, tk)).statusCode, 204);
+  assert.ok(!(await inject("GET", `${F}/income-sources`, tk)).json().some((x) => x.id === s.id));
+  assert.ok((await inject("GET", `${F}/income-sources?all=1`, tk)).json().some((x) => x.id === s.id && !x.active));
+  assert.equal((await inject("POST", `${F}/income-sources`, tk, { name: "x", kind: "bogus" })).statusCode, 400);
+});
+
+test("fase B: Recebi cria lançamento, vincula e não duplica; apagar o lançamento reabre a previsão", async () => {
+  const tk = tokenA();
+  const src = (await inject("POST", `${F}/income-sources`, tk, { name: "Freela Y", kind: "freelance" })).json();
+  const ex = (await inject("POST", `${F}/expected-incomes`, tk, { sourceId: src.id, amountCents: 30000, expectedDate: "2029-03-10", status: "confirmed" })).json();
+  const r = await inject("POST", `${F}/expected-incomes/${ex.id}/receive`, tk, { amountCents: 28000, date: "2029-03-12" });
+  assert.equal(r.statusCode, 201);
+  const entry = r.json();
+  assert.equal(entry.type, "income");
+  assert.equal(entry.amountCents, 28000);
+  assert.equal(entry.description, "Freela Y");
+  assert.equal((await inject("POST", `${F}/expected-incomes/${ex.id}/receive`, tk, {})).statusCode, 409);
+  assert.ok(!(await inject("GET", `${F}/expected-incomes`, tk)).json().some((e) => e.id === ex.id));
+  const all = (await inject("GET", `${F}/expected-incomes?received=1`, tk)).json().find((e) => e.id === ex.id);
+  assert.equal(all.receivedEntryId, entry.id);
+  assert.equal((await inject("GET", `${F}/summary?month=2029-03`, tk)).json().incomeCents, 28000);
+  assert.equal((await inject("DELETE", `${F}/entries/${entry.id}`, tk)).statusCode, 204);
+  assert.ok((await inject("GET", `${F}/expected-incomes`, tk)).json().some((e) => e.id === ex.id));
+});
+
+test("fase B: projeção por API com cenários, recebida fora da previsão e isolamento", async () => {
+  const tk = "x";
+  void tk;
+  const t = jwt.sign({ userId: "user-proj" }, "test-secret");
+  await inject("PUT", `${F}/settings`, t, { openingBalanceCents: 100000, openingDate: "2030-01-01" });
+  assert.deepEqual((await inject("GET", `${F}/settings`, t)).json(), { openingBalanceCents: 100000, openingDate: "2030-01-01" });
+  const s = (await inject("POST", `${F}/series`, t, { type: "expense", kind: "monthly", amountCents: 20000, startDate: "2030-01-05" })).json();
+  await inject("PUT", `${F}/series/${s.id}/exceptions/2030-02`, t, { skipped: true });
+  const conf = (await inject("POST", `${F}/expected-incomes`, t, { amountCents: 50000, expectedDate: "2030-02-10", status: "confirmed" })).json();
+  await inject("POST", `${F}/expected-incomes`, t, { amountCents: 10000, expectedDate: "2030-03-10", status: "probable" });
+  await inject("POST", `${F}/expected-incomes`, t, { amountCents: 777777, expectedDate: "2030-03-11", status: "uncertain" });
+  const get = async () => (await inject("GET", `${F}/projection?from=2030-01&months=3`, t)).json();
+  let p = await get();
+  assert.deepEqual(p.months.map((m) => m.confirmedBalanceCents), [80000, 130000, 110000]);
+  assert.deepEqual(p.months.map((m) => m.withProbableBalanceCents), [80000, 130000, 120000]);
+  // recebi: continua contando uma única vez
+  await inject("POST", `${F}/expected-incomes/${conf.id}/receive`, t, {});
+  p = await get();
+  assert.deepEqual(p.months.map((m) => m.confirmedBalanceCents), [80000, 130000, 110000]);
+  // validação e isolamento
+  assert.equal((await inject("GET", `${F}/projection?from=2030-01&months=7`, t)).statusCode, 400);
+  assert.equal((await inject("GET", `${F}/projection?months=3`, t)).statusCode, 400);
+  const other = (await inject("GET", `${F}/projection?from=2030-01&months=3`, tokenB())).json();
+  assert.deepEqual(other.months.map((m) => m.confirmedBalanceCents), [0, 0, 0]);
+  assert.equal((await inject("POST", `${F}/expected-incomes/${conf.id}/receive`, tokenB(), {})).statusCode, 404);
+  assert.equal((await inject("PATCH", `${F}/expected-incomes/${conf.id}`, tokenB(), { amountCents: 1 })).statusCode, 404);
+  assert.equal((await inject("PUT", `${F}/settings`, t, { openingBalanceCents: 1.5 })).statusCode, 400);
 });
