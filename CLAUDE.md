@@ -1,7 +1,7 @@
 # CLAUDE.md — TaskFlow
 
 PWA de organização de tarefas (uso principal: celular), em produção em `kflow.mlutegar.com`.
-Abas: **Tarefas / Hábitos (Rotinas) / Modos**; nav inferior mobile: Tarefas · Hábitos · Foco (Daily Focus) + drawer (Modos, Análises, Perfil).
+Abas: **Tarefas / Hábitos (Rotinas) / Modos**; nav inferior mobile: Tarefas · Hábitos · Foco (Daily Focus) · **Mais** (bottom sheet com todas as páginas: Modos, Saúde, Análises, Perfil…).
 Priorização diária (5 tarefas "de Hoje"), pomodoro/foco, Daily Focus, modos de atividade.
 
 > Documentação histórica detalhada: vault `obsidian-generalmast/` (começar por `0-Painel.md`; uma nota numerada por feature/fix). **Antes de qualquer tarefa, olhar o Painel; depois de concluir, criar nota nova (N+1) e linkar no Painel.**
@@ -36,12 +36,12 @@ Scripts:
 ## 3. Arquitetura
 
 ### Backend (`backend/src`)
-`index.js` registra rotas com prefixo: `/auth /tasks /projects /routines /daily-tasks /mode-stats /daily-focus /preferences /session-usage-logs /mode-combo-log /ai /uploads /orbita /ical /saude/medications /saude/skincare /saude/shopping-list /saude/nutrition` + `GET /health`. Arquivos em `routes/*.js`; helpers de domínio em `src/` (`taskRecurrence.js`, `taskVersion.js`, `taskSyncInfrastructure.js`, `taskEstimatedTime.js`, `auth.js`, `prisma.js`).
-Models (Prisma/SQLite): User, Task (+ChecklistItem, TaskCompletion, TaskChange, TaskMutationReceipt), Project, Routine (+RoutineChecklistItem), DailyTask, DailyFocus{Session,Checkin,Emotion,DayState,Achievement,ActiveSession}, UserPreferences, SessionUsageLog, UserModeActivation, ModeStat, ModeLog (legado), ModeComboLog.
+`index.js` registra rotas com prefixo: `/auth /tasks /projects /routines /daily-tasks /mode-stats /daily-focus /preferences /session-usage-logs /mode-combo-log /ai /uploads /orbita /ical /saude/medications /saude/skincare /saude/shopping-list /saude/nutrition /saude/workouts` + `GET /health`. Arquivos em `routes/*.js`; helpers de domínio em `src/` (`taskRecurrence.js`, `taskVersion.js`, `taskSyncInfrastructure.js`, `taskEstimatedTime.js`, `auth.js`, `prisma.js`).
+Models (Prisma/SQLite): User, Task (+ChecklistItem, TaskCompletion, TaskChange, TaskMutationReceipt), Project, Routine (+RoutineChecklistItem), DailyTask, DailyFocus{Session,Checkin,Emotion,DayState,Achievement,ActiveSession}, UserPreferences, SessionUsageLog, UserModeActivation, ModeStat, ModeLog (legado), ModeComboLog; **Saúde:** Medication (+MedicationSchedule, MedicationIntake), SkincareProduct/SkincareStep/SkincareCheck, Meal, WaterLog, Workout, WorkoutPlan.
 **Atenção:** dono dos models é `userId` (não `createdBy`) — há teste-guard `taskOwnerField.test.js`. Tarefas usam versão otimista (409 em conflito).
 
 ### Frontend (`frontend/src`)
-- **Roteamento por hash**, sem react-router: `main.tsx` mapeia `#/tasks #/routines #/modes #/daily-focus #/dashboard #/history #/profile`; rota desconhecida → `#/tasks`. Shell: `components/layout/{AppShell,Sidebar,BottomNav,MobileDrawer,navItems}`. `App.tsx` ≈ Tarefas/legado.
+- **Roteamento por hash**, sem react-router: `main.tsx` mapeia `#/tasks #/routines #/modes #/daily-focus #/dashboard #/history #/profile #/saude`; rota desconhecida → `#/tasks`. Shell: `components/layout/{AppShell,Sidebar,BottomNav,MobileDrawer,navItems}`. `App.tsx` ≈ Tarefas/legado.
 - **Providers acima do roteador** (`main.tsx`): `AuthContext`, `ActiveModeContext` (sessão de modo global, minimizável → `FloatingModeCard`), `QuickTaskContext` (captura rápida, atalho N / Ctrl+K), QueryClient, Toast. `DailyFocusFloatingCard` aparece fora de `#/daily-focus`.
 - **Páginas**: `pages/{TasksPage,RoutinesPage,ModesPage,TaskDetailPage}`, `components/daily-focus/DailyFocusPage.tsx` (~125KB, maior arquivo), `components/dashboard`, `history`, `analytics`, `auth` (ProfilePage).
 - **Dados**: TanStack Query (`hooks/useTasks|useRoutines|useProjects|…`, chaves em `lib/taskKeys.ts`; chaves de painéis agregados ficam FORA de `taskKeys.lists()` com invalidação explícita). Clientes HTTP em `api/*.ts` sobre `lib/apiClient.ts` (JWT, timeout, refresh em 401 single-flight, BroadcastChannel entre abas).
@@ -121,13 +121,33 @@ O que o repo mostra: `vite.config` usa `base: "/taskflow/"`; `frontend/nginx.con
 - `showToast(msg)`, `showToast(msg, "error")`, `showToast(msg, "error", { durationMs })` ou `showToast(msg, { type, duration })`; tipos `info|success|error|warning`, default 3000 ms.
 - `useTasks(filter, sort, …)` exige os 2 primeiros args (`useTasks(undefined, undefined)`) e devolve `{ tasks, … }` (não existe `data`).
 
-### 7.5 Saúde (prompt 02) — em andamento
-- Fases A (Remédios, nota 68), B (Skincare + lista de compras com seção "Remédios" de estoque ≤ `lowStockThreshold`, nota 69) e C (Alimentação: refeições + água sem calorias, e reposição rápida `POST /saude/medications/:id/restock`, nota 70) prontas. Falta D (Exercícios).
-- Skincare: passos nunca são apagados (`active=false`), `productId` é SetNull, frequência por passo reaproveita `health/schedule.js`.
-- Navegação: bottom nav = Tarefas · Hábitos · Foco · **Mais** (bottom sheet com todos os `NAV_ITEMS`; Finanças entra com 1 linha em `navItems.tsx`).
-- API `/saude/*`: JWT obrigatório, camelCase, datas `YYYY-MM-DD`, horas `HH:MM`, zod em tudo. Nunca apagar horários/passos: usar `active=false`; intakes guardam snapshot de hora e dose. Lógica pura em `backend/src/health/` (reusa `recurrenceDays.js`, de onde `routines.js` importa `appliesToday`).
-- **Pendência — Web Push:** os lembretes de remédio são só locais/best-effort (timers + Notification API, só com o app aberto, opt-in). Lembrete confiável com o app fechado exige VAPID + handler `push` no `sw.ts` + agendador no backend.
-- Badge de pendências no item "Mais": adiado.
+### 7.5 Saúde (prompt 02 — concluído; notas 68–71)
+Página `#/saude` (`pages/HealthPage.tsx`, `components/health/*`), mobile-first, 4 abas. Acesso: bottom nav **Mais** → sheet com todos os `NAV_ITEMS` (Finanças entra com 1 linha em `navItems.tsx`).
+
+| Aba | O que tem | API (todas JWT + zod) |
+|---|---|---|
+| **Remédios** | Hoje (check tomei/não tomei por horário, estoque com aviso), Remédios (cadastro: dose, horários com `doseQty`, frequência, início/fim, estoque; arquivar/reativar; excluir só com confirmação), Histórico (7/30/90 dias), lembretes locais | `/saude/medications` (`/today`, `/intakes`, `/history`, `/:id/restock`) |
+| **Pele** | Manhã/Noite (check separado, passos com frequência própria, reordenar), Produtos (tenho/acabando/preciso comprar), Compras (produtos + seção Remédios com estoque ≤ limite, "Comprei" e "Repor") | `/saude/skincare` (`/products`, `/steps`, `/today`, `/checks`), `/saude/shopping-list` |
+| **Comida** | Água (+1 copo/desfazer, meta visual de 8), refeições por tipo/horário/descrição, navegação entre dias; sem calorias | `/saude/nutrition` (`/meals`, `/water`) |
+| **Treino** | Hoje (planejados com botão "Fiz" → registro pré-preenchido), Histórico por semana (seg–dom) com resumo, Plano semanal | `/saude/workouts` (`/today`, `/plan`) |
+
+Regras e convenções:
+- Dados pessoais: toda rota exige JWT e filtra por `userId`; camelCase; datas `YYYY-MM-DD` (dia civil local, sem UTC) e horas `HH:MM`, validadas com zod (`backend/src/health/validation.js`, `workoutValidation.js`).
+- **Nunca apagar histórico:** horários, passos e remédios usam `active=false`; intakes guardam snapshot de hora e dose (`scheduledTime`, `doseQty`); `SkincareStep.productId` é `SetNull`; `Workout.planId` é referência sem FK. Excluir remédio de vez só com `?confirm=true`.
+- **Estoque:** "tomei" copia `doseQty` do horário para o intake e baixa; desfazer/"não tomei" devolve o `doseQty` do intake; nunca negativo. `restock` soma com `increment` atômico.
+- Lógica pura e testada em `backend/src/health/` (`schedule.js` frequência, `stock.js`, `shoppingList.js`, `nutrition.js`, `workouts.js`); `recurrenceDays.js` é compartilhado com Hábitos (`appliesToday`). Rotinas/Hábitos **não** foram reaproveitados (progresso agregado ≠ check por horário com estoque).
+- Frontend: `api/saude.ts` e `api/saudeWorkouts.ts` com `api.get<T>()` tipado; hooks `useMedications|useSkincare|useNutrition|useWorkouts`; chaves em `lib/healthKeys.ts` (prefixo `["saude", …]`; a lista de compras `["saude","shopping"]` é invalidada por remédios e skincare). Checks são otimistas com rollback.
+- Migrations só aditivas (4: `20261111000000_saude_medicamentos`, `20261112000000_saude_skincare`, `20261113000000_saude_alimentacao`, `20261114000000_saude_exercicios`); aplicam via `prisma migrate deploy` no start, Litestream replica via WAL.
+
+**Pendências da Saúde (não corrigir sem pedido):**
+- **Web Push:** lembretes de remédio são só locais/best-effort (timers + Notification API, só com o app aberto, opt-in). Confiável com o app fechado exige VAPID + handler `push` no `sw.ts` + agendador no backend. Skincare, água e treinos não têm lembrete.
+- **Badge de pendências no "Mais"** (remédio atrasado, estoque baixo): adiado.
+- **Sem fila offline** na Saúde: sem rede, o check falha (toast) e reverte; o resto das páginas tem fila.
+- **Estoque:** se a baixa foi truncada em 0 (dose maior que o estoque), desfazer devolve a dose cheia; remover um horário depois de marcar "tomei" impede desfazer essa dose pela tela (o histórico fica).
+- **Água:** meta fixa de 8 copos de 250 ml (não configurável); sem metas de refeição/calorias.
+- **Treino:** não há edição da data do treino no formulário (só no dia/linha em que foi criado) nem metas semanais; plano sem lembrete.
+- Dados de Saúde ainda não entram em Análises/backup exportável nem no `useRemoteSync`.
+- Opcional não feito: hábito "Tomar remédios" que marca sozinho quando todas as doses do dia foram tomadas.
 
 ## 8. Backlog (funcionalidades que provavelmente ainda NÃO existem)
 Verificado por busca no código em 2026-11-11 (nenhuma ocorrência de "adaptativ*"/"adaptive"):

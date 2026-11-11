@@ -547,3 +547,34 @@ model WaterLog {
   @@unique([userId, date])
   @@map("water_logs")
 }
+
+// ─── Saúde: Exercícios (prompt 02, Fase D) ───────────────────────────────────
+// Datas "YYYY-MM-DD". `planId` é só uma referência leve (sem FK): apagar o item do plano
+// não apaga o histórico de treinos feitos a partir dele.
+
+model Workout {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  date        String // "YYYY-MM-DD"
+  type        String
+  durationMin Int      @map("duration_min")
+  notes       String?
+  planId      String?  @map("plan_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId, date])
+  @@map("workouts")
+}
+
+model WorkoutPlan {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  weekday     Int // 0=dom … 6=sáb
+  type        String
+  durationMin Int?     @map("duration_min")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId, weekday])
+  @@map("workout_plans")
+}

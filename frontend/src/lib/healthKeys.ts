@@ -16,6 +16,11 @@ export const healthKeys = {
   nutritionAll: () => ["saude", "nutrition"] as const,
   meals: (date: string) => ["saude", "nutrition", "meals", date] as const,
   water: (date: string) => ["saude", "nutrition", "water", date] as const,
+  // Exercícios
+  workoutsAll: () => ["saude", "workouts"] as const,
+  workoutsRange: (from: string, to: string) => ["saude", "workouts", "range", from, to] as const,
+  workoutsToday: (date: string) => ["saude", "workouts", "today", date] as const,
+  workoutPlan: () => ["saude", "workouts", "plan"] as const,
   // Lista de compras (skincare + remédios): depende dos dois, invalidada por ambos
   shopping: () => ["saude", "shopping"] as const,
 };

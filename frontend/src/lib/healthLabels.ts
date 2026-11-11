@@ -9,6 +9,13 @@ export const FREQUENCY_LABELS: Record<MedFrequency, string> = {
   every_n_days: "A cada N dias",
 };
 
+/** Sugestões de tipo de treino (o campo aceita texto livre). */
+export const WORKOUT_TYPES = ["Musculação", "Corrida", "Caminhada", "Ciclismo", "Natação", "Yoga", "Funcional", "Alongamento", "Futebol"];
+
+/** Ordem de exibição dos dias (a semana começa na segunda); valores = getDay (0=dom). */
+export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+export const WEEKDAY_LONG = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {
   protetor: "Protetor solar",
   hidratante: "Hidratante",

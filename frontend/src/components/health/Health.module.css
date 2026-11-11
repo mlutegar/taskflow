@@ -560,3 +560,83 @@
   color: var(--text);
   font-size: 16px;
 }
+
+/* Exercícios */
+.workoutRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.workoutMain {
+  flex: 1;
+  min-width: 0;
+}
+.workoutType {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.workoutNotes {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-top: 2px;
+}
+.plannedRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.plannedDone {
+  border-style: solid;
+  border-color: var(--success);
+  background: rgba(78, 204, 163, 0.08);
+}
+.weekSummary {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.weekSummary strong {
+  color: var(--text);
+  font-size: 18px;
+}
+.dayBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dayHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+.dayToday {
+  color: var(--accent);
+}
+.planHint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.planDay {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

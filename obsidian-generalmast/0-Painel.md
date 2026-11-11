@@ -72,6 +72,7 @@ Vault de documentação do projeto **generalmast** (app de foco com "modos").
 - [[68-Saude-Fase-A-Remedios]] — prompt 02, fase A: página **Saúde** (`#/saude`), bottom sheet "Mais" na nav, Remédios (horários com dose por horário, check tomei/não tomei, estoque com aviso, histórico preservado por soft delete, lembretes locais) e migration aditiva
 - [[69-Saude-Fase-B-Skincare-e-Compras]] — prompt 02, fase B: aba Pele (rotinas Manhã/Noite com passos de frequência própria, soft delete, produtos com status) e lista de compras automática (skincare + seção Remédios com estoque baixo)
 - [[70-Saude-Fase-C-Alimentacao-e-Reposicao]] — prompt 02, fase C: aba Comida (refeições por tipo/horário/descrição e água com +1 copo/desfazer, sem calorias) e reposição rápida de remédio (`POST /saude/medications/:id/restock` + botão "Repor" na lista de compras)
+- [[71-Saude-Fase-D-Exercicios]] — prompt 02, fase D (fecha a página Saúde): aba Treino (treinos, plano semanal, histórico por semana e botão "Fiz" que registra o treino planejado já preenchido)
 
 ## Feature recente
 **Fix crítico no Daily Focus**: o erro "As.getTask is not a function" que derrubava a
