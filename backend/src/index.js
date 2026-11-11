@@ -21,6 +21,7 @@ import icalRoutes from "./routes/ical.js";
 import saudeMedicationsRoutes from "./routes/saude/medications.js";
 import saudeSkincareRoutes from "./routes/saude/skincare.js";
 import saudeShoppingRoutes from "./routes/saude/shopping.js";
+import saudeNutritionRoutes from "./routes/saude/nutrition.js";
 
 const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5175";
@@ -94,6 +95,7 @@ fastify.register(icalRoutes, { prefix: "/ical" });
 fastify.register(saudeMedicationsRoutes, { prefix: "/saude/medications" });
 fastify.register(saudeSkincareRoutes, { prefix: "/saude/skincare" });
 fastify.register(saudeShoppingRoutes, { prefix: "/saude/shopping-list" });
+fastify.register(saudeNutritionRoutes, { prefix: "/saude/nutrition" });
 
 // Erro global
 fastify.setErrorHandler((error, request, reply) => {

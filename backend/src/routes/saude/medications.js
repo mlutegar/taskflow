@@ -16,6 +16,7 @@ import {
   intakeInput,
   dateQuery,
   rangeQuery,
+  restockInput,
   zodMessage,
 } from "../../health/validation.js";
 
@@ -174,6 +175,21 @@ export default async function medicationsRoutes(fastify) {
       return tx.medication.findUnique({ where: { id: med.id }, include: { schedules: true } });
     });
 
+    return shapeMedication(updated, todayServer());
+  });
+
+  // POST /saude/medications/:id/restock { qty }  — soma qty ao estoque (reposição rápida)
+  fastify.post("/:id/restock", async (req, reply) => {
+    const parsed = restockInput.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.status(400).send({ error: zodMessage(parsed.error) });
+    const med = await prisma.medication.findFirst({ where: { id: req.params.id, userId: req.userId } });
+    if (!med) return reply.status(404).send({ error: "Remédio não encontrado." });
+    // increment atômico: duas reposições simultâneas não se sobrescrevem
+    const updated = await prisma.medication.update({
+      where: { id: med.id },
+      data: { stockQty: { increment: parsed.data.qty } },
+      include: { schedules: true },
+    });
     return shapeMedication(updated, todayServer());
   });
 

@@ -7,12 +7,8 @@ import styles from "./Health.module.css";
 
 type Sub = "morning" | "night" | "products" | "shopping";
 
-interface SkincareSectionProps {
-  onGoMedications: () => void;
-}
-
 /** Cuidado de pele: rotinas Manhã/Noite (check separado), Produtos e Compras. */
-export default function SkincareSection({ onGoMedications }: SkincareSectionProps): JSX.Element {
+export default function SkincareSection(): JSX.Element {
   const [sub, setSub] = useState<Sub>("morning");
   const { data: shopping } = useShoppingList();
   const count = shopping?.total ?? 0;
@@ -44,7 +40,7 @@ export default function SkincareSection({ onGoMedications }: SkincareSectionProp
       {sub === "morning" && <RoutinePeriod period="morning" />}
       {sub === "night" && <RoutinePeriod period="night" />}
       {sub === "products" && <ProductList />}
-      {sub === "shopping" && <ShoppingListView onGoMedications={onGoMedications} />}
+      {sub === "shopping" && <ShoppingListView />}
     </>
   );
 }

@@ -457,3 +457,106 @@
   background: var(--accent);
   color: #fff;
 }
+
+/* Alimentação */
+.dayNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dayTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: capitalize;
+}
+.water {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+.waterTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.waterCount {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.glasses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.glass {
+  width: 22px;
+  height: 28px;
+  border-radius: 4px 4px 8px 8px;
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+}
+.glassOn {
+  background: #4aa8e0;
+  border-color: #4aa8e0;
+}
+.waterActions {
+  display: flex;
+  gap: 8px;
+}
+.waterAdd {
+  flex: 1;
+  min-height: 52px;
+  font-size: 16px;
+  background: #4aa8e0;
+  border-color: #4aa8e0;
+  color: #06202f;
+}
+.mealType {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mealRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.mealDesc {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.textarea {
+  min-height: 84px;
+  resize: vertical;
+  font-family: inherit;
+}
+.restock {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.restockInput {
+  width: 72px;
+  min-height: 40px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+}

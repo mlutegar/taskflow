@@ -149,3 +149,30 @@ export const checkInput = z.object({
   date: dateStr,
   done: z.boolean(),
 });
+
+// ── Alimentação e reposição de remédio ─────────────────────────────────────
+import { MEAL_TYPES } from "./nutrition.js";
+
+export const mealCreate = z.object({
+  date: dateStr,
+  type: z.enum(MEAL_TYPES),
+  time: timeStr,
+  description: z.string().trim().min(1).max(500),
+});
+
+export const mealUpdate = z.object({
+  date: dateStr.optional(),
+  type: z.enum(MEAL_TYPES).optional(),
+  time: timeStr.optional(),
+  description: z.string().trim().min(1).max(500).optional(),
+});
+
+/** delta: +1 adiciona um copo, -1 desfaz (qualquer inteiro não nulo de -50 a 50). */
+export const waterAdd = z.object({
+  date: dateStr,
+  delta: z.number().int().min(-50).max(50).refine((n) => n !== 0, "delta não pode ser 0"),
+});
+
+export const restockInput = z.object({
+  qty: z.number().positive("Quantidade deve ser maior que zero").max(100000),
+});

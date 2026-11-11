@@ -12,6 +12,10 @@ export const healthKeys = {
   skincareProducts: () => ["saude", "skincare", "products"] as const,
   skincareSteps: () => ["saude", "skincare", "steps"] as const,
   skincareToday: (date: string) => ["saude", "skincare", "today", date] as const,
+  // Alimentação
+  nutritionAll: () => ["saude", "nutrition"] as const,
+  meals: (date: string) => ["saude", "nutrition", "meals", date] as const,
+  water: (date: string) => ["saude", "nutrition", "water", date] as const,
   // Lista de compras (skincare + remédios): depende dos dois, invalidada por ambos
   shopping: () => ["saude", "shopping"] as const,
 };

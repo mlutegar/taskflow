@@ -90,6 +90,17 @@ export function useArchiveMedication() {
   });
 }
 
+/** Reposição rápida: soma ao estoque (a lista de compras e o dia são invalidados). */
+export function useRestockMedication() {
+  const invalidate = useInvalidateMedications();
+  return useMutation<Medication, Error, { id: string; qty: number }>({
+    mutationFn: ({ id, qty }) => medicationsApi.restock(id, qty),
+    onSuccess: () => {
+      invalidate();
+    },
+  });
+}
+
 export function useDeleteMedication() {
   const invalidate = useInvalidateMedications();
   return useMutation<void, Error, string>({

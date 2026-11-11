@@ -213,3 +213,27 @@ test("lista informa lowStock e daysLeft", async () => {
   assert.equal(found.lowStock, true);
   assert.equal(typeof found.daysLeft, "number");
 });
+
+test("restock: soma ao estoque, exige quantidade > 0, 404 para outro usuário, 401 sem token", async () => {
+  const med = await createMed(tokenA(), { name: "Repor", stockQty: 2 });
+  const url = `/saude/medications/${med.id}/restock`;
+
+  const ok = await inject("POST", url, tokenA(), { qty: 30 });
+  assert.equal(ok.statusCode, 200);
+  assert.equal(ok.json().stockQty, 32);
+  assert.equal(ok.json().lowStock, false);
+
+  const dec = await inject("POST", url, tokenA(), { qty: 0.5 }); // fracionado permitido
+  assert.equal(dec.json().stockQty, 32.5);
+
+  for (const qty of [0, -3, "10", null, undefined]) {
+    assert.equal((await inject("POST", url, tokenA(), { qty })).statusCode, 400, `qty=${qty}`);
+  }
+  assert.equal((await inject("POST", url, tokenA(), {})).statusCode, 400);
+  assert.equal((await inject("POST", url, tokenA(), { qty: 1e9 })).statusCode, 400);
+
+  assert.equal((await inject("POST", url, tokenB(), { qty: 5 })).statusCode, 404);
+  assert.equal((await inject("POST", url, null, { qty: 5 })).statusCode, 401);
+  const db = await prisma.medication.findUnique({ where: { id: med.id } });
+  assert.equal(db.stockQty, 32.5); // nada vazou do usuário B
+});

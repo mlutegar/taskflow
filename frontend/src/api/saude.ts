@@ -97,6 +97,9 @@ export const medicationsApi = {
   /** Exclusão real: apaga também o histórico. Exige confirmação explícita no servidor. */
   remove: (id: string) => api.delete<void>(`/saude/medications/${id}?confirm=true`),
 
+  /** Reposição rápida: soma `qty` (> 0) ao estoque. */
+  restock: (id: string, qty: number) => api.post<Medication>(`/saude/medications/${id}/restock`, { qty }),
+
   today: (date: string) => api.get<TodayResponse>(`/saude/medications/today?date=${date}`),
 
   setIntake: (scheduleId: string, date: string, status: IntakeStatus) =>
@@ -203,4 +206,41 @@ export const skincareApi = {
 
 export const shoppingApi = {
   list: () => api.get<ShoppingList>("/saude/shopping-list"),
+};
+
+// ── Alimentação (prefixo /saude/nutrition) ────────────────────────────────────
+export type MealType = "breakfast" | "lunch" | "snack" | "dinner";
+
+export interface Meal {
+  id: string;
+  date: string;
+  type: MealType;
+  time: string; // HH:MM
+  description: string;
+}
+
+export interface MealInput {
+  date: string;
+  type: MealType;
+  time: string;
+  description: string;
+}
+
+export interface WaterDay {
+  date: string;
+  count: number;
+  glassMl: number;
+  totalMl: number;
+  goalGlasses: number;
+}
+
+export const nutritionApi = {
+  meals: (date: string) => api.get<Meal[]>(`/saude/nutrition/meals?date=${date}`),
+  createMeal: (data: MealInput) => api.post<Meal>("/saude/nutrition/meals", data),
+  updateMeal: (id: string, data: Partial<MealInput>) => api.patch<Meal>(`/saude/nutrition/meals/${id}`, data),
+  deleteMeal: (id: string) => api.delete<void>(`/saude/nutrition/meals/${id}`),
+
+  water: (date: string) => api.get<WaterDay>(`/saude/nutrition/water?date=${date}`),
+  /** +1 adiciona um copo; -1 desfaz (o servidor nunca deixa abaixo de 0). */
+  addWater: (date: string, delta: number) => api.post<WaterDay>("/saude/nutrition/water/add", { date, delta }),
 };
