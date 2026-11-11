@@ -1,77 +1,82 @@
-# TaskFlow — Gerenciador de tarefas com modos de execução gamificados
+# TaskFlow — Tarefas, hábitos e foco com modos de execução
 
-TaskFlow é um app web para gerenciar tarefas e rotinas com **modos de execução
-gamificados** que tornam a produtividade mais divertida. Você organiza suas tarefas,
-acompanha rotinas diárias e executa o trabalho dentro de "modos" com mecânicas
-específicas para diferentes estados de foco.
+TaskFlow é um PWA (pensado para uso no celular) para organizar tarefas e hábitos e
+executar o trabalho dentro de **modos de atividade** com mecânicas próprias para cada
+estado de foco.
 
 ## ✨ Funcionalidades
 
-### Tarefas
-- Criar, editar, concluir, reabrir e excluir (com desfazer)
-- Prioridade (Crítica → Baixa), data de vencimento e recorrência
-- Checklists / subtarefas aninhadas
-- Busca, filtros (todas / ativas / concluídas) e ordenação
-- Painel "Hoje" com o que foi concluído no dia
-
-### Rotinas 📅
-Tarefas diárias que se resetam automaticamente todo dia.
-- Metas quantificáveis com valor alvo (ex: **4.5L de água**) e progresso
-- Conclusão por data e histórico
-- Visualização em **lista** ou **heatmap** de consistência
-
-### 🎮 Modos de execução
-Cada modo guia sua sessão de trabalho com mecânicas próprias:
-
-| Modo | Ideia |
-|---|---|
-| 🎵 **Music Mode** | Encontre a música certa no Spotify e faça a tarefa enquanto ouve |
-| 📱 **TikTok Mode** | Ciclos progressivos: n × 5 vídeos → n tarefas |
-| 🔪 **Splite Mode** | Ciclos progressivos com uma atividade de recompensa personalizável |
-| ⚡ **Momentum Mode** | Quebre a inércia com sessões de 5 minutos |
-| ☕ **Espresso Sprint** | Sprints de 25 min com rastreamento de café |
-| 🎮 **RPG Class Mode** | Produtividade gamificada com classes de personagem e XP |
-| 🦅 **Lazy Falcon Mode** | Ciclos com opção de salvar tarefas para continuar depois |
-| 🫖 **Café Ritual** | Shot de café + a música certa para atingir estado de pico |
-| 📲 **Tab Hop** | Rotação entre apps abertos — feito para transporte |
-| ✨ **Modos personalizados** | Crie seus próprios modos com passos e dicas |
-
-As atividades de recompensa dos modos **Splite** e **Lazy Falcon** são editáveis
-(adicionar/remover) e ficam salvas no navegador.
+- **Tarefas**: prioridade, vencimento (data/hora), recorrência (diária, semanal, anual…),
+  checklists, projetos hierárquicos, tempo estimado, imagens na descrição, filtros e
+  ordenação, captura rápida global (atalho `N` / `Ctrl+K`, com linguagem natural).
+- **Hábitos (Rotinas)**: tarefas recorrentes do dia, metas quantificáveis, heatmap de
+  consistência estilo GitHub, sequência atual/melhor.
+- **Daily Focus**: escolha das 5 prioridades do dia, cronômetro persistente (sobrevive à
+  navegação e sincroniza entre dispositivos), checkpoint emocional, atividade contínua,
+  histórico e conquistas.
+- **Modos**: ~94 modos agrupados por categoria (Música, Ciclos, Foco, Memória, Ritual,
+  Mobile, Personalizados), cada um com descrição, pré-requisito e botão **Iniciar**;
+  sessões minimizáveis em card flutuante, métricas de uso e modos personalizados.
+- **Análises/Perfil**: dashboard, histórico de sessões, revisão semanal.
+- **PWA**: instalável, service worker com banner "Nova versão disponível".
 
 ## 🧱 Stack
 
-- **Frontend:** React + Vite (CSS Modules)
-- **Persistência:** Supabase (Postgres) para tarefas, rotinas e estatísticas de modos
-- **Deploy:** GitHub Pages via GitHub Actions (`.github/workflows/deploy.yml`)
+| Camada | Tecnologias |
+|---|---|
+| Frontend (`frontend/`) | React 18, Vite 5, TypeScript, CSS Modules, TanStack Query, vite-plugin-pwa, Vitest |
+| Backend (`backend/`) | Node 20, Fastify 4, Prisma 5, **SQLite**, JWT, zod |
+| Infra | Docker Compose (API + nginx com os estáticos), **Litestream** (replicação contínua do SQLite), VPS com Cloudflare Tunnel |
+| CI | GitHub Actions: lint, typecheck, testes e build do frontend; checagem de drift das migrations do Prisma |
 
-Estado local (sessões em andamento, modos personalizados, atividades) fica em
-`localStorage`.
+O frontend usa roteamento por hash (`#/tasks`, `#/routines`, `#/modes`, `#/daily-focus`,
+`#/dashboard`, `#/profile`) e fala com a API em `/api` (proxy no Vite em dev e no nginx em
+produção). Estado local fica em `localStorage` (prefixo `taskflow.`), com fila de
+reenvio quando offline.
 
-## 🚀 Como rodar localmente
+## 🚀 Rodando localmente
 
 Pré-requisitos: Node.js 20+.
 
 ```bash
-cd frontend
-npm install
-npm run dev
+npm install                      # raiz (concurrently)
+npm --prefix backend install
+npm --prefix frontend install
+# crie o .env na raiz (JWT_SECRET, DATABASE_URL etc.; não é versionado)
+npm run setup                    # aplica o schema do banco (Prisma)
+npm run dev                      # API em :3001 + Web em :5175
 ```
 
-Crie um arquivo `frontend/.env.local` com as credenciais do seu projeto Supabase:
+Abra `http://localhost:5175/taskflow/` (o `base` do Vite é `/taskflow/`).
 
-```
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
-```
+### Scripts úteis
 
-O schema do banco está em `supabase/`.
+| Onde | Comando | O que faz |
+|---|---|---|
+| raiz | `npm run dev` | sobe API e frontend juntos (libera as portas antes) |
+| `frontend/` | `npm run lint` · `typecheck` · `test` · `build` | qualidade e build |
+| `backend/` | `npm test` | testes (`node --test`) |
+| `backend/` | `npm run db:migrate` · `db:deploy` · `db:drift-check` | migrations Prisma |
 
-### Build de produção
+Toda mudança em `backend/prisma/schema.prisma` precisa de uma migration versionada
+(o CI falha se houver drift).
 
-```bash
-cd frontend
-npm run build
-```
+## 🐳 Produção
 
-O deploy para GitHub Pages é automático a cada push na branch `main`.
+`docker-compose.yml` define três serviços:
+
+- `taskflow-api` — Fastify + Prisma, banco SQLite no volume `taskflow_data`
+  (porta `127.0.0.1:3033`);
+- `taskflow` — nginx servindo o build do frontend (compilado **dentro** do Docker) e
+  fazendo proxy de `/api/` para a API (porta `127.0.0.1:3026`);
+- `litestream` — replica o SQLite continuamente (`litestream.yml`).
+
+Deploy: `./deploy-git.ps1` (push → pull no VPS → rebuild → health check) ou, no modo
+legado, `./deploy-vps.sh`. O acesso público é feito por Cloudflare Tunnel apontando
+para a porta do nginx.
+
+## 📚 Documentação
+
+- `CLAUDE.md` — visão técnica (arquitetura, catálogo de modos, convenções, pendências).
+- `obsidian-generalmast/` — vault com uma nota por feature/fix (comece por `0-Painel.md`).
+- `PROMPTS.md` — sequência de prompts de trabalho e status.
