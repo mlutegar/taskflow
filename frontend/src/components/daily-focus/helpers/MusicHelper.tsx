@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import styles from "../DailyFocus.module.css";
 import { logActivation } from "../../../lib/modeActivations";
+import { openSpotify } from "../../../lib/openSpotify";
+import { MUSIC_VARIANTS, HUNDRED_LIKE_VARIANTS } from "../../../data/musicVariants";
 
 type PlaylistItem = string | { name: string; done: boolean };
 
@@ -22,14 +24,16 @@ export const DEFAULT_STATE: MusicState = { variant: "hundred", count: 0, current
 export default function MusicHelper({ state, onChange }: MusicHelperProps) {
   const s: MusicState = { ...DEFAULT_STATE, ...state };
   const prevCount = useRef<number>(s.count);
+  const isHundredLike = HUNDRED_LIKE_VARIANTS.includes(s.variant);
+  const spotify = MUSIC_VARIANTS.find((m) => m.variant === s.variant)?.spotify;
 
   // Registra ativação quando o contador chega em 100
   useEffect(() => {
-    if (s.variant === "hundred" && s.count === 100 && prevCount.current !== 100) {
-      logActivation("music_hundred");
+    if (isHundredLike && s.count === 100 && prevCount.current !== 100) {
+      logActivation(MUSIC_VARIANTS.find((m) => m.variant === s.variant)?.id ?? "music_hundred");
     }
     prevCount.current = s.count;
-  }, [s.count, s.variant]);
+  }, [s.count, s.variant, isHundredLike]);
 
   const setField = (field: keyof MusicState, val: unknown): void => onChange({ ...s, [field]: val });
 
@@ -48,8 +52,11 @@ export default function MusicHelper({ state, onChange }: MusicHelperProps) {
 
   return (
     <div className={styles.helperPanelBody}>
-      {s.variant === "hundred" && (
+      {isHundredLike && (
         <>
+          {spotify && (
+            <button className={styles.helperSmallBtn} onClick={() => openSpotify(spotify)}>🟢 Abrir Spotify</button>
+          )}
           {s.count === 100 && (
             <div style={{
               background: "linear-gradient(135deg, rgba(124,110,245,0.15), rgba(78,204,163,0.15))",

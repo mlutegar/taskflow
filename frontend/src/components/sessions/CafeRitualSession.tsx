@@ -4,6 +4,8 @@ import SubtaskInline from "./SubtaskInline";
 import SubtaskFlow from "./SubtaskFlow";
 import styles from "./session.module.css";
 import { useSessionPersist } from "../../lib/useSessionPersist";
+import { getCafeVariant } from "../../data/cafeVariants";
+import OpenSpotifyButton from "./OpenSpotifyButton";
 
 interface TaskItem {
   id: string;
@@ -20,12 +22,15 @@ interface CafeRitualSessionProps {
   onAddChecklist?: (taskId: string, text: string) => void;
   onClose: () => void;
   onComplete?: () => void;
+  /** `preset.variant`: "ritual" (padrão) ou "leite". */
+  preset?: { variant?: string };
 }
 
 type Step = "ritual" | "music_hunt" | "register_song" | "select_task" | "working" | "cycle_done" | "summary";
 
-export default function CafeRitualSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete }: CafeRitualSessionProps) {
-  const { saved, persist, clearSaved } = useSessionPersist("caferitual");
+export default function CafeRitualSession({ tasks, onCompleteTask, onToggleChecklist, onAddChecklist, onClose, onComplete, preset }: CafeRitualSessionProps) {
+  const v = getCafeVariant(preset?.variant);
+  const { saved, persist, clearSaved } = useSessionPersist(v.persistKey);
 
   const [step,         setStep]         = useState<Step>(saved?.step         ?? "ritual");
   const [completed,    setCompleted]    = useState<number>(saved?.completed    ?? 0);
@@ -87,9 +92,9 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
     <div className={styles.root}>
       {/* ── Header ── */}
       <div className={styles.header}>
-        <span className={styles.headerEmoji}>🫖</span>
+        <span className={styles.headerEmoji}>{v.emoji}</span>
         <div className={styles.headerMeta}>
-          <span className={styles.headerTitle}>Café Ritual</span>
+          <span className={styles.headerTitle}>{v.title}</span>
           <span className={styles.headerSub}>
             {cycles > 0 ? `Ciclo ${cycles + 1}` : "Ritual inicial"} • ✅ {completed} concluída{completed !== 1 ? "s" : ""}
           </span>
@@ -111,12 +116,12 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
           <>
             <div className={styles.promptBox}>
               <div className={styles.promptTitle}>
-                {cycles === 0 ? "🫖 Prepare seu shot de café" : "🫖 Novo ciclo — prepare outro shot"}
+                {cycles === 0 ? `${v.emoji} Prepare seu ${v.drinkShort === "shot" ? "shot de café" : v.drinkShort}` : `${v.emoji} Novo ciclo — prepare outro ${v.drinkShort}`}
               </div>
               <div className={styles.promptText}>
                 {cycles === 0
-                  ? "Este é o seu ritual de âncora. Prepare um shot de café quente agora. O momento de tomá-lo marca o início da sua sessão de foco."
-                  : "Você completou um ciclo. Para o próximo, prepare outro shot. A consistência do ritual é o que cria o estado de pico."}
+                  ? `Este é o seu ritual de âncora. Prepare ${v.drinkWithArticle} agora. O momento de tomá-lo marca o início da sua sessão de foco.`
+                  : `Você completou um ciclo. Para o próximo, prepare outro ${v.drinkShort}. A consistência do ritual é o que cria o estado de pico.`}
               </div>
             </div>
             {cycles > 0 && (
@@ -126,10 +131,10 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
             )}
             <button
               className={`${styles.btn} ${styles.btnPrimary}`}
-              style={{ background: "#d4960a", borderColor: "#d4960a" }}
+              style={{ background: v.color, borderColor: v.color }}
               onClick={() => setStep("music_hunt")}
             >
-              🫖 Shot tomado — vamos caçar a música!
+              {v.emoji} {v.drinkShort === "shot" ? "Shot tomado" : "Café tomado"} — vamos caçar a música!
             </button>
             <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleClose}>
               Sem café, sem ritual
@@ -140,7 +145,7 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
         {/* ── Etapa 2: Caça à música ── */}
         {step === "music_hunt" && (
           <>
-            <div className={styles.infoPill} style={{ color: "#d4960a", borderColor: "rgba(212,150,10,0.3)" }}>
+            <div className={styles.infoPill} style={{ color: v.color, borderColor: v.border }}>
               ☕ Café tomado — agora a música certa
             </div>
             <div className={styles.promptBox}>
@@ -151,11 +156,12 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
             </div>
             <button
               className={`${styles.btn} ${styles.btnPrimary}`}
-              style={{ background: "#d4960a", borderColor: "#d4960a" }}
+              style={{ background: v.color, borderColor: v.color }}
               onClick={() => setStep("register_song")}
             >
               🎵 Encontrei minha música!
             </button>
+            <OpenSpotifyButton />
             <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("ritual")}>
               ← Voltar ao ritual
             </button>
@@ -165,7 +171,7 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
         {/* ── Etapa 3: Registrar a música ── */}
         {step === "register_song" && (
           <>
-            <div className={styles.infoPill} style={{ color: "#d4960a", borderColor: "rgba(212,150,10,0.3)" }}>
+            <div className={styles.infoPill} style={{ color: v.color, borderColor: v.border }}>
               🎵 Qual é a música que ressoou?
             </div>
             <div className={styles.promptBox}>
@@ -191,7 +197,7 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
               />
               <button
                 className={`${styles.btn} ${styles.btnPrimary}`}
-                style={{ background: "#d4960a", borderColor: "#d4960a" }}
+                style={{ background: v.color, borderColor: v.color }}
                 disabled={!songInput.trim()}
                 onClick={() => {
                   setSongName(songInput.trim());
@@ -214,7 +220,7 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
         {/* ── Etapa 4: Seleção de tarefa ── */}
         {step === "select_task" && (
           <>
-            <div className={styles.infoPill} style={{ color: "#d4960a", borderColor: "rgba(212,150,10,0.3)" }}>
+            <div className={styles.infoPill} style={{ color: v.color, borderColor: v.border }}>
               ☕🎵 Estado de pico ativado — escolha sua tarefa
             </div>
             {songName && songName !== "—" && (
@@ -238,7 +244,7 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
           const live = tasks.find((t) => t.id === selectedTask.id) || selectedTask;
           return (
             <>
-              <div className={styles.infoPill} style={{ color: "#d4960a", borderColor: "rgba(212,150,10,0.3)" }}>
+              <div className={styles.infoPill} style={{ color: v.color, borderColor: v.border }}>
                 {songName && songName !== "—" ? `🎵 ${songName} — foco total!` : "☕ Estado de pico — foco total!"}
               </div>
               <div className={styles.taskDisplay}>
@@ -265,7 +271,7 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
         {/* ── Entre ciclos ── */}
         {step === "cycle_done" && (
           <>
-            <div className={styles.summaryBox} style={{ borderColor: "rgba(212,150,10,0.25)" }}>
+            <div className={styles.summaryBox} style={{ borderColor: v.border }}>
               <span className={styles.summaryEmoji}>✅</span>
               <div className={styles.summaryTitle}>Ciclo {cycles} completo!</div>
               <div className={styles.summaryText}>
@@ -275,15 +281,15 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
             <div className={styles.promptBox}>
               <div className={styles.promptTitle}>Próximo ciclo?</div>
               <div className={styles.promptText}>
-                Cada ciclo começa do zero: novo shot de café, nova música, novo estado de pico. O ritual é o que cria a consistência.
+                Cada ciclo começa do zero: novo {v.drinkShort === "shot" ? "shot de café" : v.drinkShort}, nova música, novo estado de pico. O ritual é o que cria a consistência.
               </div>
             </div>
             <button
               className={`${styles.btn} ${styles.btnPrimary}`}
-              style={{ background: "#d4960a", borderColor: "#d4960a" }}
+              style={{ background: v.color, borderColor: v.color }}
               onClick={() => setStep("ritual")}
             >
-              🫖 Novo ciclo — preparar shot
+              {v.emoji} Novo ciclo — preparar {v.drinkShort}
             </button>
             <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setStep("music_hunt")}>
               🎵 Só nova música (sem café)
@@ -297,8 +303,8 @@ export default function CafeRitualSession({ tasks, onCompleteTask, onToggleCheck
         {/* ── Sumário ── */}
         {step === "summary" && (
           <>
-            <div className={styles.summaryBox} style={{ borderColor: "rgba(212,150,10,0.25)" }}>
-              <span className={styles.summaryEmoji}>🫖</span>
+            <div className={styles.summaryBox} style={{ borderColor: v.border }}>
+              <span className={styles.summaryEmoji}>{v.emoji}</span>
               <div className={styles.summaryTitle}>Sessão encerrada!</div>
               <div className={styles.summaryText}>
                 {cycles} ciclo{cycles !== 1 ? "s" : ""} • {completed} tarefa{completed !== 1 ? "s" : ""} concluída{completed !== 1 ? "s" : ""}

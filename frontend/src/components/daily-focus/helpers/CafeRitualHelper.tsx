@@ -13,9 +13,11 @@ export interface CafeRitualState {
   cycles: number;
   currentSong: string;
   step: Step;
+  /** "ritual" (padrão) ou "leite" — só muda o texto/emoji. */
+  variant?: string;
 }
 
-export const DEFAULT_STATE: CafeRitualState = { cycles: 0, currentSong: "", step: "prepare" };
+export const DEFAULT_STATE: CafeRitualState = { cycles: 0, currentSong: "", step: "prepare", variant: "ritual" };
 
 interface CafeRitualHelperProps {
   state: Partial<CafeRitualState>;
@@ -24,6 +26,8 @@ interface CafeRitualHelperProps {
 
 export default function CafeRitualHelper({ state, onChange }: CafeRitualHelperProps) {
   const s: CafeRitualState = { ...DEFAULT_STATE, ...state };
+  const isLeite = s.variant === "leite";
+  const stepLabels: Record<Step, string> = { ...STEP_LABELS, prepare: isLeite ? "🥛 Preparar café com leite" : STEP_LABELS.prepare };
 
   const advance = (): void => {
     const idx = STEPS.indexOf(s.step);
@@ -37,8 +41,8 @@ export default function CafeRitualHelper({ state, onChange }: CafeRitualHelperPr
   return (
     <div className={styles.helperPanelBody}>
       <div className={styles.cycleDisplay}>
-        <span className={styles.cycleBadge}>☕ Ciclo {s.cycles + 1}</span>
-        <span className={styles.cycleTaskProgress}>{STEP_LABELS[s.step]}</span>
+        <span className={styles.cycleBadge}>{isLeite ? "🥛" : "☕"} Ciclo {s.cycles + 1}</span>
+        <span className={styles.cycleTaskProgress}>{stepLabels[s.step]}</span>
       </div>
 
       {s.step === "hunt" && (
@@ -64,7 +68,7 @@ export default function CafeRitualHelper({ state, onChange }: CafeRitualHelperPr
         style={{ width: "100%" }}
         onClick={advance}
       >
-        {s.step === "prepare" && "✓ Café preparado"}
+        {s.step === "prepare" && (isLeite ? "✓ Café com leite preparado" : "✓ Café preparado")}
         {s.step === "hunt" && "✓ Música encontrada"}
         {s.step === "work" && "✓ Ciclo completo → Próximo"}
       </button>

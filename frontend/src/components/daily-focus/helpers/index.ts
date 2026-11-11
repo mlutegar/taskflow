@@ -55,6 +55,7 @@ export const HELPER_REGISTRY: Record<string, HelperEntry> = {
   espresso: { Component: EspressoHelper, defaultState: espressoDefault },
   rpg: { Component: RPGHelper, defaultState: rpgDefault },
   caferitual: { Component: CafeRitualHelper, defaultState: cafeDefault },
+  cafe_com_leite: { Component: CafeRitualHelper, defaultState: { ...cafeDefault, variant: "leite" } },
   tabhop: { Component: TabHopHelper, defaultState: tabhopDefault },
   // Modos independentes de atividade
   agua: { Component: AguaHelper, defaultState: aguaDefault },

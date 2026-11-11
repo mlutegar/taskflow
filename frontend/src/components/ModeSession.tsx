@@ -51,7 +51,8 @@ export const SESSION_MAP: Record<string, React.ComponentType<any>> = {
   rpg:      RPGSession,
   lazyfal:  LazyFalconSession,
   caferitual: CafeRitualSession,
-  tabhop:   TabHopSession,
+  cafe_com_leite: CafeRitualSession, // preset.variant "leite" (mesmo fluxo, texto/emoji/cor próprios)
+  tabhop:  TabHopSession,
   sing:     SingSession,
   pomodoro: PomodoroSession,
   // Modos de atividade independentes — reutilizam SpliteSession com preset

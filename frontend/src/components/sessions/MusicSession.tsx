@@ -6,7 +6,8 @@ import WorkingTask from "./WorkingTask";
 import styles from "./session.module.css";
 import { useModeSession } from "../../hooks/useModeSession";
 import type { Task } from "../../types/index";
-import { MUSIC_STEP_BY_VARIANT, MUSIC_HEADER_BY_VARIANT } from "../../data/musicVariants";
+import { MUSIC_STEP_BY_VARIANT, MUSIC_HEADER_BY_VARIANT, MUSIC_VARIANTS } from "../../data/musicVariants";
+import OpenSpotifyButton from "./OpenSpotifyButton";
 
 const PLAYLIST_SIZE = 10;
 const DEFAULT_VARIANT = "hundred";
@@ -26,6 +27,8 @@ export default function MusicSession({ tasks, preset, onCompleteTask, onToggleCh
   // envia sua variante; sem preset válido, cai no fluxo padrão (100 Músicas).
   const variant = (preset?.variant && MUSIC_STEP_BY_VARIANT[preset.variant]) ? preset.variant : DEFAULT_VARIANT;
   const header = MUSIC_HEADER_BY_VARIANT[variant];
+  const variantMeta = MUSIC_VARIANTS.find((m) => m.variant === variant);
+  const find = variantMeta?.find;
 
   const {
     persist, clearSaved, saved,
@@ -109,13 +112,14 @@ export default function MusicSession({ tasks, preset, onCompleteTask, onToggleCh
         {/* ── Modo 1: 100 Músicas ── */}
         {step === "hundred_finding" && (
           <>
-            <div className={styles.infoPill}>🎧 Modo: 100 Músicas — música {completed + 1}</div>
+            <div className={styles.infoPill}>{find ? find.pill : "🎧 Modo: 100 Músicas"} — música {completed + 1}</div>
             <div className={styles.promptBox}>
-              <div className={styles.promptTitle}>🎧 Encontre sua música</div>
-              <div className={styles.promptText}>Abra o Spotify e passe por ~100 músicas. Quando encontrar UMA que realmente ressoa, volte aqui.</div>
+              <div className={styles.promptTitle}>{find ? find.title : "🎧 Encontre sua música"}</div>
+              <div className={styles.promptText}>{find ? find.text : "Abra o Spotify e passe por ~100 músicas. Quando encontrar UMA que realmente ressoa, volte aqui."}</div>
             </div>
+            {variantMeta?.spotify && <OpenSpotifyButton target={variantMeta.spotify} />}
             <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => available.length === 0 ? setStep("summary") : setStep("hundred_select")}>
-              🎵 Encontrei minha música!
+              {find ? find.button : "🎵 Encontrei minha música!"}
             </button>
             <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setStep("summary")}>Encerrar sessão</button>
           </>

@@ -66,6 +66,7 @@ Vault de documentação do projeto **generalmast** (app de foco com "modos").
 - [[62-Fix-Erro-getTask-Daily-Focus]] — **fix crítico**: erro "As.getTask is not a function" no Daily Focus ao selecionar tarefa existente nos slots de preparação. Causa: `TaskSlot.tsx` chamava `tasksApi.getTask()` (método inexistente); o correto é `tasksApi.get()`. Correção de uma linha, solução imediata.
 - [[63-Exploracao-e-CLAUDE-md]] — mapeamento do repositório (stack, arquitetura, catálogo de 94 modos e onde rodam) consolidado no `CLAUDE.md` da raiz; criação do `PROMPTS.md`
 - [[64-Anexos-Daily-Focus]] — docs antigos de checklist/cronômetro/sync movidos da raiz do repo para o vault; lacunas fundidas nas notas 54 e 55
+- [[65-Novos-Modos-Cafe-com-Leite-Curtidas-DJ]] — 3 modos novos (`cafe_com_leite`, `music_liked`, `music_dj`) com sessão própria no `SESSION_MAP` (reuso de `CafeRitualSession`/`MusicSession` via preset), helpers no Daily Focus e botão "Abrir Spotify"
 
 ## Feature recente
 **Fix crítico no Daily Focus**: o erro "As.getTask is not a function" que derrubava a
